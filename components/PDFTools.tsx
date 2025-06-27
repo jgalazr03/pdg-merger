@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import PDFMerger from './PDFMerger';
 import PDFSplitter from './PDFSplitter';
+import Image from 'next/image';
 
 type Tool = 'merge' | 'split';
 
@@ -16,9 +17,20 @@ export default function PDFTools() {
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
       <div className="container mx-auto px-4 py-8 max-w-4xl">
         <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 mb-4">
-            Herramientas PDF
-          </h1>
+          <div className="flex items-center justify-center gap-4 mb-6">
+            <div className="w-12 h-12 flex-shrink-0">
+              <Image
+                src="/isotipo-gainco.svg"
+                alt="Logo de la empresa"
+                width={40}
+                height={40}
+                className="object-contain"
+              />
+            </div>
+            <h1 className="text-3xl font-bold text-gray-900">
+              Herramientas PDF
+            </h1>
+          </div>
           <p className="text-lg text-gray-600">
             Une o divide archivos PDF de forma rápida y segura
           </p>
