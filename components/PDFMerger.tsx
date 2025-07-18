@@ -243,7 +243,7 @@ export default function PDFMerger() {
               }
             </p>
             {!isDragOver && (
-              <Button>
+              <Button className="bg-blue-600 hover:bg-blue-700 text-white">
                 <Upload className="w-4 h-4 mr-2" />
                 Seleccionar archivos
               </Button>
