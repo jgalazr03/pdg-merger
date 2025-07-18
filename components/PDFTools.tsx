@@ -38,14 +38,7 @@ export default function PDFTools() {
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
       <div className="container mx-auto px-4 py-8 max-w-4xl">
         <div className="text-center mb-8">
-          <div className="flex items-center justify-center gap-4 mb-6">
-            <div className="w-12 h-12 flex-shrink-0">
-              <img 
-                src="/logo.svg" 
-                alt="Logo de la empresa" 
-                className="w-full h-full object-contain"
-              />
-            </div>
+          <div className="text-center mb-6">
             <h1 className="text-3xl font-bold text-gray-900">
               Herramientas PDF
             </h1>
