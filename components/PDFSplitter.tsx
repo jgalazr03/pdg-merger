@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { PDFDocument } from 'pdf-lib';
 import { Upload, FileText, Download, Loader2, X, Scissors, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -25,6 +25,19 @@ export default function PDFSplitter() {
   const [rangeError, setRangeError] = useState<string>('');
   const [isDragOver, setIsDragOver] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const fileInfoRef = useRef<HTMLDivElement>(null);
+
+  // Auto-scroll when file is selected
+  useEffect(() => {
+    if (selectedFile && fileInfoRef.current) {
+      setTimeout(() => {
+        fileInfoRef.current?.scrollIntoView({ 
+          behavior: 'smooth', 
+          block: 'start' 
+        });
+      }, 100);
+    }
+  }, [selectedFile]);
 
   const formatFileSize = (bytes: number): string => {
     if (bytes < 1024) return `${bytes} B`;
@@ -302,7 +315,7 @@ export default function PDFSplitter() {
       </Card>
 
       {selectedFile && (
-        <Card className="mb-8">
+        <Card className="mb-8" ref={fileInfoRef}>
           <CardContent className="p-6">
             <div className="flex justify-between items-center mb-6">
               <h3 className="text-lg font-semibold text-gray-900">

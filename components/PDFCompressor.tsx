@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import Image from 'next/image';
 import { PDFDocument } from 'pdf-lib';
 import * as pdfjsLib from 'pdfjs-dist';
@@ -64,6 +64,19 @@ export default function PDFCompressor() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [isDragOver, setIsDragOver] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const filesListRef = useRef<HTMLDivElement>(null);
+
+  // Auto-scroll when files are added
+  useEffect(() => {
+    if (files.length > 0 && filesListRef.current) {
+      setTimeout(() => {
+        filesListRef.current?.scrollIntoView({ 
+          behavior: 'smooth', 
+          block: 'start' 
+        });
+      }, 100);
+    }
+  }, [files.length]);
 
   const formatFileSize = (bytes: number): string => {
     if (bytes < 1024) return `${bytes} B`;
@@ -539,7 +552,7 @@ export default function PDFCompressor() {
       </Card>
 
       {files.length > 0 && (
-        <Card className="mb-8">
+        <Card className="mb-8" ref={filesListRef}>
           <CardContent className="p-6">
             <div className="flex justify-between items-center mb-6">
               <h3 className="text-lg font-semibold text-gray-900">
