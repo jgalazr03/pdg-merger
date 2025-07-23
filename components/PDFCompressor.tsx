@@ -1,10 +1,12 @@
 'use client';
 
 import { useState, useRef } from 'react';
+import Image from 'next/image';
 import { PDFDocument } from 'pdf-lib';
 import * as pdfjsLib from 'pdfjs-dist';
 import JSZip from 'jszip';
-import { Upload, FileText, Download, Loader2, X, Compass as Compress, AlertCircle, Eye } from 'lucide-react';
+import ExcelJS from 'exceljs';
+import { Upload, FileText, Download, Loader2, X, Compass as Compress, AlertCircle, Eye, FileSpreadsheet } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
@@ -19,7 +21,7 @@ if (typeof window !== 'undefined') {
   pdfjsLib.GlobalWorkerOptions.workerSrc = '/pdf.worker.min.js';
 }
 
-interface PDFFile {
+interface ProcessableFile {
   id: string;
   file: File;
   name: string;
@@ -29,6 +31,7 @@ interface PDFFile {
   preview?: string;
   isProcessing: boolean;
   error?: string;
+  type: 'pdf' | 'excel';
 }
 
 type CompressionLevel = 'low' | 'medium' | 'high';
@@ -39,8 +42,24 @@ const compressionSettings = {
   high: { scale: 0.6, quality: 0.5, description: 'Menor calidad, mayor reducción' }
 };
 
+/**
+ * PDFCompressor Component - Now supports PDF and Excel file compression
+ * 
+ * Features:
+ * - PDF compression: Full document compression with configurable quality
+ * - Excel compression: Embedded images compression without affecting data
+ * - Drag & drop interface
+ * - Multiple compression levels (low, medium, high)
+ * - Batch processing
+ * - ZIP download for multiple files
+ * - Client-side processing (no server uploads)
+ * 
+ * Supported formats:
+ * - PDF (.pdf)
+ * - Excel (.xlsx, .xls)
+ */
 export default function PDFCompressor() {
-  const [files, setFiles] = useState<PDFFile[]>([]);
+  const [files, setFiles] = useState<ProcessableFile[]>([]);
   const [compressionLevel, setCompressionLevel] = useState<CompressionLevel>('medium');
   const [isProcessing, setIsProcessing] = useState(false);
   const [isDragOver, setIsDragOver] = useState(false);
@@ -62,9 +81,15 @@ export default function PDFCompressor() {
     let totalSize = files.reduce((sum, file) => sum + file.originalSize, 0);
 
     for (const file of Array.from(selectedFiles)) {
-      // Validate PDF type
-      if (file.type !== 'application/pdf') {
-        alert(`"${file.name}" no es un archivo PDF válido.`);
+      // Validate file type (PDF or Excel)
+      const isPDF = file.type === 'application/pdf';
+      const isExcel = file.type === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' || 
+                     file.type === 'application/vnd.ms-excel' ||
+                     file.name.toLowerCase().endsWith('.xlsx') ||
+                     file.name.toLowerCase().endsWith('.xls');
+      
+      if (!isPDF && !isExcel) {
+        alert(`"${file.name}" no es un archivo PDF o Excel válido.`);
         continue;
       }
 
@@ -115,16 +140,20 @@ export default function PDFCompressor() {
   const handleFileSelect = async (selectedFiles: FileList) => {
     const validFiles = validateFiles(selectedFiles);
     
-    const newFiles: PDFFile[] = await Promise.all(
+    const newFiles: ProcessableFile[] = await Promise.all(
       validFiles.map(async (file) => {
-        const preview = await generatePreview(file);
+        const fileType = file.type === 'application/pdf' ? 'pdf' : 'excel';
+        const preview = fileType === 'pdf' ? await generatePreview(file) : undefined;
+        const fileName = file.name.replace(/\.(pdf|xlsx|xls)$/i, '');
+        
         return {
           id: Math.random().toString(36).substring(2, 15),
           file,
-          name: file.name.replace('.pdf', ''),
+          name: fileName,
           originalSize: file.size,
           preview,
           isProcessing: false,
+          type: fileType,
         };
       })
     );
@@ -168,7 +197,7 @@ export default function PDFCompressor() {
     }
   };
 
-  const compressPDF = async (pdfFile: PDFFile): Promise<Blob> => {
+  const compressPDF = async (pdfFile: ProcessableFile): Promise<Blob> => {
     const { scale, quality } = compressionSettings[compressionLevel];
     
     // Load PDF with PDF.js
@@ -213,6 +242,116 @@ export default function PDFCompressor() {
     return new Blob([pdfBytes], { type: 'application/pdf' });
   };
 
+  /**
+   * Compresses Excel files by reducing the size of embedded images
+   * without affecting spreadsheet data, formulas, or formatting
+   * 
+   * Process:
+   * 1. Load Excel file using ExcelJS
+   * 2. Iterate through all worksheets
+   * 3. Extract embedded images from each worksheet
+   * 4. Compress images using Canvas API with specified quality/scale
+   * 5. Replace original images with compressed versions
+   * 6. Generate new Excel file with reduced size
+   * 
+   * @param excelFile - The ProcessableFile containing the Excel file
+   * @returns Promise<Blob> - Compressed Excel file as Blob
+   */
+  const compressExcel = async (excelFile: ProcessableFile): Promise<Blob> => {
+    const { quality } = compressionSettings[compressionLevel];
+    
+    try {
+      // Load the Excel file
+      const arrayBuffer = await excelFile.file.arrayBuffer();
+      const workbook = new ExcelJS.Workbook();
+      await workbook.xlsx.load(arrayBuffer);
+
+      // Process all images in the workbook
+      for (const worksheet of workbook.worksheets) {
+        // Get all images in this worksheet
+        const images = worksheet.getImages();
+        
+        for (const image of images) {
+          const imageModel = workbook.model.media.find(m => m.name === image.imageId);
+          if (imageModel && imageModel.buffer) {
+            try {
+              // Compress the image using canvas
+              const compressedBuffer = await compressImageBuffer(new Uint8Array(imageModel.buffer), quality);
+              
+              // Update the image in the workbook
+              const mediaIndex = workbook.model.media.findIndex(m => m.name === image.imageId);
+              if (mediaIndex !== -1) {
+                // Convert Uint8Array to the Buffer type expected by ExcelJS
+                const nodeBuffer = Buffer.from ? Buffer.from(compressedBuffer) : new (Buffer as any)(compressedBuffer);
+                (workbook.model.media[mediaIndex] as any).buffer = nodeBuffer;
+              }
+            } catch (error) {
+              console.warn(`Failed to compress image ${image.imageId}:`, error);
+            }
+          }
+        }
+      }
+
+      // Save the modified workbook
+      const buffer = await workbook.xlsx.writeBuffer();
+      return new Blob([buffer], { 
+        type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' 
+      });
+    } catch (error) {
+      console.error('Error compressing Excel file:', error);
+      throw new Error('Error al comprimir el archivo Excel');
+    }
+  };
+
+  /**
+   * Compresses image buffer using Canvas API
+   * Reduces both quality and dimensions based on compression settings
+   * 
+   * @param imageBuffer - Original image as Uint8Array
+   * @param quality - JPEG quality (0-1)
+   * @returns Promise<Uint8Array> - Compressed image buffer
+   */
+  const compressImageBuffer = async (imageBuffer: Uint8Array, quality: number): Promise<Uint8Array> => {
+    return new Promise((resolve, reject) => {
+      try {
+        // Create an image element
+        const img = document.createElement('img');
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d')!;
+        
+        img.onload = () => {
+          // Calculate new dimensions (reduce by scale factor)
+          const scale = compressionSettings[compressionLevel].scale;
+          canvas.width = img.width * scale;
+          canvas.height = img.height * scale;
+          
+          // Draw and compress
+          ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+          
+          // Convert to blob
+          canvas.toBlob((blob) => {
+            if (blob) {
+              blob.arrayBuffer().then(arrayBuffer => {
+                resolve(new Uint8Array(arrayBuffer));
+              });
+            } else {
+              reject(new Error('Failed to create blob'));
+            }
+          }, 'image/jpeg', quality);
+        };
+        
+        img.onerror = () => reject(new Error('Failed to load image'));
+        
+        // Convert buffer to data URL
+        const blob = new Blob([imageBuffer]);
+        const url = URL.createObjectURL(blob);
+        img.src = url;
+      } catch (error) {
+        reject(error);
+      }
+    });
+  };
+
   const compressFiles = async () => {
     setIsProcessing(true);
     
@@ -224,7 +363,15 @@ export default function PDFCompressor() {
       ));
       
       try {
-        const compressedBlob = await compressPDF(file);
+        let compressedBlob: Blob;
+        
+        if (file.type === 'pdf') {
+          compressedBlob = await compressPDF(file);
+        } else if (file.type === 'excel') {
+          compressedBlob = await compressExcel(file);
+        } else {
+          throw new Error('Tipo de archivo no soportado');
+        }
         
         setFiles(prev => prev.map(f => 
           f.id === file.id ? {
@@ -235,7 +382,7 @@ export default function PDFCompressor() {
           } : f
         ));
       } catch (error) {
-        console.error('Error compressing PDF:', error);
+        console.error('Error compressing file:', error);
         setFiles(prev => prev.map(f => 
           f.id === file.id ? {
             ...f,
@@ -249,13 +396,17 @@ export default function PDFCompressor() {
     setIsProcessing(false);
   };
 
-  const downloadFile = (file: PDFFile) => {
+  const downloadFile = (file: ProcessableFile) => {
     if (!file.compressedBlob) return;
     
     const url = URL.createObjectURL(file.compressedBlob);
     const link = document.createElement('a');
     link.href = url;
-    link.download = `${file.name}_comprimido.pdf`;
+    
+    // Set appropriate file extension based on type
+    const extension = file.type === 'pdf' ? '.pdf' : '.xlsx';
+    link.download = `${file.name}_comprimido${extension}`;
+    
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -276,7 +427,8 @@ export default function PDFCompressor() {
     
     compressedFiles.forEach(file => {
       if (file.compressedBlob) {
-        zip.file(`${file.name}_comprimido.pdf`, file.compressedBlob);
+        const extension = file.type === 'pdf' ? '.pdf' : '.xlsx';
+        zip.file(`${file.name}_comprimido${extension}`, file.compressedBlob);
       }
     });
     
@@ -284,7 +436,7 @@ export default function PDFCompressor() {
     const url = URL.createObjectURL(zipBlob);
     const link = document.createElement('a');
     link.href = url;
-    link.download = 'pdfs_comprimidos.zip';
+    link.download = 'archivos_comprimidos.zip';
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -310,10 +462,11 @@ export default function PDFCompressor() {
           <Compress className="w-8 h-8 text-purple-600" />
         </div>
         <h1 className="text-4xl font-bold text-gray-900 mb-4">
-          Comprimir PDFs
+          Comprimir PDFs y Excel
         </h1>
         <p className="text-xl text-gray-600 max-w-2xl mx-auto">
-          Reduce el tamaño de múltiples archivos PDF manteniendo la calidad visual.
+          Reduce el tamaño de archivos PDF y Excel manteniendo la calidad visual.
+          Para archivos Excel, comprime las imágenes embebidas sin afectar datos o fórmulas.
           Todo se procesa en tu navegador, tus archivos no salen de tu computadora.
         </p>
       </div>
@@ -341,15 +494,15 @@ export default function PDFCompressor() {
               "text-lg font-semibold mb-2 transition-colors",
               isDragOver ? "text-purple-900" : "text-gray-900"
             )}>
-              {isDragOver ? "Suelta los archivos PDF aquí" : "Selecciona archivos PDF"}
+              {isDragOver ? "Suelta los archivos aquí" : "Selecciona archivos PDF o Excel"}
             </h3>
             <p className={cn(
               "mb-6 transition-colors",
               isDragOver ? "text-purple-700" : "text-gray-600"
             )}>
               {isDragOver 
-                ? "Suelta para agregar los archivos PDF" 
-                : "Haz clic aquí o arrastra y suelta tus archivos PDF"
+                ? "Suelta para agregar los archivos" 
+                : "Haz clic aquí o arrastra y suelta tus archivos PDF (.pdf) o Excel (.xlsx, .xls)"
               }
             </p>
             {!isDragOver && (
@@ -362,7 +515,7 @@ export default function PDFCompressor() {
               ref={fileInputRef}
               type="file"
               multiple
-              accept=".pdf,application/pdf"
+              accept=".pdf,.xlsx,.xls,application/pdf,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel"
               className="hidden"
               onChange={(e) => e.target.files && handleFileSelect(e.target.files)}
             />
@@ -375,8 +528,9 @@ export default function PDFCompressor() {
                 <p className="font-medium mb-1">Límites y consideraciones:</p>
                 <ul className="space-y-1">
                   <li>• Tamaño máximo total: 500MB</li>
-                  <li>• Solo archivos PDF válidos</li>
+                  <li>• Archivos PDF (.pdf) y Excel (.xlsx, .xls) válidos</li>
                   <li>• No se permiten archivos duplicados</li>
+                  <li>• Para Excel: comprime imágenes embebidas sin afectar datos</li>
                 </ul>
               </div>
             </div>
@@ -436,14 +590,20 @@ export default function PDFCompressor() {
                   className="flex items-center gap-4 p-4 bg-gray-50 rounded-lg border"
                 >
                   {file.preview ? (
-                    <img
+                    <Image
                       src={file.preview}
                       alt={`Vista previa de ${file.name}`}
+                      width={64}
+                      height={80}
                       className="w-16 h-20 object-cover rounded border"
                     />
                   ) : (
-                    <div className="flex items-center justify-center w-16 h-20 bg-red-100 rounded border">
-                      <FileText className="w-8 h-8 text-red-600" />
+                    <div className="flex items-center justify-center w-16 h-20 bg-gray-100 rounded border">
+                      {file.type === 'pdf' ? (
+                        <FileText className="w-8 h-8 text-red-600" />
+                      ) : (
+                        <FileSpreadsheet className="w-8 h-8 text-green-600" />
+                      )}
                     </div>
                   )}
                   
@@ -528,7 +688,7 @@ export default function PDFCompressor() {
               ¿Listo para comprimir?
             </h3>
             <p className="text-gray-600 mb-6">
-              Se comprimirán {files.length} archivos PDF con nivel de compresión {
+              Se comprimirán {files.length} archivo{files.length !== 1 ? 's' : ''} con nivel de compresión {
                 compressionLevel === 'low' ? 'bajo' : 
                 compressionLevel === 'medium' ? 'medio' : 'alto'
               }.
@@ -548,7 +708,7 @@ export default function PDFCompressor() {
                 ) : (
                   <>
                     <Compress className="w-5 h-5 mr-2" />
-                    Comprimir PDFs
+                    Comprimir archivos
                   </>
                 )}
               </Button>

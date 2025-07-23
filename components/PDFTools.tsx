@@ -18,7 +18,7 @@ const PDFCompressor = dynamic(() => import('./PDFCompressor'), {
           <Compress className="w-8 h-8 text-purple-600" />
         </div>
         <h1 className="text-4xl font-bold text-gray-900 mb-4">
-          Comprimir PDFs
+          Comprimir PDFs y Excel
         </h1>
         <p className="text-xl text-gray-600 max-w-2xl mx-auto mb-8">
           Cargando herramienta de compresión...
@@ -40,11 +40,11 @@ export default function PDFTools() {
         <div className="text-center mb-8">
           <div className="text-center mb-6">
             <h1 className="text-3xl font-bold text-gray-900">
-              Herramientas PDF
+              Herramientas de Documentos
             </h1>
           </div>
           <p className="text-lg text-gray-600">
-            Une o divide archivos PDF de forma rápida y segura
+            Une, divide o comprime archivos PDF y Excel de forma rápida y segura
           </p>
         </div>
 
@@ -76,7 +76,7 @@ export default function PDFTools() {
                 className={activeTool === 'compress' ? 'bg-purple-600 hover:bg-purple-700' : ''}
               >
                 <Compress className="w-5 h-5 mr-2" />
-                Comprimir PDFs
+                Comprimir PDFs y Excel
               </Button>
             </div>
           </CardContent>
