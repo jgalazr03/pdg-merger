@@ -2,18 +2,21 @@
 
 import { useState, useRef, useEffect } from 'react';
 import { PDFDocument } from 'pdf-lib';
-import { Upload, FileText, Download, Loader2, X, GripVertical, Edit3 } from 'lucide-react';
+import { Upload, FileText, Download, Loader2, X, GripVertical, Edit3, Image as ImageIcon, Crop } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
+import ImageCropModal, { CropResult } from '@/components/ImageCropModal';
 
 interface PDFFile {
   id: string;
   file: File;
   name: string;
   size: string;
+  type: 'pdf' | 'image';
+  cropped?: CropResult;
 }
 
 export default function PDFMerger() {
@@ -24,6 +27,7 @@ export default function PDFMerger() {
   const [fileName, setFileName] = useState('');
   const [fileNameError, setFileNameError] = useState('');
   const [isDragOver, setIsDragOver] = useState(false);
+  const [cropFileId, setCropFileId] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const filesListRef = useRef<HTMLDivElement>(null);
 
@@ -82,14 +86,23 @@ export default function PDFMerger() {
     return trimmedName || 'documento_final';
   };
 
+  const isPdfFile = (file: File): boolean =>
+    file.type === 'application/pdf' || /\.pdf$/i.test(file.name);
+
+  const isImageFile = (file: File): boolean =>
+    file.type === 'image/jpeg' ||
+    file.type === 'image/png' ||
+    /\.(jpe?g|png)$/i.test(file.name);
+
   const handleFileSelect = (selectedFiles: FileList) => {
     const newFiles = Array.from(selectedFiles)
-      .filter(file => file.type === 'application/pdf')
+      .filter(file => isPdfFile(file) || isImageFile(file))
       .map(file => ({
         id: Math.random().toString(36).substring(2, 15),
         file,
-        name: file.name.replace('.pdf', ''),
+        name: file.name.replace(/\.(pdf|jpe?g|png)$/i, ''),
         size: formatFileSize(file.size),
+        type: isPdfFile(file) ? ('pdf' as const) : ('image' as const),
       }));
 
     setFiles(prev => [...prev, ...newFiles]);
@@ -98,6 +111,26 @@ export default function PDFMerger() {
   const removeFile = (id: string) => {
     setFiles(prev => prev.filter(file => file.id !== id));
   };
+
+  // Convierte un data URL (base64) en bytes para embeber en el PDF
+  const dataUrlToBytes = (dataUrl: string): Uint8Array => {
+    const base64 = dataUrl.split(',')[1];
+    const binary = atob(base64);
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) {
+      bytes[i] = binary.charCodeAt(i);
+    }
+    return bytes;
+  };
+
+  const handleCropConfirm = (result: CropResult) => {
+    setFiles(prev =>
+      prev.map(f => (f.id === cropFileId ? { ...f, cropped: result } : f))
+    );
+    setCropFileId(null);
+  };
+
+  const fileToCrop = files.find(f => f.id === cropFileId);
 
   // Drag & Drop for file upload area
   const handleDragEnter = (e: React.DragEvent) => {
@@ -157,18 +190,58 @@ export default function PDFMerger() {
   };
 
   const mergePDFs = async () => {
-    if (files.length < 2) return;
+    if (files.length < 1) return;
     if (!validateFileName(fileName)) return;
 
     setIsProcessing(true);
     try {
       const mergedPdf = await PDFDocument.create();
 
+      // Dimensiones de una página tamaño Carta (Letter) en puntos
+      const LETTER_SHORT = 612;
+      const LETTER_LONG = 792;
+
       for (const pdfFile of files) {
-        const arrayBuffer = await pdfFile.file.arrayBuffer();
-        const pdf = await PDFDocument.load(arrayBuffer);
-        const copiedPages = await mergedPdf.copyPages(pdf, pdf.getPageIndices());
-        copiedPages.forEach((page) => mergedPdf.addPage(page));
+        if (pdfFile.type === 'image' && pdfFile.cropped) {
+          // Imagen recortada: se coloca centrada en una hoja Carta auto-orientada
+          const bytes = dataUrlToBytes(pdfFile.cropped.dataUrl);
+          const image = await mergedPdf.embedJpg(bytes);
+
+          // Orientar la hoja Carta según la proporción de la imagen recortada
+          const landscape = pdfFile.cropped.width > pdfFile.cropped.height;
+          const pageWidth = landscape ? LETTER_LONG : LETTER_SHORT;
+          const pageHeight = landscape ? LETTER_SHORT : LETTER_LONG;
+
+          const page = mergedPdf.addPage([pageWidth, pageHeight]);
+          const scaled = image.scaleToFit(pageWidth, pageHeight);
+          page.drawImage(image, {
+            x: (pageWidth - scaled.width) / 2,
+            y: (pageHeight - scaled.height) / 2,
+            width: scaled.width,
+            height: scaled.height,
+          });
+        } else if (pdfFile.type === 'image') {
+          // Imagen sin recortar: página del tamaño exacto de la imagen (sin bordes)
+          const arrayBuffer = await pdfFile.file.arrayBuffer();
+          const isPng =
+            pdfFile.file.type === 'image/png' || /\.png$/i.test(pdfFile.file.name);
+          const image = isPng
+            ? await mergedPdf.embedPng(arrayBuffer)
+            : await mergedPdf.embedJpg(arrayBuffer);
+
+          const page = mergedPdf.addPage([image.width, image.height]);
+          page.drawImage(image, {
+            x: 0,
+            y: 0,
+            width: image.width,
+            height: image.height,
+          });
+        } else {
+          const arrayBuffer = await pdfFile.file.arrayBuffer();
+          const pdf = await PDFDocument.load(arrayBuffer);
+          const copiedPages = await mergedPdf.copyPages(pdf, pdf.getPageIndices());
+          copiedPages.forEach((page) => mergedPdf.addPage(page));
+        }
       }
 
       const pdfBytes = await mergedPdf.save();
@@ -177,7 +250,7 @@ export default function PDFMerger() {
       setDownloadUrl(url);
     } catch (error) {
       console.error('Error merging PDFs:', error);
-      alert('Error al unir los PDFs. Por favor, intenta de nuevo.');
+      alert('Error al generar el PDF. Por favor, intenta de nuevo.');
     } finally {
       setIsProcessing(false);
     }
@@ -213,10 +286,10 @@ export default function PDFMerger() {
           <FileText className="w-8 h-8 text-blue-600" />
         </div>
         <h1 className="text-4xl font-bold text-gray-900 mb-4">
-          Unir PDFs
+          Unir PDFs e imágenes
         </h1>
         <p className="text-xl text-gray-600 max-w-2xl mx-auto">
-          Combina múltiples archivos PDF en un solo documento de forma rápida y sencilla.
+          Combina archivos PDF e imágenes (JPG, PNG) en un solo documento PDF de forma rápida y sencilla.
           Todo se procesa en tu navegador, tus archivos no salen de tu computadora.
         </p>
       </div>
@@ -244,15 +317,15 @@ export default function PDFMerger() {
               "text-lg font-semibold mb-2 transition-colors",
               isDragOver ? "text-blue-900" : "text-gray-900"
             )}>
-              {isDragOver ? "Suelta los archivos PDF aquí" : "Selecciona archivos PDF"}
+              {isDragOver ? "Suelta los archivos aquí" : "Selecciona archivos PDF o imágenes"}
             </h3>
             <p className={cn(
               "mb-6 transition-colors",
               isDragOver ? "text-blue-700" : "text-gray-600"
             )}>
-              {isDragOver 
-                ? "Suelta para agregar los archivos PDF" 
-                : "Haz clic aquí o arrastra y suelta tus archivos PDF"
+              {isDragOver
+                ? "Suelta para agregar los archivos"
+                : "Haz clic aquí o arrastra y suelta tus archivos PDF o imágenes (JPG, PNG)"
               }
             </p>
             {!isDragOver && (
@@ -265,7 +338,7 @@ export default function PDFMerger() {
               ref={fileInputRef}
               type="file"
               multiple
-              accept=".pdf,application/pdf"
+              accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png"
               className="hidden"
               onChange={(e) => e.target.files && handleFileSelect(e.target.files)}
             />
@@ -305,8 +378,15 @@ export default function PDFMerger() {
                 >
                   <GripVertical className="w-5 h-5 text-gray-400" />
                   <div className="flex items-center gap-3 flex-1">
-                    <div className="flex items-center justify-center w-10 h-10 bg-red-100 rounded">
-                      <FileText className="w-5 h-5 text-red-600" />
+                    <div className={cn(
+                      "flex items-center justify-center w-10 h-10 rounded",
+                      file.type === 'image' ? "bg-blue-100" : "bg-red-100"
+                    )}>
+                      {file.type === 'image' ? (
+                        <ImageIcon className="w-5 h-5 text-blue-600" />
+                      ) : (
+                        <FileText className="w-5 h-5 text-red-600" />
+                      )}
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="font-medium text-gray-900 truncate">
@@ -314,12 +394,30 @@ export default function PDFMerger() {
                       </p>
                       <p className="text-sm text-gray-500">
                         {file.size}
+                        {file.cropped && (
+                          <span className="ml-2 inline-flex items-center text-green-600">
+                            <Crop className="w-3 h-3 mr-1" />
+                            Recortado
+                          </span>
+                        )}
                       </p>
                     </div>
                     <div className="flex items-center gap-2 text-sm text-gray-500">
                       <span>#{index + 1}</span>
                     </div>
                   </div>
+                  {file.type === 'image' && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setCropFileId(file.id)}
+                      className="border-blue-300 text-blue-700 hover:bg-blue-50"
+                      title="Recortar imagen"
+                    >
+                      <Crop className="w-4 h-4 mr-2" />
+                      {file.cropped ? 'Reajustar' : 'Recortar'}
+                    </Button>
+                  )}
                   <Button
                     variant="ghost"
                     size="sm"
@@ -335,22 +433,25 @@ export default function PDFMerger() {
             <div className="mt-6 p-4 bg-blue-50 rounded-lg">
               <p className="text-sm text-blue-800">
                 <strong>Tip:</strong> Arrastra los archivos para cambiar el orden.
-                Los PDFs se unirán en el orden que aparecen aquí.
+                Los archivos se unirán en el orden que aparecen aquí. Usa el ícono de
+                recorte en las imágenes para ajustarlas a tamaño Carta.
               </p>
             </div>
           </CardContent>
         </Card>
       )}
 
-      {files.length > 1 && (
+      {files.length >= 1 && (
         <Card className="mb-8">
           <CardContent className="p-6">
             <div className="text-center mb-6">
               <h3 className="text-lg font-semibold text-gray-900 mb-2">
-                ¿Listo para unir?
+                {files.length > 1 ? '¿Listo para unir?' : '¿Listo para generar el PDF?'}
               </h3>
               <p className="text-gray-600">
-                Se unirán {files.length} archivos PDF en un solo documento.
+                {files.length > 1
+                  ? `Se unirán ${files.length} archivos en un solo documento PDF.`
+                  : 'Se generará un documento PDF a partir de tu archivo.'}
               </p>
             </div>
 
@@ -398,7 +499,7 @@ export default function PDFMerger() {
                 ) : (
                   <>
                     <FileText className="w-5 h-5 mr-2" />
-                    Unir PDFs
+                    {files.length > 1 ? 'Unir archivos' : 'Generar PDF'}
                   </>
                 )}
               </Button>
@@ -438,6 +539,14 @@ export default function PDFMerger() {
             </div>
           </CardContent>
         </Card>
+      )}
+
+      {fileToCrop && (
+        <ImageCropModal
+          file={fileToCrop.file}
+          onCancel={() => setCropFileId(null)}
+          onConfirm={handleCropConfirm}
+        />
       )}
     </div>
   );
