@@ -23,7 +23,10 @@ const plex = IBM_Plex_Sans({
 });
 
 export const metadata: Metadata = {
-  title: 'Herramientas PDF y Excel | GAINCO',
+  title: {
+    default: 'Herramientas | GAINCO',
+    template: '%s | GAINCO',
+  },
   description:
     'Une, divide y comprime archivos PDF y Excel de forma rápida y segura, directo desde tu navegador.',
   // Favicon: isotipo de marca en SVG que cambia de color con el tema del sistema

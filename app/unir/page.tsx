@@ -5,7 +5,7 @@ import { getTool } from '@/lib/tools';
 const tool = getTool('unir');
 
 export const metadata: Metadata = {
-  title: `${tool.title} | GAINCO`,
+  title: tool.title,
   description: tool.description,
 };
 
