@@ -220,7 +220,7 @@ export default function ImageCropModal({ file, onCancel, onConfirm }: ImageCropM
                 <div
                   key={corner.mode}
                   onPointerDown={(e) => startDrag(e, corner.mode)}
-                  className={`absolute w-3 h-3 bg-white border border-blue-600 rounded-sm ${corner.className}`}
+                  className={`absolute w-3 h-3 bg-white border border-brand-red rounded-sm ${corner.className}`}
                 />
               ))}
             </div>
@@ -231,11 +231,7 @@ export default function ImageCropModal({ file, onCancel, onConfirm }: ImageCropM
           <Button variant="outline" onClick={onCancel} disabled={isSaving}>
             Cancelar
           </Button>
-          <Button
-            onClick={handleConfirm}
-            disabled={isSaving}
-            className="bg-blue-600 hover:bg-blue-700"
-          >
+          <Button onClick={handleConfirm} disabled={isSaving}>
             {isSaving ? (
               <>
                 <Loader2 className="w-4 h-4 mr-2 animate-spin" />

@@ -1,48 +1,42 @@
 import { Check } from 'lucide-react';
-import { ToolAccent } from '@/lib/tools';
 import { cn } from '@/lib/utils';
 
 const STEPS = ['Subir', 'Opciones', 'Listo'] as const;
 
 /**
- * Indicador de pasos del flujo de cada herramienta (Subir → Opciones → Listo).
- * `current` es 1, 2 o 3.
+ * Indicador de pasos (Subir → Opciones → Listo) con colores de marca:
+ * rojo para el paso actual, navy para los completados. `current` es 1, 2 o 3.
  */
-export default function StepIndicator({
-  current,
-  accent,
-}: {
-  current: 1 | 2 | 3;
-  accent: ToolAccent;
-}) {
+export default function StepIndicator({ current }: { current: 1 | 2 | 3 }) {
   return (
-    <ol className="mx-auto mb-10 flex max-w-md items-center justify-center gap-2">
+    <ol className="mb-10 flex items-center gap-3 border-y border-border/70 py-3">
       {STEPS.map((label, i) => {
         const stepNumber = i + 1;
         const isDone = stepNumber < current;
         const isCurrent = stepNumber === current;
         return (
-          <li key={label} className="flex flex-1 items-center gap-2">
-            <div className="flex items-center gap-2">
+          <li key={label} className="flex flex-1 items-center gap-3">
+            <div className="flex items-center gap-2.5">
               <span
                 aria-hidden="true"
                 className={cn(
-                  'flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-sm font-semibold transition-colors',
-                  isDone && cn(accent.soft, accent.text),
-                  isCurrent && cn(accent.solid),
-                  !isDone && !isCurrent && 'bg-gray-100 text-gray-400'
+                  'flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-bold transition-colors',
+                  isDone && 'bg-brand-navy text-white',
+                  isCurrent && 'bg-brand-red text-white ring-4 ring-brand-red/15',
+                  !isDone && !isCurrent && 'bg-muted text-muted-foreground'
                 )}
               >
-                {isDone ? <Check className="h-4 w-4" /> : stepNumber}
+                {isDone ? <Check className="h-3.5 w-3.5" /> : stepNumber}
               </span>
               <span
                 className={cn(
-                  'text-sm font-medium',
-                  isCurrent ? 'text-gray-900' : 'text-gray-500'
+                  'text-sm font-semibold',
+                  isCurrent ? 'text-brand-navy' : 'text-muted-foreground'
                 )}
               >
                 <span className="sr-only">
-                  Paso {stepNumber}{isCurrent ? ' (actual)' : ''}:{' '}
+                  Paso {stepNumber}
+                  {isCurrent ? ' (actual)' : ''}:{' '}
                 </span>
                 {label}
               </span>
@@ -52,7 +46,7 @@ export default function StepIndicator({
                 aria-hidden="true"
                 className={cn(
                   'h-px flex-1',
-                  stepNumber < current ? accent.iconBg : 'bg-gray-200'
+                  stepNumber < current ? 'bg-brand-navy/40' : 'bg-border'
                 )}
               />
             )}

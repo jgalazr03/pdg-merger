@@ -19,7 +19,8 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { cn } from '@/lib/utils';
+import { cn, scrollIntoViewSafe } from '@/lib/utils';
+import { toastUndo } from '@/lib/toast';
 import { getTool } from '@/lib/tools';
 import ToolShell from '@/components/tools/ToolShell';
 import FileDropzone from '@/components/tools/FileDropzone';
@@ -50,12 +51,7 @@ export default function PDFMerger() {
   // Auto-scroll when files are added
   useEffect(() => {
     if (files.length > 0 && filesListRef.current) {
-      setTimeout(() => {
-        filesListRef.current?.scrollIntoView({
-          behavior: 'smooth',
-          block: 'start',
-        });
-      }, 100);
+      setTimeout(() => scrollIntoViewSafe(filesListRef.current), 100);
     }
   }, [files.length]);
 
@@ -279,34 +275,47 @@ export default function PDFMerger() {
     setFileNameError('');
   };
 
+  // Acción destructiva con red de seguridad: vacía la lista pero ofrece deshacer.
+  const clearAll = () => {
+    if (files.length === 0) return;
+    const snapshot = { files, fileName, downloadUrl };
+    const count = files.length;
+    resetAll();
+    toastUndo('Lista vaciada', {
+      description: `Se ${count === 1 ? 'quitó' : 'quitaron'} ${count} archivo${count !== 1 ? 's' : ''}.`,
+      onUndo: () => {
+        setFiles(snapshot.files);
+        setFileName(snapshot.fileName);
+        setDownloadUrl(snapshot.downloadUrl);
+      },
+    });
+  };
+
   const step: 1 | 2 | 3 = files.length === 0 ? 1 : downloadUrl ? 3 : 2;
 
   return (
     <ToolShell tool={tool} step={step}>
-      <Card className="mb-8">
-        <CardContent className="p-6 sm:p-8">
-          <FileDropzone
-            accent={accent}
-            multiple
-            accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png"
-            idleTitle="Selecciona archivos PDF o imágenes"
-            idleSubtitle="Haz clic aquí o arrastra y suelta tus archivos PDF o imágenes (JPG, PNG)"
-            dragTitle="Suelta los archivos aquí"
-            buttonLabel="Seleccionar archivos"
-            ariaLabel="Seleccionar o arrastrar archivos PDF o imágenes"
-            onFiles={handleFileSelect}
-          />
-        </CardContent>
-      </Card>
+      <FileDropzone
+        className="mb-8"
+        accent={accent}
+        multiple
+        accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png"
+        idleTitle="Selecciona archivos PDF o imágenes"
+        idleSubtitle="Haz clic aquí o arrastra y suelta tus archivos PDF o imágenes (JPG, PNG)"
+        dragTitle="Suelta los archivos aquí"
+        buttonLabel="Seleccionar archivos"
+        ariaLabel="Seleccionar o arrastrar archivos PDF o imágenes"
+        onFiles={handleFileSelect}
+      />
 
       {files.length > 0 && (
         <Card className="mb-8 motion-safe:animate-slide-up" ref={filesListRef}>
           <CardContent className="p-6">
             <div className="mb-6 flex items-center justify-between">
-              <h2 className="text-lg font-semibold text-gray-900">
+              <h2 className="font-display text-lg font-bold text-brand-navy">
                 Archivos seleccionados ({files.length})
               </h2>
-              <Button variant="outline" size="sm" onClick={resetAll}>
+              <Button variant="outline" size="sm" onClick={clearAll}>
                 <X className="mr-2 h-4 w-4" />
                 Limpiar todo
               </Button>
@@ -321,12 +330,12 @@ export default function PDFMerger() {
                   onDragOver={handleDragOver}
                   onDrop={(e) => handleDrop(e, index)}
                   className={cn(
-                    'flex items-center gap-3 rounded-lg border-2 border-transparent bg-gray-50 p-4 transition-all hover:bg-gray-100',
+                    'flex items-center gap-3 rounded-lg border-2 border-transparent bg-muted/50 p-4 transition duration-200 ease-out-quint hover:bg-muted',
                     draggedIndex === index && 'opacity-50 motion-safe:scale-95'
                   )}
                 >
                   <GripVertical
-                    className="hidden h-5 w-5 shrink-0 cursor-move text-gray-400 sm:block"
+                    className="hidden h-5 w-5 shrink-0 cursor-move text-muted-foreground sm:block"
                     aria-hidden="true"
                   />
 
@@ -338,7 +347,7 @@ export default function PDFMerger() {
                       disabled={index === 0}
                       aria-label={`Mover ${file.name} hacia arriba`}
                       className={cn(
-                        'rounded p-0.5 text-gray-400 transition-colors hover:text-gray-700 disabled:opacity-30 disabled:hover:text-gray-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-1',
+                        'flex h-9 w-9 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-brand-navy disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-1',
                         accent.ring
                       )}
                     >
@@ -350,7 +359,7 @@ export default function PDFMerger() {
                       disabled={index === files.length - 1}
                       aria-label={`Mover ${file.name} hacia abajo`}
                       className={cn(
-                        'rounded p-0.5 text-gray-400 transition-colors hover:text-gray-700 disabled:opacity-30 disabled:hover:text-gray-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-1',
+                        'flex h-9 w-9 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-brand-navy disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-1',
                         accent.ring
                       )}
                     >
@@ -362,30 +371,30 @@ export default function PDFMerger() {
                     <div
                       className={cn(
                         'flex h-10 w-10 shrink-0 items-center justify-center rounded',
-                        file.type === 'image' ? accent.iconBg : 'bg-red-100'
+                        file.type === 'image' ? accent.soft : 'bg-brand-navy/[0.06]'
                       )}
                     >
                       {file.type === 'image' ? (
                         <ImageIcon className={cn('h-5 w-5', accent.text)} />
                       ) : (
-                        <FileText className="h-5 w-5 text-red-600" />
+                        <FileText className="h-5 w-5 text-brand-navy" />
                       )}
                     </div>
                     <div className="min-w-0 flex-1">
-                      <p className="truncate font-medium text-gray-900">
+                      <p className="truncate font-medium text-ink">
                         {file.name}
                       </p>
-                      <p className="text-sm text-gray-500">
+                      <p className="text-sm text-muted-foreground">
                         {file.size}
                         {file.cropped && (
-                          <span className="ml-2 inline-flex items-center text-green-600">
+                          <span className="ml-2 inline-flex items-center text-success">
                             <Crop className="mr-1 h-3 w-3" />
                             Recortado
                           </span>
                         )}
                       </p>
                     </div>
-                    <span className="shrink-0 text-sm text-gray-400">
+                    <span className="shrink-0 text-sm text-muted-foreground">
                       #{index + 1}
                     </span>
                   </div>
@@ -407,7 +416,7 @@ export default function PDFMerger() {
                     size="sm"
                     onClick={() => removeFile(file.id)}
                     aria-label={`Quitar ${file.name}`}
-                    className="shrink-0 text-gray-400 hover:text-red-600"
+                    className="shrink-0 text-muted-foreground hover:text-brand-red"
                   >
                     <X className="h-4 w-4" />
                   </Button>
@@ -430,10 +439,10 @@ export default function PDFMerger() {
         <Card className="mb-8">
           <CardContent className="p-6">
             <div className="mb-6 text-center">
-              <h2 className="mb-2 text-lg font-semibold text-gray-900">
+              <h2 className="mb-2 font-display text-lg font-bold text-brand-navy">
                 {files.length > 1 ? '¿Listo para unir?' : '¿Listo para generar el PDF?'}
               </h2>
-              <p className="text-gray-600">
+              <p className="text-muted-foreground">
                 {files.length > 1
                   ? `Se unirán ${files.length} archivos en un solo documento PDF.`
                   : 'Se generará un documento PDF a partir de tu archivo.'}
@@ -443,7 +452,7 @@ export default function PDFMerger() {
             <div className="mx-auto mb-6 max-w-md">
               <Label
                 htmlFor="filename"
-                className="mb-2 block text-sm font-medium text-gray-700"
+                className="mb-2 block text-sm font-medium text-ink"
               >
                 <Edit3 className="mr-2 inline h-4 w-4" />
                 Nombre del archivo final
@@ -459,19 +468,19 @@ export default function PDFMerger() {
                   aria-describedby="filename-help"
                   className={cn(
                     'pr-12',
-                    fileNameError && 'border-red-300 focus-visible:ring-red-200'
+                    fileNameError && 'border-brand-red/50 focus-visible:ring-brand-red/20'
                   )}
                 />
                 <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3">
-                  <span className="text-sm text-gray-500">.pdf</span>
+                  <span className="text-sm text-muted-foreground">.pdf</span>
                 </div>
               </div>
               {fileNameError ? (
-                <p className="mt-2 text-sm text-red-600" id="filename-help">
+                <p className="mt-2 text-sm text-brand-red" id="filename-help">
                   {fileNameError}
                 </p>
               ) : (
-                <p className="mt-2 text-xs text-gray-500" id="filename-help">
+                <p className="mt-2 text-xs text-muted-foreground" id="filename-help">
                   Si lo dejas vacío, se usará &quot;documento_final.pdf&quot;
                 </p>
               )}
@@ -503,13 +512,13 @@ export default function PDFMerger() {
       )}
 
       {downloadUrl && (
-        <Card className="border-green-200 bg-green-50 motion-safe:animate-slide-up">
+        <Card className="border-success/20 bg-success/[0.06] motion-safe:animate-slide-up">
           <CardContent className="p-6 text-center">
-            <div className="mb-4 inline-flex h-16 w-16 items-center justify-center rounded-full bg-green-100">
-              <Download className="h-8 w-8 text-green-600" />
+            <div className="mb-4 inline-flex h-16 w-16 items-center justify-center rounded-full bg-success/10">
+              <Download className="h-8 w-8 text-success" />
             </div>
-            <h2 className="mb-2 text-lg font-semibold text-green-900">¡Listo!</h2>
-            <p className="mb-6 text-green-800">
+            <h2 className="mb-2 font-display text-lg font-bold text-success">¡Listo!</h2>
+            <p className="mb-6 text-success/90">
               Tu PDF unificado está listo para descargar como &quot;
               {getValidFileName()}.pdf&quot;
             </p>
@@ -517,10 +526,10 @@ export default function PDFMerger() {
               <Button
                 onClick={downloadMergedPDF}
                 size="lg"
-                className="bg-green-600 text-white hover:bg-green-700"
+                className={accent.solid}
               >
                 <Download className="mr-2 h-5 w-5" />
-                Descargar {getValidFileName()}.pdf
+                Descargar PDF
               </Button>
               <Button variant="outline" onClick={resetAll} size="lg">
                 Crear otro PDF

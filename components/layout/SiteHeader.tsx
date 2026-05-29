@@ -21,23 +21,26 @@ export default function SiteHeader() {
     pathname === href || pathname.startsWith(`${href}/`);
 
   return (
-    <header className="sticky top-0 z-40 w-full border-b border-gray-200 bg-white/80 backdrop-blur supports-[backdrop-filter]:bg-white/60">
+    <header className="sticky top-0 z-40 w-full border-b border-border bg-surface/80 backdrop-blur supports-[backdrop-filter]:bg-surface/70">
       <div className="container mx-auto flex h-16 max-w-6xl items-center justify-between px-4">
         <Link
           href="/"
-          className="flex items-center gap-2 rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-400 focus-visible:ring-offset-2"
-          aria-label="Inicio · Herramientas PDF GAINCO"
+          className="flex items-center gap-3 rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-red focus-visible:ring-offset-2"
+          aria-label="Inicio · Herramientas GAINCO"
         >
           <Image
-            src="/isotipo-gainco.svg"
-            alt=""
-            width={32}
+            src="/logos/logo-gainco-color.svg"
+            alt="GAINCO"
+            width={146}
             height={32}
-            className="h-8 w-8"
+            className="h-8 w-auto"
             priority
           />
-          <span className="text-base font-bold text-gray-900">
-            Herramientas <span className="text-gray-500">GAINCO</span>
+          <span className="hidden items-center gap-2.5 sm:inline-flex">
+            <span aria-hidden="true" className="h-4 w-px bg-brand-red/50" />
+            <span className="font-display text-sm font-semibold uppercase tracking-wide text-brand-navy/80">
+              Herramientas
+            </span>
           </span>
         </Link>
 
@@ -54,15 +57,19 @@ export default function SiteHeader() {
                 href={tool.href}
                 aria-current={active ? 'page' : undefined}
                 className={cn(
-                  'flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2',
-                  tool.accent.ring,
+                  'relative flex items-center gap-2 rounded-md px-3 py-2 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-red focus-visible:ring-offset-2',
                   active
-                    ? cn(tool.accent.soft, tool.accent.text)
-                    : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
+                    ? 'text-brand-navy'
+                    : 'text-muted-foreground hover:text-brand-navy'
                 )}
               >
-                <tool.Icon className="h-4 w-4" />
+                <tool.Icon
+                  className={cn('h-4 w-4', active ? tool.accent.text : 'text-current')}
+                />
                 {tool.name}
+                {active && (
+                  <span className="absolute inset-x-3 -bottom-px h-0.5 rounded-full bg-brand-red" />
+                )}
               </Link>
             );
           })}
@@ -72,7 +79,7 @@ export default function SiteHeader() {
         <div className="md:hidden">
           <Sheet>
             <SheetTrigger
-              className="inline-flex h-10 w-10 items-center justify-center rounded-md text-gray-700 transition-colors hover:bg-gray-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-400 focus-visible:ring-offset-2"
+              className="inline-flex h-11 w-11 items-center justify-center rounded-md text-ink transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-red focus-visible:ring-offset-2"
               aria-label="Abrir menú"
             >
               <Menu className="h-5 w-5" />
@@ -88,14 +95,15 @@ export default function SiteHeader() {
                         href={tool.href}
                         aria-current={active ? 'page' : undefined}
                         className={cn(
-                          'flex items-center gap-3 rounded-md px-3 py-3 text-sm font-medium transition-colors',
+                          'flex items-center gap-3 rounded-md px-3 py-3 text-sm font-semibold transition-colors',
                           active
-                            ? cn(tool.accent.soft, tool.accent.text)
-                            : 'text-gray-700 hover:bg-gray-100'
+                            ? 'bg-brand-navy/[0.06] text-brand-navy'
+                            : 'text-muted-foreground hover:bg-muted'
                         )}
                       >
-                        <tool.Icon className="h-5 w-5" />
+                        <tool.Icon className={cn('h-5 w-5', active ? tool.accent.text : 'text-current')} />
                         {tool.name}
+                        {active && <span className="ml-auto h-2 w-2 rounded-full bg-brand-red" />}
                       </Link>
                     </SheetClose>
                   );

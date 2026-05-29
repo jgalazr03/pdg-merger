@@ -2,7 +2,7 @@
 
 import { useRef, useState } from 'react';
 import { Upload } from 'lucide-react';
-import { Button } from '@/components/ui/button';
+import { buttonVariants } from '@/components/ui/button';
 import { ToolAccent } from '@/lib/tools';
 import { cn } from '@/lib/utils';
 
@@ -21,11 +21,13 @@ interface FileDropzoneProps {
   /** Etiqueta accesible de la zona. */
   ariaLabel: string;
   onFiles: (files: FileList) => void;
+  className?: string;
 }
 
 /**
  * Zona de carga reutilizable y accesible (clic, arrastrar y soltar, y teclado).
- * Centraliza el patrón que antes estaba duplicado en cada herramienta.
+ * Una sola caja con profundidad — sin doble borde — y acento rojo de marca al
+ * interactuar.
  */
 export default function FileDropzone({
   accept,
@@ -37,6 +39,7 @@ export default function FileDropzone({
   buttonLabel,
   ariaLabel,
   onFiles,
+  className,
 }: FileDropzoneProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [isDragOver, setIsDragOver] = useState(false);
@@ -91,34 +94,42 @@ export default function FileDropzone({
       onDragOver={handleDragOver}
       onDrop={handleDrop}
       className={cn(
-        'cursor-pointer rounded-xl border-2 border-dashed p-10 text-center transition-all sm:p-12',
-        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2',
-        accent.ring,
+        'group relative cursor-pointer rounded-2xl border-2 border-dashed bg-white px-6 py-10 text-center shadow-sm transition duration-200 ease-out-quint sm:py-12',
+        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-red focus-visible:ring-offset-2',
         isDragOver
-          ? cn(accent.border, accent.soft, 'motion-safe:scale-[1.02]')
-          : cn('border-gray-300', accent.borderHover)
+          ? 'border-brand-red bg-brand-red/[0.03] shadow-md motion-safe:scale-[1.01]'
+          : 'border-border hover:border-brand-red/40 hover:shadow-md',
+        className
       )}
     >
-      <Upload
+      <div
         className={cn(
-          'mx-auto mb-4 h-12 w-12 transition-colors',
-          isDragOver ? accent.text : 'text-gray-400'
-        )}
-      />
-      <h3
-        className={cn(
-          'mb-2 text-lg font-semibold transition-colors',
-          isDragOver ? 'text-gray-900' : 'text-gray-900'
+          'mx-auto mb-5 flex h-14 w-14 items-center justify-center rounded-2xl transition-colors',
+          isDragOver ? 'bg-brand-red/10' : 'bg-brand-navy/[0.04] group-hover:bg-brand-navy/[0.07]'
         )}
       >
+        <Upload
+          className={cn(
+            'h-6 w-6 transition-colors',
+            isDragOver ? 'text-brand-red' : 'text-brand-navy/70'
+          )}
+          strokeWidth={1.75}
+        />
+      </div>
+      <h3 className="mb-1.5 font-display text-lg font-bold text-brand-navy">
         {isDragOver ? dragTitle : idleTitle}
       </h3>
-      <p className="mx-auto mb-6 max-w-md text-gray-600">{idleSubtitle}</p>
+      <p className="mx-auto mb-6 max-w-md text-sm text-muted-foreground">
+        {idleSubtitle}
+      </p>
       {!isDragOver && (
-        <Button type="button" className={accent.solid} tabIndex={-1}>
+        <span
+          aria-hidden="true"
+          className={cn(buttonVariants({ size: 'lg' }), accent.solid)}
+        >
           <Upload className="mr-2 h-4 w-4" />
           {buttonLabel}
-        </Button>
+        </span>
       )}
       <input
         ref={inputRef}

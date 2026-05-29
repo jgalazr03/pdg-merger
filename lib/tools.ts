@@ -3,30 +3,42 @@ import { Combine, Scissors, Minimize2, type LucideIcon } from 'lucide-react';
 export type ToolSlug = 'unir' | 'dividir' | 'comprimir';
 
 /**
- * Conjunto de clases Tailwind (literales, para que el JIT las detecte) que
- * definen el color de acento de cada herramienta. Centralizar aquí evita
- * colores "mágicos" repartidos por los componentes.
+ * Sistema de acento.
+ *
+ * Filosofía de marca GAINCO: el CHROME de acción es compartido (rojo de marca
+ * para CTAs, navy para la estructura, foco rojo). Cada herramienta solo aporta
+ * un SUB-ACENTO sutil (su tono) en el glifo del ícono, una línea fina y los
+ * tintes suaves de las cajas informativas. Así se siente UN producto con
+ * identidad, no tres apps de colores distintos.
+ *
+ * Todas las clases son literales para que el JIT de Tailwind las detecte.
  */
 export interface ToolAccent {
-  /** Color del texto/ícono de acento. */
-  text: string;
-  /** Botón sólido principal. */
+  // --- Chrome de marca (mismo valor en las 3 herramientas) ---
+  /** CTA primario: rojo de marca. */
   solid: string;
-  /** Fondo suave (cajas informativas, estados activos). */
+  /** Anillo de foco accesible: rojo de marca. */
+  ring: string;
+  /** Tile del ícono en el hero: navy de marca. */
+  iconBg: string;
+
+  // --- Sub-acento por herramienta (sutil) ---
+  /** Tono de la herramienta para el glifo del ícono y acentos pequeños. */
+  text: string;
+  /** Línea/borde fino con el tono de la herramienta. */
+  line: string;
+  /** Fondo suave para cajas de ayuda. */
   soft: string;
   /** Texto sobre fondo suave. */
   softText: string;
-  /** Fondo del círculo del ícono en el hero. */
-  iconBg: string;
-  /** Borde en estado activo/seleccionado. */
-  border: string;
-  /** Borde al hacer hover en la zona de carga. */
-  borderHover: string;
-  /** Anillo de foco accesible. */
-  ring: string;
-  /** Gradiente de fondo para la tarjeta de la landing. */
-  cardGradient: string;
 }
+
+// Chrome de marca compartido
+const BRAND = {
+  solid: 'bg-brand-red text-white hover:bg-brand-red/90',
+  ring: 'focus-visible:ring-brand-red',
+  iconBg: 'bg-brand-navy',
+};
 
 export interface ToolDef {
   slug: ToolSlug;
@@ -54,15 +66,11 @@ export const TOOLS: ToolDef[] = [
       'Combina archivos PDF e imágenes en un único PDF, reordénalos a tu gusto y descárgalo al instante. Todo ocurre en tu navegador.',
     Icon: Combine,
     accent: {
-      text: 'text-blue-600',
-      solid: 'bg-blue-600 hover:bg-blue-700 text-white',
-      soft: 'bg-blue-50',
-      softText: 'text-blue-800',
-      iconBg: 'bg-blue-100',
-      border: 'border-blue-500',
-      borderHover: 'hover:border-blue-400',
-      ring: 'focus-visible:ring-blue-500',
-      cardGradient: 'from-blue-50',
+      ...BRAND,
+      text: 'text-brand-ocean',
+      line: 'bg-brand-ocean',
+      soft: 'bg-sky-50',
+      softText: 'text-brand-ocean',
     },
   },
   {
@@ -75,15 +83,11 @@ export const TOOLS: ToolDef[] = [
       'Separa un PDF en varios documentos indicando páginas o rangos (1-3, 5, 8-10). Rápido, preciso y 100% en tu navegador.',
     Icon: Scissors,
     accent: {
-      text: 'text-orange-600',
-      solid: 'bg-orange-600 hover:bg-orange-700 text-white',
-      soft: 'bg-orange-50',
-      softText: 'text-orange-800',
-      iconBg: 'bg-orange-100',
-      border: 'border-orange-500',
-      borderHover: 'hover:border-orange-400',
-      ring: 'focus-visible:ring-orange-500',
-      cardGradient: 'from-orange-50',
+      ...BRAND,
+      text: 'text-amber-600',
+      line: 'bg-amber-500',
+      soft: 'bg-amber-50',
+      softText: 'text-amber-700',
     },
   },
   {
@@ -96,15 +100,11 @@ export const TOOLS: ToolDef[] = [
       'Disminuye el tamaño de tus PDFs y hojas de Excel comprimiendo imágenes sin afectar los datos. Ideal para enviar por correo.',
     Icon: Minimize2,
     accent: {
-      text: 'text-purple-600',
-      solid: 'bg-purple-600 hover:bg-purple-700 text-white',
-      soft: 'bg-purple-50',
-      softText: 'text-purple-800',
-      iconBg: 'bg-purple-100',
-      border: 'border-purple-500',
-      borderHover: 'hover:border-purple-400',
-      ring: 'focus-visible:ring-purple-500',
-      cardGradient: 'from-purple-50',
+      ...BRAND,
+      text: 'text-teal-700',
+      line: 'bg-teal-500',
+      soft: 'bg-teal-50',
+      softText: 'text-teal-700',
     },
   },
 ];

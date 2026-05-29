@@ -1,0 +1,141 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-05-29T00:00:00Z",
+  "title": "Design System: Herramientas GAINCO",
+  "extensions": {
+    "colorMeta": {
+      "gainco-navy": {
+        "role": "secondary",
+        "displayName": "Navy GAINCO",
+        "canonical": "hsl(240 100% 13%)",
+        "tonalRamp": ["hsl(240 100% 8%)", "hsl(240 100% 13%)", "hsl(240 80% 22%)", "hsl(240 60% 34%)", "hsl(240 45% 50%)", "hsl(240 50% 68%)", "hsl(240 60% 85%)", "hsl(240 70% 95%)"]
+      },
+      "signal-red": {
+        "role": "primary",
+        "displayName": "Rojo Señal GAINCO",
+        "canonical": "hsl(354 100% 39%)",
+        "tonalRamp": ["hsl(354 90% 15%)", "hsl(354 95% 25%)", "hsl(354 100% 33%)", "hsl(354 100% 39%)", "hsl(354 95% 50%)", "hsl(354 90% 64%)", "hsl(354 85% 80%)", "hsl(354 80% 93%)"]
+      },
+      "gainco-ocean": {
+        "role": "secondary",
+        "displayName": "Océano GAINCO",
+        "canonical": "hsl(204 100% 25%)",
+        "tonalRamp": ["hsl(204 100% 10%)", "hsl(204 100% 16%)", "hsl(204 100% 22%)", "hsl(204 100% 25%)", "hsl(204 90% 36%)", "hsl(204 80% 52%)", "hsl(204 75% 72%)", "hsl(204 70% 90%)"]
+      },
+      "warm-paper": {
+        "role": "neutral",
+        "displayName": "Papel Cálido",
+        "canonical": "hsl(36 33% 98%)",
+        "tonalRamp": ["hsl(36 12% 90%)", "hsl(36 16% 93%)", "hsl(36 22% 95%)", "hsl(36 28% 96%)", "hsl(36 33% 98%)", "hsl(36 30% 99%)", "hsl(0 0% 100%)", "hsl(0 0% 100%)"]
+      },
+      "slate-ink": {
+        "role": "neutral",
+        "displayName": "Tinta Pizarra",
+        "canonical": "hsl(222 47% 11%)",
+        "tonalRamp": ["hsl(222 47% 8%)", "hsl(222 47% 11%)", "hsl(222 35% 20%)", "hsl(222 25% 32%)", "hsl(222 16% 42%)", "hsl(222 14% 60%)", "hsl(222 16% 80%)", "hsl(222 24% 93%)"]
+      }
+    },
+    "typographyMeta": {
+      "display": { "displayName": "Display (Archivo)", "purpose": "Titular de la landing; permite una palabra en rojo de señal." },
+      "headline": { "displayName": "Headline (Archivo)", "purpose": "H1 de cada herramienta, en navy." },
+      "body": { "displayName": "Body (IBM Plex Sans)", "purpose": "Texto general; línea máx. 65–75ch." },
+      "label": { "displayName": "Label (Archivo)", "purpose": "Eyebrows y etiquetas en mayúsculas con tracking." }
+    },
+    "shadows": [
+      { "name": "rest", "value": "0 1px 2px 0 rgba(0,0,68,0.05)", "purpose": "Tarjetas y dropzone en reposo; separación mínima del papel." },
+      { "name": "hover-lift", "value": "0 10px 24px -6px rgba(0,0,68,0.10)", "purpose": "Elevación contenida de superficies interactivas; tinte navy, nunca negro." }
+    ],
+    "motion": [
+      { "name": "ease-out-quint", "value": "cubic-bezier(0.22, 1, 0.36, 1)", "purpose": "Easing por defecto para entradas y transiciones." },
+      { "name": "duration-entrance", "value": "250ms", "purpose": "Aparición de elementos (fade-in)." },
+      { "name": "duration-move", "value": "300ms", "purpose": "Deslizamientos (slide-up) y aperturas de panel." },
+      { "name": "duration-micro", "value": "150ms", "purpose": "Hover, color y feedback de pulsación." }
+    ],
+    "breakpoints": [
+      { "name": "sm", "value": "640px" },
+      { "name": "md", "value": "768px" },
+      { "name": "lg", "value": "1024px" }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "CTA primario: la acción de cada pantalla, en rojo de señal.",
+      "html": "<button class=\"ds-btn-primary\">Seleccionar archivos</button>",
+      "css": ".ds-btn-primary{display:inline-flex;align-items:center;justify-content:center;gap:8px;height:44px;padding:0 32px;background:#c60014;color:#fff;border:none;border-radius:6px;font-family:'IBM Plex Sans',system-ui,sans-serif;font-weight:600;font-size:14px;cursor:pointer;transition:background-color .15s cubic-bezier(.22,1,.36,1),transform .15s cubic-bezier(.22,1,.36,1)}.ds-btn-primary:hover{background:#b30012}.ds-btn-primary:focus-visible{outline:none;box-shadow:0 0 0 2px #fcfaf7,0 0 0 4px #c60014}.ds-btn-primary:active{transform:scale(.98)}"
+    },
+    {
+      "name": "Outline Button",
+      "kind": "button",
+      "refersTo": "button-outline",
+      "description": "Acción secundaria (Limpiar, Cambiar archivo, Procesar otro).",
+      "html": "<button class=\"ds-btn-outline\">Limpiar todo</button>",
+      "css": ".ds-btn-outline{display:inline-flex;align-items:center;justify-content:center;gap:8px;height:44px;padding:0 32px;background:#fff;color:#0f1729;border:1px solid #e5e0dc;border-radius:6px;font-family:'IBM Plex Sans',system-ui,sans-serif;font-weight:600;font-size:14px;cursor:pointer;transition:background-color .15s cubic-bezier(.22,1,.36,1)}.ds-btn-outline:hover{background:#fcfaf7}.ds-btn-outline:focus-visible{outline:none;box-shadow:0 0 0 2px #fcfaf7,0 0 0 4px #c60014}"
+    },
+    {
+      "name": "Content Card",
+      "kind": "card",
+      "refersTo": "card",
+      "description": "Contenedor de contenido sobre papel cálido.",
+      "html": "<div class=\"ds-card\">Contenido</div>",
+      "css": ".ds-card{background:#fff;border:1px solid #e5e0dc;border-radius:12px;padding:24px;box-shadow:0 1px 2px 0 rgba(0,0,68,.05)}"
+    },
+    {
+      "name": "Icon Tile",
+      "kind": "custom",
+      "refersTo": "icon-tile",
+      "description": "Tile navy con glifo blanco y acento rojo; reemplaza el cuadrito pastel genérico.",
+      "html": "<div class=\"ds-icon-tile\"><svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.75\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M10 18H5a3 3 0 0 1-3-3v-1\"/><path d=\"M14 2a2 2 0 0 1 2 2v4a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2z\"/><path d=\"M20 2a2 2 0 0 1 2 2v4a2 2 0 0 1-2 2h-6a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2z\"/></svg></div>",
+      "css": ".ds-icon-tile{position:relative;display:inline-flex;align-items:center;justify-content:center;width:64px;height:64px;background:#000044;border-radius:16px;box-shadow:0 10px 24px -6px rgba(0,0,68,.2)}.ds-icon-tile svg{width:32px;height:32px;color:#fff}.ds-icon-tile::after{content:\"\";position:absolute;bottom:-4px;left:50%;transform:translateX(-50%);width:32px;height:4px;border-radius:9999px;background:#c60014}"
+    },
+    {
+      "name": "Active Nav Link",
+      "kind": "nav",
+      "refersTo": "nav-link",
+      "description": "Enlace de navegación activo: texto navy + subrayado rojo (no pill de color).",
+      "html": "<a href=\"#\" class=\"ds-nav-link ds-nav-link--active\">Unir PDF</a>",
+      "css": ".ds-nav-link{position:relative;display:inline-flex;align-items:center;gap:8px;padding:8px 12px;font-family:'IBM Plex Sans',system-ui,sans-serif;font-weight:600;font-size:14px;color:#5a647c;text-decoration:none;transition:color .15s cubic-bezier(.22,1,.36,1)}.ds-nav-link:hover{color:#000044}.ds-nav-link--active{color:#000044}.ds-nav-link--active::after{content:\"\";position:absolute;left:12px;right:12px;bottom:-1px;height:2px;border-radius:9999px;background:#c60014}"
+    },
+    {
+      "name": "File Dropzone",
+      "kind": "custom",
+      "refersTo": "dropzone",
+      "description": "Zona de carga: una sola caja discontinua, chip navy y acento rojo al arrastrar.",
+      "html": "<div class=\"ds-dropzone\" role=\"button\" tabindex=\"0\"><div class=\"ds-dropzone__chip\"><svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.75\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M12 3v12\"/><path d=\"m7 8 5-5 5 5\"/><path d=\"M5 21h14\"/></svg></div><p class=\"ds-dropzone__title\">Selecciona archivos PDF o imágenes</p></div>",
+      "css": ".ds-dropzone{display:block;width:100%;border:2px dashed #e5e0dc;border-radius:16px;background:#fff;padding:40px 24px;text-align:center;box-shadow:0 1px 2px 0 rgba(0,0,68,.05);cursor:pointer;transition:border-color .2s cubic-bezier(.22,1,.36,1),box-shadow .2s cubic-bezier(.22,1,.36,1)}.ds-dropzone:hover{border-color:rgba(198,0,20,.4);box-shadow:0 10px 24px -6px rgba(0,0,68,.1)}.ds-dropzone:focus-visible{outline:none;box-shadow:0 0 0 2px #fcfaf7,0 0 0 4px #c60014}.ds-dropzone__chip{display:inline-flex;align-items:center;justify-content:center;width:56px;height:56px;margin-bottom:20px;border-radius:16px;background:rgba(0,0,68,.04)}.ds-dropzone__chip svg{width:24px;height:24px;color:rgba(0,0,68,.7)}.ds-dropzone__title{font-family:'Archivo',system-ui,sans-serif;font-weight:700;font-size:18px;color:#000044;margin:0}"
+    }
+  ],
+  "narrative": {
+    "northStar": "El taller de precisión",
+    "overview": "Herramientas que simplemente funcionan: exactas, fiables y sin ruido. La interfaz es el banco de trabajo, no la pieza expuesta; cuando hace bien su trabajo, desaparece y solo queda la tarea resuelta. La identidad GAINCO entra con criterio: navy profundo como tinta y estructura, un rojo de señal escaso pero inequívoco para la acción. La profundidad se construye por capas sutiles. Rechaza el SaaS de plantilla genérico y cualquier cosa que se reconozca como hecha por IA.",
+    "keyCharacteristics": [
+      "La tarea primero: subir → opciones → listo manda sobre todo lo demás.",
+      "Tinta navy + acento rojo escaso; el rojo es señal, no relleno.",
+      "Tipografía técnica (Archivo / IBM Plex Sans), nunca Inter ni genéricos.",
+      "Capas con sombra sutil; nada plano-muerto, nada sobrecargado.",
+      "Accesible por defecto: contraste AA, teclado, foco visible, reduced-motion."
+    ],
+    "rules": [
+      { "name": "La Regla del Rojo Escaso", "body": "El rojo de señal ocupa ≤10% de cualquier pantalla. Vive en el CTA primario, el foco y el estado activo. Si aparece en más de un par de sitios a la vez, deja de significar acción.", "section": "colors" },
+      { "name": "La Regla del Sub-acento Callado", "body": "El color por herramienta (océano/ámbar/teal) solo toca el ícono, una línea fina y tintes suaves. Jamás pinta botones, fondos grandes ni el cromo.", "section": "colors" },
+      { "name": "La Regla Anti-Inter", "body": "Nunca Inter, Roboto, Arial ni system-ui como fuente de marca. Archivo + IBM Plex Sans son la voz.", "section": "typography" },
+      { "name": "La Regla del Tinte Navy", "body": "Las sombras se tiñen hacia el navy de marca (rgba(0,0,68,…)), nunca negro neutro.", "section": "elevation" }
+    ],
+    "dos": [
+      "Do reservar el rojo de señal (#c60014) para acción/foco/estado activo: ≤10% de la pantalla.",
+      "Do usar navy (#000044) como tinta y estructura, y neutros cálidos (papel #fcfaf7) en vez de blanco/gris clínico.",
+      "Do titular con Archivo y redactar con IBM Plex Sans; jerarquía por escala + peso (ratio ≥1.25).",
+      "Do teñir las sombras hacia el navy y mantenerlas sutiles en reposo.",
+      "Do comunicar cada estado (progreso, éxito, error) con más de un canal, no solo color; foco visible y teclado siempre."
+    ],
+    "donts": [
+      "Don't caer en el SaaS de plantilla genérico: gradientes morados sobre blanco, rejillas de cards idénticas, hero-metric, ni nada que se vea hecho por IA.",
+      "Don't usar Inter, Roboto, Arial ni system-ui como fuente de marca.",
+      "Don't pintar el cromo con el color por herramienta: océano/ámbar/teal solo en ícono, línea fina y tintes.",
+      "Don't usar negro puro (#000) ni sombras negras neutras; ni border-left/right >1px como franja de acento.",
+      "Don't meter texto con gradiente (background-clip: text) ni glassmorphism decorativo; ni resolver con modal lo que se puede hacer inline."
+    ]
+  }
+}

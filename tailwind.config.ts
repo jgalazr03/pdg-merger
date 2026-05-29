@@ -10,6 +10,17 @@ const config: Config = {
   ],
   theme: {
     extend: {
+      fontFamily: {
+        sans: ['var(--font-sans)', 'system-ui', 'sans-serif'],
+        display: ['var(--font-display)', 'var(--font-sans)', 'sans-serif'],
+      },
+      // Curvas de Emil Kowalski (animations.dev): entradas con ease-out,
+      // movimiento on-screen con ease-in-out.
+      transitionTimingFunction: {
+        'out-quint': 'cubic-bezier(0.22, 1, 0.36, 1)',
+        'out-cubic': 'cubic-bezier(0.215, 0.61, 0.355, 1)',
+        'in-out-quint': 'cubic-bezier(0.86, 0, 0.07, 1)',
+      },
       backgroundImage: {
         'gradient-radial': 'radial-gradient(var(--tw-gradient-stops))',
         'gradient-conic':
@@ -21,6 +32,13 @@ const config: Config = {
         sm: 'calc(var(--radius) - 4px)',
       },
       colors: {
+        brand: {
+          navy: 'hsl(var(--brand-navy) / <alpha-value>)',
+          ocean: 'hsl(var(--brand-ocean) / <alpha-value>)',
+          red: 'hsl(var(--brand-red) / <alpha-value>)',
+        },
+        surface: 'hsl(var(--surface) / <alpha-value>)',
+        ink: 'hsl(var(--ink) / <alpha-value>)',
         background: 'hsl(var(--background))',
         foreground: 'hsl(var(--foreground))',
         card: {
@@ -50,6 +68,14 @@ const config: Config = {
         destructive: {
           DEFAULT: 'hsl(var(--destructive))',
           foreground: 'hsl(var(--destructive-foreground))',
+        },
+        success: {
+          DEFAULT: 'hsl(var(--success) / <alpha-value>)',
+          foreground: 'hsl(var(--success-foreground) / <alpha-value>)',
+        },
+        warning: {
+          DEFAULT: 'hsl(var(--warning) / <alpha-value>)',
+          foreground: 'hsl(var(--warning-foreground) / <alpha-value>)',
         },
         border: 'hsl(var(--border))',
         input: 'hsl(var(--input))',
@@ -91,8 +117,10 @@ const config: Config = {
       animation: {
         'accordion-down': 'accordion-down 0.2s ease-out',
         'accordion-up': 'accordion-up 0.2s ease-out',
-        'fade-in': 'fade-in 0.3s ease-out',
-        'slide-up': 'slide-up 0.35s ease-out',
+        // Entradas con propósito y duración corta (HIG: motion <300ms),
+        // easing premium tipo "ease-out-quint".
+        'fade-in': 'fade-in 0.25s cubic-bezier(0.22, 1, 0.36, 1) both',
+        'slide-up': 'slide-up 0.3s cubic-bezier(0.22, 1, 0.36, 1) both',
       },
     },
   },
