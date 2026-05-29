@@ -5,39 +5,46 @@ export type ToolSlug = 'unir' | 'dividir' | 'comprimir';
 /**
  * Sistema de acento.
  *
- * Filosofía de marca GAINCO: el CHROME de acción es compartido (rojo de marca
- * para CTAs, navy para la estructura, foco rojo). Cada herramienta solo aporta
- * un SUB-ACENTO sutil (su tono) en el glifo del ícono, una línea fina y los
- * tintes suaves de las cajas informativas. Así se siente UN producto con
- * identidad, no tres apps de colores distintos.
+ * Cada herramienta tiene UN color propio (de una paleta armonizada de tonos
+ * profundos sobre papel) que se aplica de forma CONSISTENTE en todas sus
+ * superficies: el tile del ícono (relleno de color + glifo blanco + borde
+ * navy), el ícono activo del nav, la línea/indicador activo y el spinner. Solo
+ * el CTA (rojo de marca) y el foco (ink/navy, por invariante) son compartidos.
+ *
+ * Paleta de herramientas (peso -700 para pasar contraste AA con glifo blanco):
+ *   unir → océano #004b7d · dividir → ámbar #b45309 · comprimir → teal #0f766e
+ * Las cajas de ayuda usan el tinte suave del MISMO matiz (ocean/amber/highlight
+ * -soft, todos en el registro apagado S~45%/L~82%) con texto ink.
  *
  * Todas las clases son literales para que el JIT de Tailwind las detecte.
  */
 export interface ToolAccent {
-  // --- Chrome de marca (mismo valor en las 3 herramientas) ---
-  /** CTA primario: rojo de marca. */
-  solid: string;
-  /** Anillo de foco accesible: rojo de marca. */
+  // --- Compartido (mismo valor en las 3 herramientas) ---
+  /** Anillo de foco accesible: ink (navy), por invariante. */
   ring: string;
-  /** Tile del ícono en el hero: navy de marca. */
-  iconBg: string;
 
-  // --- Sub-acento por herramienta (sutil) ---
-  /** Tono de la herramienta para el glifo del ícono y acentos pequeños. */
+  // --- Color propio de la herramienta (consistente en todas sus superficies) ---
+  /** CTA primario: relleno con el color de la herramienta + texto blanco. */
+  solid: string;
+  /** Relleno del tile del ícono (con glifo blanco + borde navy). */
+  iconBg: string;
+  /** Mismo color como glifo/texto sobre papel: nav activo, spinner, progreso. */
   text: string;
-  /** Línea/borde fino con el tono de la herramienta. */
+  /** Mismo color para la línea/indicador activo. */
   line: string;
+  /** Versión CLARA del color, para íconos sobre fondo oscuro (footer navy). */
+  onDark: string;
   /** Fondo suave para cajas de ayuda. */
   soft: string;
   /** Texto sobre fondo suave. */
   softText: string;
 }
 
-// Chrome de marca compartido
+// Compartido por las 3 herramientas: foco en ink (navy), por invariante del
+// sistema. El color propio (solid/iconBg/text/line) lo aporta cada herramienta
+// más abajo. El rojo se reserva SOLO para destructivo/errores (no para CTAs).
 const BRAND = {
-  solid: 'bg-brand-red text-white hover:bg-brand-red/90',
-  ring: 'focus-visible:ring-brand-red',
-  iconBg: 'bg-brand-navy',
+  ring: 'focus-visible:ring-ink',
 };
 
 export interface ToolDef {
@@ -53,6 +60,8 @@ export interface ToolDef {
   description: string;
   Icon: LucideIcon;
   accent: ToolAccent;
+  /** Formatos y límites, en divulgación progresiva (componente ToolConstraints). */
+  constraints: string[];
 }
 
 export const TOOLS: ToolDef[] = [
@@ -65,12 +74,20 @@ export const TOOLS: ToolDef[] = [
     description:
       'Combina archivos PDF e imágenes en un único PDF, reordénalos a tu gusto y descárgalo al instante. Todo ocurre en tu navegador.',
     Icon: Combine,
+    constraints: [
+      'Formatos: PDF, JPG y PNG',
+      'Se combinan en el orden que ves (puedes reordenar)',
+      'Las imágenes se ajustan a tamaño Carta (recorte opcional)',
+    ],
     accent: {
       ...BRAND,
+      solid: 'bg-brand-ocean text-white hover:opacity-85',
+      iconBg: 'bg-brand-ocean',
       text: 'text-brand-ocean',
       line: 'bg-brand-ocean',
-      soft: 'bg-sky-50',
-      softText: 'text-brand-ocean',
+      onDark: 'text-sky-400',
+      soft: 'bg-ocean-soft',
+      softText: 'text-ink',
     },
   },
   {
@@ -82,12 +99,20 @@ export const TOOLS: ToolDef[] = [
     description:
       'Separa un PDF en varios documentos indicando páginas o rangos (1-3, 5, 8-10). Rápido, preciso y 100% en tu navegador.',
     Icon: Scissors,
+    constraints: [
+      'Formato: PDF (un archivo a la vez)',
+      'Indica páginas o rangos, p. ej. 1-3, 5, 8-10',
+      'Genera un documento por cada rango',
+    ],
     accent: {
       ...BRAND,
-      text: 'text-amber-600',
-      line: 'bg-amber-500',
-      soft: 'bg-amber-50',
-      softText: 'text-amber-700',
+      solid: 'bg-amber-700 text-white hover:opacity-85',
+      iconBg: 'bg-amber-700',
+      text: 'text-amber-700',
+      line: 'bg-amber-700',
+      onDark: 'text-amber-400',
+      soft: 'bg-amber-soft',
+      softText: 'text-ink',
     },
   },
   {
@@ -99,12 +124,22 @@ export const TOOLS: ToolDef[] = [
     description:
       'Disminuye el tamaño de tus PDFs y hojas de Excel comprimiendo imágenes sin afectar los datos. Ideal para enviar por correo.',
     Icon: Minimize2,
+    constraints: [
+      'Formatos: PDF y Excel (.xlsx, .xls)',
+      'Tamaño máximo total: 500 MB',
+      'Excel: comprime imágenes embebidas sin afectar los datos',
+      'Archivos grandes (más de 100 MB) pueden tardar varios minutos',
+      'Sin archivos duplicados',
+    ],
     accent: {
       ...BRAND,
+      solid: 'bg-teal-700 text-white hover:opacity-85',
+      iconBg: 'bg-teal-700',
       text: 'text-teal-700',
-      line: 'bg-teal-500',
-      soft: 'bg-teal-50',
-      softText: 'text-teal-700',
+      line: 'bg-teal-700',
+      onDark: 'text-teal-400',
+      soft: 'bg-highlight-soft',
+      softText: 'text-ink',
     },
   },
 ];

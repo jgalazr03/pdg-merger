@@ -24,6 +24,7 @@ import { toastUndo } from '@/lib/toast';
 import { getTool } from '@/lib/tools';
 import ToolShell from '@/components/tools/ToolShell';
 import FileDropzone from '@/components/tools/FileDropzone';
+import ToolConstraints from '@/components/tools/ToolConstraints';
 import ImageCropModal, { CropResult } from '@/components/ImageCropModal';
 
 const tool = getTool('unir');
@@ -304,7 +305,7 @@ export default function PDFMerger() {
   return (
     <ToolShell tool={tool} step={step}>
       <FileDropzone
-        className="mb-8"
+        className="mb-4"
         accent={accent}
         multiple
         accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png"
@@ -316,11 +317,13 @@ export default function PDFMerger() {
         onFiles={handleFileSelect}
       />
 
+      <ToolConstraints items={tool.constraints} />
+
       {files.length > 0 && (
         <Card className="mb-8 motion-safe:animate-slide-up" ref={filesListRef}>
           <CardContent className="p-6">
             <div className="mb-6 flex items-center justify-between">
-              <h2 className="font-display text-lg font-bold text-brand-navy">
+              <h2 className="font-display text-lg font-bold text-ink">
                 Archivos seleccionados ({files.length})
               </h2>
               <Button variant="outline" size="sm" onClick={clearAll}>
@@ -338,7 +341,7 @@ export default function PDFMerger() {
                   onDragOver={handleDragOver}
                   onDrop={(e) => handleDrop(e, index)}
                   className={cn(
-                    'flex items-center gap-3 rounded-lg border-2 border-transparent bg-muted/50 p-4 transition duration-200 ease-out-quint hover:bg-muted',
+                    'flex items-center gap-3 rounded-lg border-3 border-ink bg-surface p-4 transition-colors duration-150 ease-out hover:bg-muted',
                     draggedIndex === index && 'opacity-50 motion-safe:scale-95'
                   )}
                 >
@@ -355,7 +358,7 @@ export default function PDFMerger() {
                       disabled={index === 0}
                       aria-label={`Mover ${file.name} hacia arriba`}
                       className={cn(
-                        'flex h-9 w-9 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-brand-navy disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-1',
+                        'flex h-9 w-9 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-ink disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-1',
                         accent.ring
                       )}
                     >
@@ -367,7 +370,7 @@ export default function PDFMerger() {
                       disabled={index === files.length - 1}
                       aria-label={`Mover ${file.name} hacia abajo`}
                       className={cn(
-                        'flex h-9 w-9 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-brand-navy disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-1',
+                        'flex h-9 w-9 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-ink disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-1',
                         accent.ring
                       )}
                     >
@@ -375,32 +378,27 @@ export default function PDFMerger() {
                     </button>
                   </div>
 
-                  <div className="flex flex-1 items-center gap-3">
-                    <div
-                      className={cn(
-                        'flex h-10 w-10 shrink-0 items-center justify-center rounded',
-                        file.type === 'image' ? accent.soft : 'bg-brand-navy/[0.06]'
-                      )}
-                    >
+                  <div className="flex min-w-0 flex-1 items-center gap-3">
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded border-2 border-ink bg-card">
                       {file.type === 'image' ? (
-                        <ImageIcon className={cn('h-5 w-5', accent.text)} />
+                        <ImageIcon className="h-5 w-5 text-ink" />
                       ) : (
-                        <FileText className="h-5 w-5 text-brand-navy" />
+                        <FileText className="h-5 w-5 text-ink" />
                       )}
                     </div>
                     <div className="min-w-0 flex-1">
                       <p className="truncate font-medium text-ink">
                         {file.name}
                       </p>
-                      <p className="text-sm text-muted-foreground">
-                        {file.size}
+                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                        <span>{file.size}</span>
                         {file.cropped && (
-                          <span className="ml-2 inline-flex items-center text-success">
-                            <Crop className="mr-1 h-3 w-3" />
+                          <span className="inline-flex items-center gap-1 font-medium text-success">
+                            <Crop className="h-3 w-3" />
                             Recortado
                           </span>
                         )}
-                      </p>
+                      </div>
                     </div>
                     <span className="shrink-0 text-sm text-muted-foreground">
                       #{index + 1}
@@ -412,7 +410,7 @@ export default function PDFMerger() {
                       variant="outline"
                       size="sm"
                       onClick={() => setCropFileId(file.id)}
-                      className={cn('shrink-0', accent.text)}
+                      className="shrink-0"
                       title="Recortar imagen"
                     >
                       <Crop className="mr-2 h-4 w-4" />
@@ -424,7 +422,7 @@ export default function PDFMerger() {
                     size="sm"
                     onClick={() => removeFile(file.id)}
                     aria-label={`Quitar ${file.name}`}
-                    className="shrink-0 text-muted-foreground hover:text-brand-red"
+                    className="shrink-0 text-muted-foreground hover:text-ink"
                   >
                     <X className="h-4 w-4" />
                   </Button>
@@ -432,7 +430,7 @@ export default function PDFMerger() {
               ))}
             </ul>
 
-            <div className={cn('mt-6 rounded-lg p-4', accent.soft)}>
+            <div className={cn('mt-6 rounded-lg border-3 border-ink p-4', accent.soft)}>
               <p className={cn('text-sm', accent.softText)}>
                 <strong>Tip:</strong> arrastra los archivos (o usa las flechas) para
                 cambiar el orden. Se unirán en el orden que aparecen aquí. Usa el
@@ -447,7 +445,7 @@ export default function PDFMerger() {
         <Card className="mb-8">
           <CardContent className="p-6">
             <div className="mb-6 text-center">
-              <h2 className="mb-2 font-display text-lg font-bold text-brand-navy">
+              <h2 className="mb-2 font-display text-lg font-bold text-ink">
                 {files.length > 1 ? '¿Listo para unir?' : '¿Listo para generar el PDF?'}
               </h2>
               <p className="text-muted-foreground">
@@ -476,7 +474,7 @@ export default function PDFMerger() {
                   aria-describedby="filename-help"
                   className={cn(
                     'pr-12',
-                    fileNameError && 'border-brand-red/50 focus-visible:ring-brand-red/20'
+                    fileNameError && 'border-brand-red focus-visible:ring-ink'
                   )}
                 />
                 <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3">
@@ -522,14 +520,14 @@ export default function PDFMerger() {
       {downloadUrl && (
         <Card
           ref={resultRef}
-          className="border-success/20 bg-success/[0.06] motion-safe:animate-slide-up"
+          className="motion-safe:animate-slide-up"
         >
           <CardContent className="p-6 text-center">
-            <div className="mb-4 inline-flex h-16 w-16 items-center justify-center rounded-full bg-success/10">
-              <Download className="h-8 w-8 text-success" />
+            <div className="mb-4 inline-flex h-16 w-16 items-center justify-center rounded-full border-3 border-ink bg-success text-white">
+              <Download className="h-8 w-8" />
             </div>
-            <h2 className="mb-2 font-display text-lg font-bold text-success">¡Listo!</h2>
-            <p className="mb-6 text-success/90">
+            <h2 className="mb-2 text-lg font-bold text-success">¡Listo!</h2>
+            <p className="mb-6 text-ink">
               Tu PDF unificado está listo para descargar como &quot;
               {getValidFileName()}.pdf&quot;
             </p>

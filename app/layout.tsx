@@ -1,24 +1,17 @@
 import './globals.css';
 import type { Metadata } from 'next';
-import { Archivo, IBM_Plex_Sans } from 'next/font/google';
+import { Roboto_Mono } from 'next/font/google';
 import { Analytics } from "@vercel/analytics/next"
 import SiteHeader from '@/components/layout/SiteHeader';
-import SiteFooter from '@/components/layout/SiteFooter';
+import ConditionalFooter from '@/components/layout/ConditionalFooter';
 import { Toaster } from '@/components/ui/sonner';
 
-// Display industrial con presencia (títulos / wordmark)
-const archivo = Archivo({
+// Tipografía única del sistema (invariante): monoespaciada. Jerarquía solo por
+// tamaño/peso/color, nunca mezclando familias.
+const robotoMono = Roboto_Mono({
   subsets: ['latin'],
-  weight: ['500', '600', '700', '800'],
-  variable: '--font-display',
-  display: 'swap',
-});
-
-// Body humanista técnica (UI / texto)
-const plex = IBM_Plex_Sans({
-  subsets: ['latin'],
-  weight: ['400', '500', '600', '700'],
-  variable: '--font-sans',
+  weight: ['400', '500', '700'],
+  variable: '--font-mono',
   display: 'swap',
 });
 
@@ -43,11 +36,11 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="es" className={`${archivo.variable} ${plex.variable}`}>
-      <body className="flex min-h-screen flex-col bg-surface font-sans text-ink antialiased">
+    <html lang="es" className={robotoMono.variable}>
+      <body className="flex min-h-screen flex-col bg-surface font-mono text-ink antialiased">
         <SiteHeader />
         <main className="flex-1">{children}</main>
-        <SiteFooter />
+        <ConditionalFooter />
         <Toaster position="top-right" />
         <Analytics />
       </body>

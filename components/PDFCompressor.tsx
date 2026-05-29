@@ -1,12 +1,11 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
-import Image from 'next/image';
 import { PDFDocument } from 'pdf-lib';
 import * as pdfjsLib from 'pdfjs-dist';
 import JSZip from 'jszip';
 import ExcelJS from 'exceljs';
-import { FileText, Download, Loader2, X, Minimize2 as Compress, AlertCircle, FileSpreadsheet, Clock } from 'lucide-react';
+import { FileText, Download, Loader2, X, Minimize2 as Compress, FileSpreadsheet, Clock } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { performanceMonitor } from '@/lib/performance-monitor';
@@ -19,6 +18,7 @@ import { toastUndo } from '@/lib/toast';
 import { getTool } from '@/lib/tools';
 import ToolShell from '@/components/tools/ToolShell';
 import FileDropzone from '@/components/tools/FileDropzone';
+import ToolConstraints from '@/components/tools/ToolConstraints';
 
 if (typeof window !== 'undefined') {
   pdfjsLib.GlobalWorkerOptions.workerSrc = '/pdf.worker.min.js';
@@ -31,7 +31,6 @@ interface ProcessableFile {
   originalSize: number;
   compressedSize?: number;
   compressedBlob?: Blob;
-  preview?: string;
   isProcessing: boolean;
   error?: string;
   type: 'pdf' | 'excel';
@@ -141,31 +140,6 @@ export default function PDFCompressor() {
     return validFiles;
   };
 
-  const generatePreview = async (file: File): Promise<string | undefined> => {
-    try {
-      const arrayBuffer = await file.arrayBuffer();
-      const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
-      const page = await pdf.getPage(1);
-      
-      const viewport = page.getViewport({ scale: 0.3 });
-      const canvas = document.createElement('canvas');
-      const context = canvas.getContext('2d')!;
-      
-      canvas.height = viewport.height;
-      canvas.width = viewport.width;
-      
-      await page.render({
-        canvasContext: context,
-        viewport: viewport
-      }).promise;
-      
-      return canvas.toDataURL('image/jpeg', 0.8);
-    } catch (error) {
-      console.error('Error generating preview:', error);
-      return undefined;
-    }
-  };
-
   const handleFileSelect = async (selectedFiles: FileList) => {
     const validFiles = validateFiles(selectedFiles);
     if (validFiles.length === 0) return;
@@ -175,7 +149,6 @@ export default function PDFCompressor() {
       const newFiles: ProcessableFile[] = await Promise.all(
         validFiles.map(async (file) => {
           const fileType = file.type === 'application/pdf' ? 'pdf' : 'excel';
-          const preview = fileType === 'pdf' ? await generatePreview(file) : undefined;
           const fileName = file.name.replace(/\.(pdf|xlsx|xls)$/i, '');
 
           return {
@@ -183,7 +156,6 @@ export default function PDFCompressor() {
             file,
             name: fileName,
             originalSize: file.size,
-            preview,
             isProcessing: false,
             type: fileType,
           };
@@ -654,22 +626,7 @@ export default function PDFCompressor() {
         onFiles={handleFileSelect}
       />
 
-      <div className="mb-8 rounded-xl border border-warning/30 bg-warning/[0.08] p-4">
-        <div className="flex items-start gap-2">
-          <AlertCircle className="mt-0.5 h-5 w-5 flex-shrink-0 text-warning" />
-          <div className="text-sm text-warning-foreground">
-            <p className="mb-1 font-medium">Límites y consideraciones:</p>
-            <ul className="space-y-1">
-              <li>• Tamaño máximo total: 500MB</li>
-              <li>• Archivos PDF (.pdf) y Excel (.xlsx, .xls) válidos</li>
-              <li>• No se permiten archivos duplicados</li>
-              <li>• Para Excel: comprime imágenes embebidas sin afectar datos</li>
-              <li>• Archivos grandes (&gt;100MB) pueden tardar varios minutos</li>
-              <li>• Todo se procesa en tu navegador, por lotes para no bloquear la pantalla</li>
-            </ul>
-          </div>
-        </div>
-      </div>
+      <ToolConstraints items={tool.constraints} />
 
       {isLoadingFiles && (
         <Card className="mb-8">
@@ -682,7 +639,7 @@ export default function PDFCompressor() {
               </div>
             </div>
             <p className="mt-4 text-center text-sm text-muted-foreground">
-              Preparando archivos y generando vistas previas…
+              Preparando archivos…
             </p>
           </CardContent>
         </Card>
@@ -692,7 +649,7 @@ export default function PDFCompressor() {
         <Card className="mb-8" ref={filesListRef}>
           <CardContent className="p-6">
             <div className="mb-6 flex items-center justify-between">
-              <h2 className="font-display text-lg font-bold text-brand-navy">
+              <h2 className="font-display text-lg font-bold text-ink">
                 Archivos seleccionados ({files.length})
               </h2>
               <Button
@@ -718,13 +675,13 @@ export default function PDFCompressor() {
                     onClick={() => setCompressionLevel(level as CompressionLevel)}
                     aria-pressed={compressionLevel === level}
                     className={cn(
-                      'rounded-lg border-2 p-4 text-left transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-red focus-visible:ring-offset-2',
+                      'rounded-lg border-3 border-ink p-4 text-left transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink focus-visible:ring-offset-2',
                       compressionLevel === level
-                        ? 'border-brand-red bg-brand-red/[0.04]'
-                        : 'border-border hover:border-brand-red/40'
+                        ? 'bg-highlight-soft'
+                        : 'bg-surface hover:bg-muted'
                     )}
                   >
-                    <div className="mb-1 font-medium capitalize text-ink">
+                    <div className="mb-1 font-bold capitalize text-ink">
                       {level === 'low' ? 'Baja' : level === 'medium' ? 'Media' : 'Alta'}
                     </div>
                     <div className="text-sm text-muted-foreground">
@@ -739,25 +696,15 @@ export default function PDFCompressor() {
               {files.map((file) => (
                 <div
                   key={file.id}
-                  className="flex items-center gap-4 rounded-lg bg-muted/50 p-4"
+                  className="flex items-center gap-4 rounded-lg border-3 border-ink bg-surface p-4"
                 >
-                  {file.preview ? (
-                    <Image
-                      src={file.preview}
-                      alt={`Vista previa de ${file.name}`}
-                      width={64}
-                      height={80}
-                      className="w-16 h-20 object-cover rounded border"
-                    />
-                  ) : (
-                    <div className="flex items-center justify-center w-16 h-20 bg-muted rounded border">
-                      {file.type === 'pdf' ? (
-                        <FileText className="w-8 h-8 text-brand-navy" />
-                      ) : (
-                        <FileSpreadsheet className="w-8 h-8 text-brand-navy" />
-                      )}
-                    </div>
-                  )}
+                  <div className="flex h-20 w-16 shrink-0 items-center justify-center rounded border-2 border-ink bg-card">
+                    {file.type === 'pdf' ? (
+                      <FileText className="h-8 w-8 text-ink" />
+                    ) : (
+                      <FileSpreadsheet className="h-8 w-8 text-ink" />
+                    )}
+                  </div>
                   
                   <div className="flex-1 min-w-0">
                     <p className="font-medium text-ink truncate">
@@ -815,7 +762,7 @@ export default function PDFCompressor() {
                       size="sm"
                       onClick={() => removeFile(file.id)}
                       aria-label={`Quitar ${file.name}`}
-                      className="text-muted-foreground hover:text-brand-red"
+                      className="text-muted-foreground hover:text-ink"
                     >
                       <X className="w-4 h-4" />
                     </Button>
@@ -825,7 +772,7 @@ export default function PDFCompressor() {
             </div>
 
             {totalOriginalSize > 0 && (
-              <div className="mt-6 rounded-lg bg-muted/60 p-4">
+              <div className="mt-6 rounded-lg border-3 border-ink bg-card p-4">
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-center">
                   <div>
                     <p className="text-sm font-medium text-muted-foreground">Tamaño original total</p>
@@ -861,7 +808,7 @@ export default function PDFCompressor() {
       {files.length > 0 && !allCompressed && (
         <Card className="mb-8">
           <CardContent className="p-6 text-center">
-            <h2 className="mb-4 font-display text-lg font-bold text-brand-navy">
+            <h2 className="mb-4 font-display text-lg font-bold text-ink">
               ¿Listo para comprimir?
             </h2>
             <p className="mb-6 text-muted-foreground">
@@ -898,16 +845,16 @@ export default function PDFCompressor() {
       {allCompressed && (
         <Card
           ref={resultRef}
-          className="border-success/20 bg-success/[0.06] motion-safe:animate-slide-up"
+          className="motion-safe:animate-slide-up"
         >
           <CardContent className="p-6 text-center">
-            <div className="mb-4 inline-flex h-16 w-16 items-center justify-center rounded-full bg-success/10">
-              <Download className="h-8 w-8 text-success" />
+            <div className="mb-4 inline-flex h-16 w-16 items-center justify-center rounded-full border-3 border-ink bg-success text-white">
+              <Download className="h-8 w-8" />
             </div>
-            <h2 className="mb-2 font-display text-lg font-bold text-success">
+            <h2 className="mb-2 text-lg font-bold text-success">
               ¡Compresión completada!
             </h2>
-            <p className="mb-6 text-success/90">
+            <p className="mb-6 text-ink">
               {reduced
                 ? `Se ${compressedFilesCount === 1 ? 'redujo' : 'redujeron'} ${compressedFilesCount} archivo${compressedFilesCount !== 1 ? 's' : ''} un ${totalReduction}% (${formatFileSize(totalOriginalSize - totalCompressedSize)} menos).`
                 : `Tus archivo${compressedFilesCount !== 1 ? 's' : ''} ya ${compressedFilesCount !== 1 ? 'estaban' : 'estaba'} optimizado${compressedFilesCount !== 1 ? 's' : ''}; se ${compressedFilesCount !== 1 ? 'conservan los originales' : 'conserva el original'}.`}

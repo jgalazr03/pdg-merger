@@ -13,6 +13,7 @@ import { toastUndo } from '@/lib/toast';
 import { getTool } from '@/lib/tools';
 import ToolShell from '@/components/tools/ToolShell';
 import FileDropzone from '@/components/tools/FileDropzone';
+import ToolConstraints from '@/components/tools/ToolConstraints';
 
 const tool = getTool('dividir');
 const accent = tool.accent;
@@ -253,7 +254,7 @@ export default function PDFSplitter() {
   return (
     <ToolShell tool={tool} step={step}>
       <FileDropzone
-        className="mb-8"
+        className="mb-4"
         accent={accent}
         accept=".pdf,application/pdf"
         idleTitle="Selecciona un archivo PDF"
@@ -264,11 +265,13 @@ export default function PDFSplitter() {
         onFiles={(files) => handleFileSelect(files[0])}
       />
 
+      <ToolConstraints items={tool.constraints} />
+
       {selectedFile && (
         <Card className="mb-8 motion-safe:animate-slide-up" ref={fileInfoRef}>
           <CardContent className="p-6">
             <div className="mb-6 flex items-center justify-between">
-              <h2 className="font-display text-lg font-bold text-brand-navy">
+              <h2 className="font-display text-lg font-bold text-ink">
                 Archivo seleccionado
               </h2>
               <Button variant="outline" size="sm" onClick={changeFileWithUndo}>
@@ -277,9 +280,9 @@ export default function PDFSplitter() {
               </Button>
             </div>
 
-            <div className="flex items-center gap-4 rounded-lg bg-muted/50 p-4">
-              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded bg-brand-navy/[0.06]">
-                <FileText className="h-6 w-6 text-brand-navy" />
+            <div className="flex items-center gap-4 rounded-lg border-3 border-ink bg-surface p-4">
+              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded border-2 border-ink bg-card">
+                <FileText className="h-6 w-6 text-ink" />
               </div>
               <div className="min-w-0 flex-1">
                 <p className="truncate font-medium text-ink">
@@ -308,7 +311,7 @@ export default function PDFSplitter() {
                 aria-invalid={!!rangeError}
                 aria-describedby="ranges-help"
                 className={cn(
-                  rangeError && 'border-brand-red/50 focus-visible:ring-brand-red/20'
+                  rangeError && 'border-brand-red focus-visible:ring-ink'
                 )}
               />
               {rangeError && (
@@ -320,8 +323,8 @@ export default function PDFSplitter() {
                   <span>{rangeError}</span>
                 </div>
               )}
-              <div className={cn('mt-3 rounded-lg p-3', accent.soft)}>
-                <p className={cn('text-sm font-medium', accent.softText)}>
+              <div className={cn('mt-3 rounded-lg border-3 border-ink p-3', accent.soft)}>
+                <p className={cn('text-sm font-bold', accent.softText)}>
                   Ejemplos:
                 </p>
                 <ul className={cn('mt-1 space-y-1 text-sm', accent.softText)}>
@@ -338,7 +341,7 @@ export default function PDFSplitter() {
       {selectedFile && splitRanges && !rangeError && splitPDFs.length === 0 && (
         <Card className="mb-8">
           <CardContent className="p-6 text-center">
-            <h2 className="mb-4 font-display text-lg font-bold text-brand-navy">
+            <h2 className="mb-4 font-display text-lg font-bold text-ink">
               ¿Listo para dividir?
             </h2>
             <p className="mb-6 text-muted-foreground">
@@ -371,17 +374,17 @@ export default function PDFSplitter() {
       {splitPDFs.length > 0 && (
         <Card
           ref={resultRef}
-          className="border-success/20 bg-success/[0.06] motion-safe:animate-slide-up"
+          className="motion-safe:animate-slide-up"
         >
           <CardContent className="p-6">
             <div className="mb-6 text-center">
-              <div className="mb-4 inline-flex h-16 w-16 items-center justify-center rounded-full bg-success/10">
-                <Download className="h-8 w-8 text-success" />
+              <div className="mb-4 inline-flex h-16 w-16 items-center justify-center rounded-full border-3 border-ink bg-success text-white">
+                <Download className="h-8 w-8" />
               </div>
-              <h2 className="mb-2 font-display text-lg font-bold text-success">
+              <h2 className="mb-2 text-lg font-bold text-success">
                 ¡División completada!
               </h2>
-              <p className="mb-4 text-success/90">
+              <p className="mb-4 text-ink">
                 Se han creado {splitPDFs.length} archivos PDF.
               </p>
               <Button onClick={downloadAllPDFs} size="lg" className={accent.solid}>
@@ -395,11 +398,11 @@ export default function PDFSplitter() {
               {splitPDFs.map((pdf) => (
                 <div
                   key={pdf.id}
-                  className="flex items-center justify-between gap-3 rounded-lg border bg-card p-4"
+                  className="flex items-center justify-between gap-3 rounded-lg border-3 border-ink bg-surface p-4"
                 >
                   <div className="flex min-w-0 items-center gap-3">
-                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded bg-success/10">
-                      <FileText className="h-5 w-5 text-success" />
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded border-2 border-ink bg-success text-white">
+                      <FileText className="h-5 w-5" />
                     </div>
                     <div className="min-w-0">
                       <p className="truncate text-sm font-medium text-ink">

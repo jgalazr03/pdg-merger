@@ -1,0 +1,53 @@
+/* ============================================================
+   Design System Tokens — base "react-spring-visualizer"
+   Valores verificados (no los crudos de skillui).
+   Pega esto en :root y referencia las variables en todo el proyecto.
+   ============================================================ */
+:root {
+  /* ---- Color (cada token tiene un ROL; al adaptar, conserva el rol) ---- */
+  --color-bg:        #fef6e4; /* fondo de página */
+  --color-surface:   #f3d2c1; /* tarjetas, paneles, barras */
+  --color-ink:       #001858; /* texto principal + TODOS los bordes */
+  --color-accent:    #0000ee; /* links, estados activos, foco de marca */
+  --color-muted:     #aaaaaa; /* texto secundario, placeholders */
+  --color-highlight: #8bd3dd; /* relleno de acento (cian) */
+  --color-cta:       #f582ae; /* CTA / destructivo (rosa) */
+
+  /* ---- Tipografía ---- */
+  --font-mono: "Roboto Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  --fw-regular: 400;
+  --fw-medium:  500;
+  --fw-bold:    700;
+  --fs-h1: 3rem;     /* títulos grandes */
+  --fs-h2: 24px;     /* sección */
+  --fs-h3: 18px;     /* subsección */
+  --fs-lg: 20px;     /* labels, subtítulos */
+  --fs-md: 16px;     /* inputs, controles */
+  --fs-sm: 14px;     /* texto auxiliar, código */
+  --lh-body: 1.5;
+  --lh-heading: 1.1;
+
+  /* ---- Espaciado (grid de 5px — todo es múltiplo de 5) ---- */
+  --space-1: 5px;
+  --space-2: 10px;
+  --space-3: 15px;
+  --space-4: 20px;
+  --space-6: 30px;
+  --space-8: 40px;
+  --space-12: 60px;
+
+  /* ---- Radius ---- */
+  --radius: 5px;       /* por defecto */
+  --radius-lg: 20px;   /* contenedores grandes */
+
+  /* ---- Bordes (firma del estilo: navy y gruesos) ---- */
+  --border-control: 3px solid var(--color-ink);
+  --border-panel:   4px solid var(--color-ink);
+
+  /* ---- Motion ---- */
+  --ease: cubic-bezier(0.4, 0, 0.2, 1);
+  --dur: 200ms;
+
+  /* ---- Layout ---- */
+  --container: 1000px;
+}

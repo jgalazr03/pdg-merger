@@ -9,10 +9,53 @@ const config: Config = {
     './lib/**/*.{js,ts,jsx,tsx,mdx}',
   ],
   theme: {
+    // Grid de espaciado de 5px (invariante del sistema): cada paso = 5·n px,
+    // los medios pasos redondean al múltiplo de 5 más cercano. Así TODO
+    // margin/padding/gap/width/height de la app cae en la rejilla de 5px.
+    spacing: {
+      px: '1px',
+      0: '0px',
+      0.5: '5px',
+      1: '5px',
+      1.5: '10px',
+      2: '10px',
+      2.5: '15px',
+      3: '15px',
+      3.5: '20px',
+      4: '20px',
+      5: '25px',
+      6: '30px',
+      7: '35px',
+      8: '40px',
+      9: '45px',
+      10: '50px',
+      11: '55px',
+      12: '60px',
+      14: '70px',
+      16: '80px',
+      20: '100px',
+      24: '120px',
+      28: '140px',
+      32: '160px',
+      36: '180px',
+      40: '200px',
+      44: '220px',
+      48: '240px',
+      52: '260px',
+      56: '280px',
+      60: '300px',
+      64: '320px',
+      72: '360px',
+      80: '400px',
+      96: '480px',
+    },
     extend: {
       fontFamily: {
-        sans: ['var(--font-sans)', 'system-ui', 'sans-serif'],
-        display: ['var(--font-display)', 'var(--font-sans)', 'sans-serif'],
+        // Una sola familia monoespaciada (invariante). `sans` y `display`
+        // apuntan a la misma var para que el markup heredado siga en mono.
+        sans: ['var(--font-mono)', 'ui-monospace', 'SFMono-Regular', 'Menlo', 'monospace'],
+        mono: ['var(--font-mono)', 'ui-monospace', 'SFMono-Regular', 'Menlo', 'monospace'],
+        display: ['var(--font-mono)', 'ui-monospace', 'SFMono-Regular', 'Menlo', 'monospace'],
       },
       // Curvas de Emil Kowalski (animations.dev): entradas con ease-out,
       // movimiento on-screen con ease-in-out.
@@ -21,24 +64,40 @@ const config: Config = {
         'out-cubic': 'cubic-bezier(0.215, 0.61, 0.355, 1)',
         'in-out-quint': 'cubic-bezier(0.86, 0, 0.07, 1)',
       },
-      backgroundImage: {
-        'gradient-radial': 'radial-gradient(var(--tw-gradient-stops))',
-        'gradient-conic':
-          'conic-gradient(from 180deg at 50% 50%, var(--tw-gradient-stops))',
+      // Bordes navy gruesos = firma del estilo (3px controles, 4px paneles).
+      borderWidth: {
+        3: '3px',
+        4: '4px',
       },
+      // Radius del sistema: 5px por defecto, 20px en contenedores grandes.
       borderRadius: {
-        lg: 'var(--radius)',
-        md: 'calc(var(--radius) - 2px)',
-        sm: 'calc(var(--radius) - 4px)',
+        none: '0px',
+        sm: '5px',
+        DEFAULT: '5px',
+        md: '5px',
+        lg: 'var(--radius)', // 5px
+        xl: 'var(--radius-lg)', // 20px
+        '2xl': 'var(--radius-lg)', // 20px
+        full: '9999px',
       },
       colors: {
         brand: {
           navy: 'hsl(var(--brand-navy) / <alpha-value>)',
           ocean: 'hsl(var(--brand-ocean) / <alpha-value>)',
           red: 'hsl(var(--brand-red) / <alpha-value>)',
+          teal: 'hsl(var(--brand-teal) / <alpha-value>)',
         },
         surface: 'hsl(var(--surface) / <alpha-value>)',
+        panel: 'hsl(var(--panel) / <alpha-value>)',
         ink: 'hsl(var(--ink) / <alpha-value>)',
+        // Rol "highlight": relleno de acento (cian del sistema base → teal GAINCO)
+        highlight: {
+          DEFAULT: 'hsl(var(--highlight) / <alpha-value>)',
+          soft: 'hsl(var(--highlight-soft) / <alpha-value>)',
+        },
+        // Tintes suaves por herramienta (cajas de ayuda), mismo registro que highlight-soft.
+        'ocean-soft': 'hsl(var(--ocean-soft) / <alpha-value>)',
+        'amber-soft': 'hsl(var(--amber-soft) / <alpha-value>)',
         background: 'hsl(var(--background))',
         foreground: 'hsl(var(--foreground))',
         card: {

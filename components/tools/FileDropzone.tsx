@@ -94,29 +94,22 @@ export default function FileDropzone({
       onDragOver={handleDragOver}
       onDrop={handleDrop}
       className={cn(
-        'group relative cursor-pointer rounded-2xl border-2 border-dashed bg-white px-6 py-10 text-center shadow-sm transition duration-200 ease-out-quint sm:py-12',
-        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-red focus-visible:ring-offset-2',
-        isDragOver
-          ? 'border-brand-red bg-brand-red/[0.03] shadow-md motion-safe:scale-[1.01]'
-          : 'border-border hover:border-brand-red/40 hover:shadow-md',
+        // Una sola caja: borde navy discontinuo 3px, papel, color plano, sin sombra.
+        'group relative cursor-pointer rounded-lg border-[3px] border-dashed border-ink px-6 py-10 text-center transition-colors duration-150 ease-out sm:py-12',
+        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink focus-visible:ring-offset-2',
+        isDragOver ? 'bg-highlight-soft' : 'bg-surface hover:bg-muted',
         className
       )}
     >
       <div
         className={cn(
-          'mx-auto mb-5 flex h-14 w-14 items-center justify-center rounded-2xl transition-colors',
-          isDragOver ? 'bg-brand-red/10' : 'bg-brand-navy/[0.04] group-hover:bg-brand-navy/[0.07]'
+          'mx-auto mb-5 flex h-14 w-14 items-center justify-center rounded-lg border-3 border-ink transition-colors',
+          isDragOver ? 'bg-highlight text-white' : 'bg-surface text-ink'
         )}
       >
-        <Upload
-          className={cn(
-            'h-6 w-6 transition-colors',
-            isDragOver ? 'text-brand-red' : 'text-brand-navy/70'
-          )}
-          strokeWidth={1.75}
-        />
+        <Upload className="h-6 w-6" strokeWidth={2} />
       </div>
-      <h3 className="mb-1.5 font-display text-lg font-bold text-brand-navy">
+      <h3 className="mb-1.5 text-lg font-bold text-ink">
         {isDragOver ? dragTitle : idleTitle}
       </h3>
       <p className="mx-auto mb-6 max-w-md text-sm text-muted-foreground">

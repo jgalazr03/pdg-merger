@@ -2,21 +2,25 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { ShieldCheck } from 'lucide-react';
 import { TOOLS } from '@/lib/tools';
+import { cn } from '@/lib/utils';
 
+/**
+ * Footer sobre navy de marca. En el footer el COLOR = identidad de herramienta:
+ * cada enlace lleva su ícono en el tono claro de su herramienta (accent.onDark,
+ * legible sobre navy). Todo lo demás (chrome) va neutro en blanco —escudo,
+ * eyebrow y la costura superior (que espeja el border-b-4 del header)— para no
+ * competir con los colores de herramienta. La privacidad se afirma como
+ * propuesta de valor, no como "badge".
+ */
 export default function SiteFooter() {
-  return (
-    <footer className="relative mt-20 overflow-hidden bg-brand-navy text-white/80">
-      {/* hairline rojo de marca arriba */}
-      <span className="absolute inset-x-0 top-0 h-0.5 bg-brand-red" />
-      {/* halo sutil */}
-      <span
-        aria-hidden="true"
-        className="pointer-events-none absolute -right-24 -top-24 h-64 w-64 rounded-full bg-brand-ocean/20 blur-3xl"
-      />
+  const year = new Date().getFullYear();
 
-      <div className="container relative mx-auto max-w-6xl px-4 py-12">
-        <div className="flex flex-col gap-8 md:flex-row md:items-start md:justify-between">
-          <div className="max-w-sm">
+  return (
+    <footer className="mt-20 border-t-4 border-white bg-brand-navy text-white/80">
+      <div className="container mx-auto max-w-6xl px-4 py-14">
+        <div className="grid gap-10 md:grid-cols-[1fr_auto] md:gap-16">
+          {/* Marca + propuesta + privacidad */}
+          <div className="max-w-md">
             <Image
               src="/logos/logo-gainco-white.svg"
               alt="GAINCO"
@@ -24,28 +28,40 @@ export default function SiteFooter() {
               height={33}
               className="h-8 w-auto"
             />
-            <p className="mt-4 text-sm leading-relaxed text-white/80">
-              Une, divide y comprime archivos PDF y Excel de forma rápida y
-              segura, directo desde tu navegador.
+            <p className="mt-5 text-sm leading-relaxed text-white/70">
+              Une, divide y comprime archivos PDF y Excel, directo desde tu
+              navegador.
             </p>
-            <p className="mt-5 inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1 text-xs font-medium text-white/90 ring-1 ring-white/15">
-              <ShieldCheck className="h-4 w-4" />
-              Tus archivos se procesan en tu dispositivo
+            <p className="mt-6 flex items-center gap-2.5 text-sm font-bold text-white">
+              <ShieldCheck
+                className="h-5 w-5 shrink-0 text-white"
+                strokeWidth={2.25}
+                aria-hidden="true"
+              />
+              Tus archivos nunca salen de tu equipo.
             </p>
           </div>
 
-          <nav aria-label="Herramientas" className="md:text-right">
-            <p className="mb-4 font-display text-xs font-semibold uppercase tracking-wider text-white/60">
+          {/* Herramientas */}
+          <nav aria-label="Herramientas" className="md:min-w-[180px]">
+            <p className="mb-5 text-xs font-bold uppercase tracking-wider text-white/50">
               Herramientas
             </p>
-            <ul className="space-y-2.5">
+            <ul className="space-y-3.5">
               {TOOLS.map((tool) => (
                 <li key={tool.slug}>
                   <Link
                     href={tool.href}
-                    className="rounded text-sm text-white/85 transition-colors hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-red focus-visible:ring-offset-2 focus-visible:ring-offset-brand-navy"
+                    className="group inline-flex items-center gap-2.5 text-sm font-bold text-white/75 transition-colors hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-brand-navy"
                   >
-                    {tool.name}
+                    <tool.Icon
+                      className={cn('h-4 w-4 shrink-0', tool.accent.onDark)}
+                      strokeWidth={2}
+                      aria-hidden="true"
+                    />
+                    <span className="decoration-2 underline-offset-4 group-hover:underline">
+                      {tool.name}
+                    </span>
                   </Link>
                 </li>
               ))}
@@ -53,8 +69,9 @@ export default function SiteFooter() {
           </nav>
         </div>
 
-        <div className="mt-12 border-t border-white/10 pt-6 text-center text-xs text-white/60">
-          © {new Date().getFullYear()} GAINCO. Todos los derechos reservados.
+        {/* Barra inferior */}
+        <div className="mt-12 border-t-2 border-white/15 pt-6 text-xs text-white/55">
+          © {year} GAINCO. Todos los derechos reservados.
         </div>
       </div>
     </footer>

@@ -220,7 +220,7 @@ export default function ImageCropModal({ file, onCancel, onConfirm }: ImageCropM
                 <div
                   key={corner.mode}
                   onPointerDown={(e) => startDrag(e, corner.mode)}
-                  className={`absolute w-3 h-3 bg-white border border-brand-red rounded-sm ${corner.className}`}
+                  className={`absolute w-3 h-3 bg-white border-2 border-ink rounded-sm ${corner.className}`}
                 />
               ))}
             </div>

@@ -1,37 +1,67 @@
 import { Check } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { ToolAccent } from '@/lib/tools';
 
 const STEPS = ['Subir', 'Opciones', 'Listo'] as const;
 
 /**
- * Indicador de pasos (Subir → Opciones → Listo) con colores de marca:
- * rojo para el paso actual, navy para los completados. `current` es 1, 2 o 3.
+ * Indicador de pasos VERTICAL (Subir → Opciones → Listo). El paso ACTUAL toma
+ * el color de la herramienta (accent.line); los COMPLETADOS van en navy con
+ * check; los pendientes en contorno apagado. El conector vertical se rellena
+ * en navy conforme se avanza. Si no se pasa `accent`, el actual cae a navy.
  */
-export default function StepIndicator({ current }: { current: 1 | 2 | 3 }) {
+export default function StepIndicator({
+  current,
+  accent,
+  className,
+}: {
+  current: 1 | 2 | 3;
+  accent?: ToolAccent;
+  className?: string;
+}) {
   return (
-    <ol className="mb-10 flex items-center gap-3 border-y border-border/70 py-3">
+    <ol className={cn('flex flex-col', className)}>
       {STEPS.map((label, i) => {
         const stepNumber = i + 1;
         const isDone = stepNumber < current;
         const isCurrent = stepNumber === current;
+        const isLast = i === STEPS.length - 1;
         return (
-          <li key={label} className="flex flex-1 items-center gap-3">
-            <div className="flex items-center gap-2.5">
+          <li
+            key={label}
+            className="flex items-start gap-3"
+            aria-current={isCurrent ? 'step' : undefined}
+          >
+            {/* Columna del indicador: círculo + conector vertical */}
+            <div className="flex flex-col items-center">
               <span
                 aria-hidden="true"
                 className={cn(
-                  'flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-bold transition-colors',
-                  isDone && 'bg-brand-navy text-white',
-                  isCurrent && 'bg-brand-red text-white ring-4 ring-brand-red/15',
-                  !isDone && !isCurrent && 'bg-muted text-muted-foreground'
+                  'flex h-8 w-8 shrink-0 items-center justify-center rounded-full border-3 border-ink text-xs font-bold transition-colors',
+                  isDone && 'bg-ink text-white',
+                  isCurrent && cn(accent ? accent.line : 'bg-ink', 'text-white'),
+                  !isDone && !isCurrent && 'bg-surface text-muted-foreground'
                 )}
               >
-                {isDone ? <Check className="h-3.5 w-3.5" /> : stepNumber}
+                {isDone ? <Check className="h-4 w-4" /> : stepNumber}
               </span>
+              {!isLast && (
+                <span
+                  aria-hidden="true"
+                  className={cn(
+                    'my-1 h-6 w-[3px] transition-colors duration-200 ease-out',
+                    isDone ? 'bg-ink' : 'bg-ink/25'
+                  )}
+                />
+              )}
+            </div>
+
+            {/* Etiqueta, alineada al centro del círculo */}
+            <div className="flex h-8 items-center">
               <span
                 className={cn(
-                  'text-sm font-semibold',
-                  isCurrent ? 'text-brand-navy' : 'text-muted-foreground'
+                  'text-sm font-bold',
+                  isCurrent ? 'text-ink' : 'text-muted-foreground'
                 )}
               >
                 <span className="sr-only">
@@ -41,15 +71,6 @@ export default function StepIndicator({ current }: { current: 1 | 2 | 3 }) {
                 {label}
               </span>
             </div>
-            {stepNumber < STEPS.length && (
-              <span
-                aria-hidden="true"
-                className={cn(
-                  'h-px flex-1',
-                  stepNumber < current ? 'bg-brand-navy/40' : 'bg-border'
-                )}
-              />
-            )}
           </li>
         );
       })}
