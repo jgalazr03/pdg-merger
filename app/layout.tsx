@@ -39,7 +39,7 @@ export default function RootLayout({
         <SiteHeader />
         <main className="flex-1">{children}</main>
         <SiteFooter />
-        <Toaster richColors position="top-right" />
+        <Toaster position="top-right" />
         <Analytics />
       </body>
     </html>

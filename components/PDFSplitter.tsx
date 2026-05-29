@@ -32,13 +32,21 @@ export default function PDFSplitter() {
   const [splitPDFs, setSplitPDFs] = useState<SplitPDF[]>([]);
   const [rangeError, setRangeError] = useState<string>('');
   const fileInfoRef = useRef<HTMLDivElement>(null);
+  const resultRef = useRef<HTMLDivElement>(null);
 
-  // Auto-scroll when file is selected
+  // Al seleccionar el archivo, baja a su información.
   useEffect(() => {
     if (selectedFile && fileInfoRef.current) {
       setTimeout(() => scrollIntoViewSafe(fileInfoRef.current), 100);
     }
   }, [selectedFile]);
+
+  // Al completarse la división, baja al inicio de la sección de resultado.
+  useEffect(() => {
+    if (splitPDFs.length > 0) {
+      setTimeout(() => scrollIntoViewSafe(resultRef.current), 100);
+    }
+  }, [splitPDFs.length]);
 
   const formatFileSize = (bytes: number): string => {
     if (bytes < 1024) return `${bytes} B`;
@@ -361,7 +369,10 @@ export default function PDFSplitter() {
       )}
 
       {splitPDFs.length > 0 && (
-        <Card className="border-success/20 bg-success/[0.06] motion-safe:animate-slide-up">
+        <Card
+          ref={resultRef}
+          className="border-success/20 bg-success/[0.06] motion-safe:animate-slide-up"
+        >
           <CardContent className="p-6">
             <div className="mb-6 text-center">
               <div className="mb-4 inline-flex h-16 w-16 items-center justify-center rounded-full bg-success/10">

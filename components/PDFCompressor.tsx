@@ -72,13 +72,21 @@ export default function PDFCompressor() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [isLoadingFiles, setIsLoadingFiles] = useState(false);
   const filesListRef = useRef<HTMLDivElement>(null);
+  const resultRef = useRef<HTMLDivElement>(null);
 
-  // Auto-scroll when files are added
+  // Al agregar archivos, baja a la lista.
   useEffect(() => {
     if (files.length > 0 && filesListRef.current) {
       setTimeout(() => scrollIntoViewSafe(filesListRef.current), 100);
     }
   }, [files.length]);
+
+  // Al terminar de comprimir todos, baja al inicio de la sección de resultado.
+  useEffect(() => {
+    if (files.length > 0 && files.every((f) => f.compressedBlob)) {
+      setTimeout(() => scrollIntoViewSafe(resultRef.current), 100);
+    }
+  }, [files]);
 
   const formatFileSize = (bytes: number): string => {
     if (bytes < 1024) return `${bytes} B`;
@@ -489,43 +497,36 @@ export default function PDFCompressor() {
       performanceMonitor.startMonitoring(file.id, file.name, file.originalSize, 'main-thread');
 
       try {
+        let compressedBlob: Blob;
         if (file.type === 'pdf') {
-          const compressedBlob = await compressPDF(file);
-          successCount++;
-          setFiles(prev => prev.map(f =>
-            f.id === file.id ? {
-              ...f,
-              compressedBlob,
-              compressedSize: compressedBlob.size,
-              isProcessing: false,
-              progress: 100,
-              estimatedTime: undefined
-            } : f
-          ));
-
-          // Record performance metrics
-          performanceMonitor.finishMonitoring(file.id, compressedBlob.size);
+          compressedBlob = await compressPDF(file);
         } else if (file.type === 'excel') {
           // Compresión 100% en el navegador (imágenes embebidas, sin subir el archivo)
-          const compressedBlob = await compressExcelWithProgress(file);
-          successCount++;
-          setFiles(prev => prev.map(f =>
-            f.id === file.id ? {
-              ...f,
-              compressedBlob,
-              compressedSize: compressedBlob.size,
-              isProcessing: false,
-              progress: 100,
-              estimatedTime: undefined
-            } : f
-          ));
-
-          // Record performance metrics
-          performanceMonitor.finishMonitoring(file.id, compressedBlob.size);
+          compressedBlob = await compressExcelWithProgress(file);
         } else {
           throw new Error('Tipo de archivo no soportado');
         }
-        
+
+        // Si comprimir no reduce el tamaño (p. ej. un PDF ya optimizado o un
+        // escaneo ya comprimido), conservamos el original para no entregar un
+        // archivo más grande. En ese caso la reducción queda en 0 %.
+        const bestBlob =
+          compressedBlob.size < file.originalSize ? compressedBlob : file.file;
+
+        successCount++;
+        setFiles(prev => prev.map(f =>
+          f.id === file.id ? {
+            ...f,
+            compressedBlob: bestBlob,
+            compressedSize: bestBlob.size,
+            isProcessing: false,
+            progress: 100,
+            estimatedTime: undefined
+          } : f
+        ));
+
+        // Record performance metrics
+        performanceMonitor.finishMonitoring(file.id, bestBlob.size);
       } catch (error) {
         console.error('Error compressing file:', error);
         errorCount++;
@@ -628,6 +629,12 @@ export default function PDFCompressor() {
   const totalOriginalSize = files.reduce((sum, file) => sum + file.originalSize, 0);
   const totalCompressedSize = files.reduce((sum, file) => sum + (file.compressedSize || 0), 0);
   const compressedFilesCount = files.filter(f => f.compressedBlob).length;
+  const totalReduction =
+    totalCompressedSize > 0 ? calculateReduction(totalOriginalSize, totalCompressedSize) : 0;
+  const reduced = totalReduction > 0;
+  // Todos los archivos de la lista ya tienen resultado: la herramienta llegó al
+  // paso "Listo" y la tarjeta de acción pasa a un estado de finalización.
+  const allCompressed = files.length > 0 && compressedFilesCount === files.length;
 
   const step: 1 | 2 | 3 =
     files.length === 0 ? 1 : compressedFilesCount > 0 ? 3 : 2;
@@ -758,12 +765,17 @@ export default function PDFCompressor() {
                     </p>
                     <div className="text-sm text-muted-foreground space-y-1">
                       <p>Original: {formatFileSize(file.originalSize)}</p>
-                      {file.compressedSize && (
-                        <p className="text-success">
-                          Comprimido: {formatFileSize(file.compressedSize)}
-                          ({calculateReduction(file.originalSize, file.compressedSize)}% reducción)
-                        </p>
-                      )}
+                      {file.compressedSize !== undefined &&
+                        (calculateReduction(file.originalSize, file.compressedSize) > 0 ? (
+                          <p className="text-success">
+                            Comprimido: {formatFileSize(file.compressedSize)} (
+                            {calculateReduction(file.originalSize, file.compressedSize)}% reducción)
+                          </p>
+                        ) : (
+                          <p className="text-muted-foreground">
+                            Ya estaba optimizado · se conserva el original
+                          </p>
+                        ))}
                       {file.isProcessing && file.progress !== undefined && (
                         <div className="space-y-2" aria-live="polite">
                           <div className="flex items-center justify-between text-xs">
@@ -822,13 +834,19 @@ export default function PDFCompressor() {
                   {totalCompressedSize > 0 && (
                     <>
                       <div>
-                        <p className="text-sm font-medium text-success">Tamaño comprimido total</p>
-                        <p className="text-lg font-bold text-success">{formatFileSize(totalCompressedSize)}</p>
+                        <p className={cn('text-sm font-medium', reduced ? 'text-success' : 'text-muted-foreground')}>
+                          Tamaño final total
+                        </p>
+                        <p className={cn('text-lg font-bold', reduced ? 'text-success' : 'text-ink')}>
+                          {formatFileSize(totalCompressedSize)}
+                        </p>
                       </div>
                       <div>
-                        <p className="text-sm font-medium text-success">Reducción total</p>
-                        <p className="text-lg font-bold text-success">
-                          {calculateReduction(totalOriginalSize, totalCompressedSize)}%
+                        <p className={cn('text-sm font-medium', reduced ? 'text-success' : 'text-muted-foreground')}>
+                          Reducción total
+                        </p>
+                        <p className={cn('text-lg font-bold', reduced ? 'text-success' : 'text-ink')}>
+                          {totalReduction}%
                         </p>
                       </div>
                     </>
@@ -840,19 +858,19 @@ export default function PDFCompressor() {
         </Card>
       )}
 
-      {files.length > 0 && (
+      {files.length > 0 && !allCompressed && (
         <Card className="mb-8">
           <CardContent className="p-6 text-center">
             <h2 className="mb-4 font-display text-lg font-bold text-brand-navy">
               ¿Listo para comprimir?
             </h2>
             <p className="mb-6 text-muted-foreground">
-              Se comprimirán {files.length} archivo{files.length !== 1 ? 's' : ''} con nivel de compresión {
+              Se comprimir{files.length !== 1 ? 'án' : 'á'} {files.length} archivo{files.length !== 1 ? 's' : ''} con nivel de compresión {
                 compressionLevel === 'low' ? 'bajo' :
                 compressionLevel === 'medium' ? 'medio' : 'alto'
               }.
             </p>
-            <div className="flex flex-col justify-center gap-3 sm:flex-row sm:gap-4">
+            <div className="text-center">
               <Button
                 onClick={compressFiles}
                 disabled={isProcessing}
@@ -872,13 +890,36 @@ export default function PDFCompressor() {
                   </>
                 )}
               </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
-              {compressedFilesCount > 0 && (
-                <Button onClick={downloadAllFiles} size="lg" variant="outline">
-                  <Download className="mr-2 h-5 w-5" />
-                  Descargar {compressedFilesCount > 1 ? 'ZIP' : 'archivo'}
-                </Button>
-              )}
+      {allCompressed && (
+        <Card
+          ref={resultRef}
+          className="border-success/20 bg-success/[0.06] motion-safe:animate-slide-up"
+        >
+          <CardContent className="p-6 text-center">
+            <div className="mb-4 inline-flex h-16 w-16 items-center justify-center rounded-full bg-success/10">
+              <Download className="h-8 w-8 text-success" />
+            </div>
+            <h2 className="mb-2 font-display text-lg font-bold text-success">
+              ¡Compresión completada!
+            </h2>
+            <p className="mb-6 text-success/90">
+              {reduced
+                ? `Se ${compressedFilesCount === 1 ? 'redujo' : 'redujeron'} ${compressedFilesCount} archivo${compressedFilesCount !== 1 ? 's' : ''} un ${totalReduction}% (${formatFileSize(totalOriginalSize - totalCompressedSize)} menos).`
+                : `Tus archivo${compressedFilesCount !== 1 ? 's' : ''} ya ${compressedFilesCount !== 1 ? 'estaban' : 'estaba'} optimizado${compressedFilesCount !== 1 ? 's' : ''}; se ${compressedFilesCount !== 1 ? 'conservan los originales' : 'conserva el original'}.`}
+            </p>
+            <div className="flex flex-col justify-center gap-3 sm:flex-row">
+              <Button onClick={downloadAllFiles} size="lg" className={accent.solid}>
+                <Download className="mr-2 h-5 w-5" />
+                Descargar {compressedFilesCount > 1 ? 'todo (ZIP)' : 'archivo'}
+              </Button>
+              <Button variant="outline" onClick={resetAll} size="lg">
+                Comprimir otros archivos
+              </Button>
             </div>
           </CardContent>
         </Card>

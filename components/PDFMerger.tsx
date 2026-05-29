@@ -47,13 +47,21 @@ export default function PDFMerger() {
   const [fileNameError, setFileNameError] = useState('');
   const [cropFileId, setCropFileId] = useState<string | null>(null);
   const filesListRef = useRef<HTMLDivElement>(null);
+  const resultRef = useRef<HTMLDivElement>(null);
 
-  // Auto-scroll when files are added
+  // Al agregar archivos, baja a la lista.
   useEffect(() => {
     if (files.length > 0 && filesListRef.current) {
       setTimeout(() => scrollIntoViewSafe(filesListRef.current), 100);
     }
   }, [files.length]);
+
+  // Al generarse el PDF, baja al inicio de la sección de resultado.
+  useEffect(() => {
+    if (downloadUrl) {
+      setTimeout(() => scrollIntoViewSafe(resultRef.current), 100);
+    }
+  }, [downloadUrl]);
 
   const formatFileSize = (bytes: number): string => {
     if (bytes < 1024) return `${bytes} B`;
@@ -512,7 +520,10 @@ export default function PDFMerger() {
       )}
 
       {downloadUrl && (
-        <Card className="border-success/20 bg-success/[0.06] motion-safe:animate-slide-up">
+        <Card
+          ref={resultRef}
+          className="border-success/20 bg-success/[0.06] motion-safe:animate-slide-up"
+        >
           <CardContent className="p-6 text-center">
             <div className="mb-4 inline-flex h-16 w-16 items-center justify-center rounded-full bg-success/10">
               <Download className="h-8 w-8 text-success" />
