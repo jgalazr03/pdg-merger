@@ -2,13 +2,31 @@
 
 import { useState, useRef, useEffect } from 'react';
 import { PDFDocument } from 'pdf-lib';
-import { Upload, FileText, Download, Loader2, X, GripVertical, Edit3, Image as ImageIcon, Crop } from 'lucide-react';
+import {
+  FileText,
+  Download,
+  Loader2,
+  X,
+  GripVertical,
+  Edit3,
+  Image as ImageIcon,
+  Crop,
+  ChevronUp,
+  ChevronDown,
+} from 'lucide-react';
+import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
+import { getTool } from '@/lib/tools';
+import ToolShell from '@/components/tools/ToolShell';
+import FileDropzone from '@/components/tools/FileDropzone';
 import ImageCropModal, { CropResult } from '@/components/ImageCropModal';
+
+const tool = getTool('unir');
+const accent = tool.accent;
 
 interface PDFFile {
   id: string;
@@ -26,18 +44,16 @@ export default function PDFMerger() {
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
   const [fileName, setFileName] = useState('');
   const [fileNameError, setFileNameError] = useState('');
-  const [isDragOver, setIsDragOver] = useState(false);
   const [cropFileId, setCropFileId] = useState<string | null>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
   const filesListRef = useRef<HTMLDivElement>(null);
 
   // Auto-scroll when files are added
   useEffect(() => {
     if (files.length > 0 && filesListRef.current) {
       setTimeout(() => {
-        filesListRef.current?.scrollIntoView({ 
-          behavior: 'smooth', 
-          block: 'start' 
+        filesListRef.current?.scrollIntoView({
+          behavior: 'smooth',
+          block: 'start',
         });
       }, 100);
     }
@@ -51,7 +67,7 @@ export default function PDFMerger() {
 
   const validateFileName = (name: string): boolean => {
     if (!name.trim()) return true; // Empty is allowed, will use default
-    
+
     // Check for invalid characters
     const invalidChars = /[\/\\:*?"<>|]/;
     if (invalidChars.test(name)) {
@@ -95,9 +111,13 @@ export default function PDFMerger() {
     /\.(jpe?g|png)$/i.test(file.name);
 
   const handleFileSelect = (selectedFiles: FileList) => {
-    const newFiles = Array.from(selectedFiles)
-      .filter(file => isPdfFile(file) || isImageFile(file))
-      .map(file => ({
+    const incoming = Array.from(selectedFiles);
+    const rejected = incoming.filter(
+      (file) => !isPdfFile(file) && !isImageFile(file)
+    );
+    const newFiles = incoming
+      .filter((file) => isPdfFile(file) || isImageFile(file))
+      .map((file) => ({
         id: Math.random().toString(36).substring(2, 15),
         file,
         name: file.name.replace(/\.(pdf|jpe?g|png)$/i, ''),
@@ -105,11 +125,22 @@ export default function PDFMerger() {
         type: isPdfFile(file) ? ('pdf' as const) : ('image' as const),
       }));
 
-    setFiles(prev => [...prev, ...newFiles]);
+    if (rejected.length > 0) {
+      toast.error('Algunos archivos no son válidos', {
+        description: 'Solo se aceptan archivos PDF e imágenes JPG o PNG.',
+      });
+    }
+
+    if (newFiles.length > 0) {
+      setFiles((prev) => [...prev, ...newFiles]);
+      toast.success(
+        `${newFiles.length} archivo${newFiles.length !== 1 ? 's' : ''} agregado${newFiles.length !== 1 ? 's' : ''}`
+      );
+    }
   };
 
   const removeFile = (id: string) => {
-    setFiles(prev => prev.filter(file => file.id !== id));
+    setFiles((prev) => prev.filter((file) => file.id !== id));
   };
 
   // Convierte un data URL (base64) en bytes para embeber en el PDF
@@ -124,48 +155,15 @@ export default function PDFMerger() {
   };
 
   const handleCropConfirm = (result: CropResult) => {
-    setFiles(prev =>
-      prev.map(f => (f.id === cropFileId ? { ...f, cropped: result } : f))
+    setFiles((prev) =>
+      prev.map((f) => (f.id === cropFileId ? { ...f, cropped: result } : f))
     );
     setCropFileId(null);
   };
 
-  const fileToCrop = files.find(f => f.id === cropFileId);
+  const fileToCrop = files.find((f) => f.id === cropFileId);
 
-  // Drag & Drop for file upload area
-  const handleDragEnter = (e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setIsDragOver(true);
-  };
-
-  const handleDragLeave = (e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    // Only set to false if we're leaving the drop zone entirely
-    if (!e.currentTarget.contains(e.relatedTarget as Node)) {
-      setIsDragOver(false);
-    }
-  };
-
-  const handleDragOverUpload = (e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    e.dataTransfer.dropEffect = 'copy';
-  };
-
-  const handleDropUpload = (e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setIsDragOver(false);
-
-    const droppedFiles = e.dataTransfer.files;
-    if (droppedFiles.length > 0) {
-      handleFileSelect(droppedFiles);
-    }
-  };
-
-  // Drag & Drop for file reordering
+  // Reordenamiento por arrastre
   const handleDragStart = (e: React.DragEvent, index: number) => {
     setDraggedIndex(index);
     e.dataTransfer.effectAllowed = 'move';
@@ -179,14 +177,17 @@ export default function PDFMerger() {
   const handleDrop = (e: React.DragEvent, dropIndex: number) => {
     e.preventDefault();
     if (draggedIndex === null) return;
-
-    const newFiles = [...files];
-    const draggedFile = newFiles[draggedIndex];
-    newFiles.splice(draggedIndex, 1);
-    newFiles.splice(dropIndex, 0, draggedFile);
-    
-    setFiles(newFiles);
+    moveFile(draggedIndex, dropIndex);
     setDraggedIndex(null);
+  };
+
+  // Reordenamiento accesible por teclado
+  const moveFile = (from: number, to: number) => {
+    if (to < 0 || to >= files.length || from === to) return;
+    const newFiles = [...files];
+    const [moved] = newFiles.splice(from, 1);
+    newFiles.splice(to, 0, moved);
+    setFiles(newFiles);
   };
 
   const mergePDFs = async () => {
@@ -248,9 +249,12 @@ export default function PDFMerger() {
       const blob = new Blob([pdfBytes], { type: 'application/pdf' });
       const url = URL.createObjectURL(blob);
       setDownloadUrl(url);
+      toast.success('¡PDF generado correctamente!');
     } catch (error) {
       console.error('Error merging PDFs:', error);
-      alert('Error al generar el PDF. Por favor, intenta de nuevo.');
+      toast.error('No se pudo generar el PDF', {
+        description: 'Revisa los archivos e inténtalo de nuevo.',
+      });
     } finally {
       setIsProcessing(false);
     }
@@ -273,148 +277,128 @@ export default function PDFMerger() {
     setDownloadUrl(null);
     setFileName('');
     setFileNameError('');
-    setIsDragOver(false);
-    if (fileInputRef.current) {
-      fileInputRef.current.value = '';
-    }
   };
 
-  return (
-    <div className="container mx-auto px-4 py-12 max-w-4xl">
-      <div className="text-center mb-12">
-        <div className="inline-flex items-center justify-center w-16 h-16 bg-blue-100 rounded-full mb-6">
-          <FileText className="w-8 h-8 text-blue-600" />
-        </div>
-        <h1 className="text-4xl font-bold text-gray-900 mb-4">
-          Unir PDFs e imágenes
-        </h1>
-        <p className="text-xl text-gray-600 max-w-2xl mx-auto">
-          Combina archivos PDF e imágenes (JPG, PNG) en un solo documento PDF de forma rápida y sencilla.
-          Todo se procesa en tu navegador, tus archivos no salen de tu computadora.
-        </p>
-      </div>
+  const step: 1 | 2 | 3 = files.length === 0 ? 1 : downloadUrl ? 3 : 2;
 
+  return (
+    <ToolShell tool={tool} step={step}>
       <Card className="mb-8">
-        <CardContent className="p-8">
-          <div
-            className={cn(
-              "border-2 border-dashed rounded-lg p-12 text-center transition-all cursor-pointer",
-              isDragOver 
-                ? "border-blue-500 bg-blue-50 scale-105" 
-                : "border-gray-300 hover:border-blue-400"
-            )}
-            onClick={() => fileInputRef.current?.click()}
-            onDragEnter={handleDragEnter}
-            onDragLeave={handleDragLeave}
-            onDragOver={handleDragOverUpload}
-            onDrop={handleDropUpload}
-          >
-            <Upload className={cn(
-              "w-12 h-12 mx-auto mb-4 transition-colors",
-              isDragOver ? "text-blue-500" : "text-gray-400"
-            )} />
-            <h3 className={cn(
-              "text-lg font-semibold mb-2 transition-colors",
-              isDragOver ? "text-blue-900" : "text-gray-900"
-            )}>
-              {isDragOver ? "Suelta los archivos aquí" : "Selecciona archivos PDF o imágenes"}
-            </h3>
-            <p className={cn(
-              "mb-6 transition-colors",
-              isDragOver ? "text-blue-700" : "text-gray-600"
-            )}>
-              {isDragOver
-                ? "Suelta para agregar los archivos"
-                : "Haz clic aquí o arrastra y suelta tus archivos PDF o imágenes (JPG, PNG)"
-              }
-            </p>
-            {!isDragOver && (
-              <Button className="bg-blue-600 hover:bg-blue-700 text-white">
-                <Upload className="w-4 h-4 mr-2" />
-                Seleccionar archivos
-              </Button>
-            )}
-            <input
-              ref={fileInputRef}
-              type="file"
-              multiple
-              accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png"
-              className="hidden"
-              onChange={(e) => e.target.files && handleFileSelect(e.target.files)}
-            />
-          </div>
+        <CardContent className="p-6 sm:p-8">
+          <FileDropzone
+            accent={accent}
+            multiple
+            accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png"
+            idleTitle="Selecciona archivos PDF o imágenes"
+            idleSubtitle="Haz clic aquí o arrastra y suelta tus archivos PDF o imágenes (JPG, PNG)"
+            dragTitle="Suelta los archivos aquí"
+            buttonLabel="Seleccionar archivos"
+            ariaLabel="Seleccionar o arrastrar archivos PDF o imágenes"
+            onFiles={handleFileSelect}
+          />
         </CardContent>
       </Card>
 
       {files.length > 0 && (
-        <Card className="mb-8" ref={filesListRef}>
+        <Card className="mb-8 motion-safe:animate-slide-up" ref={filesListRef}>
           <CardContent className="p-6">
-            <div className="flex justify-between items-center mb-6">
-              <h3 className="text-lg font-semibold text-gray-900">
+            <div className="mb-6 flex items-center justify-between">
+              <h2 className="text-lg font-semibold text-gray-900">
                 Archivos seleccionados ({files.length})
-              </h3>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={resetAll}
-              >
-                <X className="w-4 h-4 mr-2" />
+              </h2>
+              <Button variant="outline" size="sm" onClick={resetAll}>
+                <X className="mr-2 h-4 w-4" />
                 Limpiar todo
               </Button>
             </div>
-            
-            <div className="space-y-3">
+
+            <ul className="space-y-3">
               {files.map((file, index) => (
-                <div
+                <li
                   key={file.id}
                   draggable
                   onDragStart={(e) => handleDragStart(e, index)}
                   onDragOver={handleDragOver}
                   onDrop={(e) => handleDrop(e, index)}
                   className={cn(
-                    "flex items-center gap-4 p-4 bg-gray-50 rounded-lg border-2 border-transparent transition-all cursor-move hover:bg-gray-100",
-                    draggedIndex === index && "opacity-50 scale-95"
+                    'flex items-center gap-3 rounded-lg border-2 border-transparent bg-gray-50 p-4 transition-all hover:bg-gray-100',
+                    draggedIndex === index && 'opacity-50 motion-safe:scale-95'
                   )}
                 >
-                  <GripVertical className="w-5 h-5 text-gray-400" />
-                  <div className="flex items-center gap-3 flex-1">
-                    <div className={cn(
-                      "flex items-center justify-center w-10 h-10 rounded",
-                      file.type === 'image' ? "bg-blue-100" : "bg-red-100"
-                    )}>
+                  <GripVertical
+                    className="hidden h-5 w-5 shrink-0 cursor-move text-gray-400 sm:block"
+                    aria-hidden="true"
+                  />
+
+                  {/* Controles de orden accesibles por teclado */}
+                  <div className="flex shrink-0 flex-col">
+                    <button
+                      type="button"
+                      onClick={() => moveFile(index, index - 1)}
+                      disabled={index === 0}
+                      aria-label={`Mover ${file.name} hacia arriba`}
+                      className={cn(
+                        'rounded p-0.5 text-gray-400 transition-colors hover:text-gray-700 disabled:opacity-30 disabled:hover:text-gray-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-1',
+                        accent.ring
+                      )}
+                    >
+                      <ChevronUp className="h-4 w-4" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => moveFile(index, index + 1)}
+                      disabled={index === files.length - 1}
+                      aria-label={`Mover ${file.name} hacia abajo`}
+                      className={cn(
+                        'rounded p-0.5 text-gray-400 transition-colors hover:text-gray-700 disabled:opacity-30 disabled:hover:text-gray-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-1',
+                        accent.ring
+                      )}
+                    >
+                      <ChevronDown className="h-4 w-4" />
+                    </button>
+                  </div>
+
+                  <div className="flex flex-1 items-center gap-3">
+                    <div
+                      className={cn(
+                        'flex h-10 w-10 shrink-0 items-center justify-center rounded',
+                        file.type === 'image' ? accent.iconBg : 'bg-red-100'
+                      )}
+                    >
                       {file.type === 'image' ? (
-                        <ImageIcon className="w-5 h-5 text-blue-600" />
+                        <ImageIcon className={cn('h-5 w-5', accent.text)} />
                       ) : (
-                        <FileText className="w-5 h-5 text-red-600" />
+                        <FileText className="h-5 w-5 text-red-600" />
                       )}
                     </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="font-medium text-gray-900 truncate">
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate font-medium text-gray-900">
                         {file.name}
                       </p>
                       <p className="text-sm text-gray-500">
                         {file.size}
                         {file.cropped && (
                           <span className="ml-2 inline-flex items-center text-green-600">
-                            <Crop className="w-3 h-3 mr-1" />
+                            <Crop className="mr-1 h-3 w-3" />
                             Recortado
                           </span>
                         )}
                       </p>
                     </div>
-                    <div className="flex items-center gap-2 text-sm text-gray-500">
-                      <span>#{index + 1}</span>
-                    </div>
+                    <span className="shrink-0 text-sm text-gray-400">
+                      #{index + 1}
+                    </span>
                   </div>
+
                   {file.type === 'image' && (
                     <Button
                       variant="outline"
                       size="sm"
                       onClick={() => setCropFileId(file.id)}
-                      className="border-blue-300 text-blue-700 hover:bg-blue-50"
+                      className={cn('shrink-0', accent.text)}
                       title="Recortar imagen"
                     >
-                      <Crop className="w-4 h-4 mr-2" />
+                      <Crop className="mr-2 h-4 w-4" />
                       {file.cropped ? 'Reajustar' : 'Recortar'}
                     </Button>
                   )}
@@ -422,32 +406,33 @@ export default function PDFMerger() {
                     variant="ghost"
                     size="sm"
                     onClick={() => removeFile(file.id)}
-                    className="text-gray-400 hover:text-red-600"
+                    aria-label={`Quitar ${file.name}`}
+                    className="shrink-0 text-gray-400 hover:text-red-600"
                   >
-                    <X className="w-4 h-4" />
+                    <X className="h-4 w-4" />
                   </Button>
-                </div>
+                </li>
               ))}
-            </div>
+            </ul>
 
-            <div className="mt-6 p-4 bg-blue-50 rounded-lg">
-              <p className="text-sm text-blue-800">
-                <strong>Tip:</strong> Arrastra los archivos para cambiar el orden.
-                Los archivos se unirán en el orden que aparecen aquí. Usa el ícono de
-                recorte en las imágenes para ajustarlas a tamaño Carta.
+            <div className={cn('mt-6 rounded-lg p-4', accent.soft)}>
+              <p className={cn('text-sm', accent.softText)}>
+                <strong>Tip:</strong> arrastra los archivos (o usa las flechas) para
+                cambiar el orden. Se unirán en el orden que aparecen aquí. Usa el
+                ícono de recorte en las imágenes para ajustarlas a tamaño Carta.
               </p>
             </div>
           </CardContent>
         </Card>
       )}
 
-      {files.length >= 1 && (
+      {files.length >= 1 && !downloadUrl && (
         <Card className="mb-8">
           <CardContent className="p-6">
-            <div className="text-center mb-6">
-              <h3 className="text-lg font-semibold text-gray-900 mb-2">
+            <div className="mb-6 text-center">
+              <h2 className="mb-2 text-lg font-semibold text-gray-900">
                 {files.length > 1 ? '¿Listo para unir?' : '¿Listo para generar el PDF?'}
-              </h3>
+              </h2>
               <p className="text-gray-600">
                 {files.length > 1
                   ? `Se unirán ${files.length} archivos en un solo documento PDF.`
@@ -455,9 +440,12 @@ export default function PDFMerger() {
               </p>
             </div>
 
-            <div className="max-w-md mx-auto mb-6">
-              <Label htmlFor="filename" className="text-sm font-medium text-gray-700 mb-2 block">
-                <Edit3 className="w-4 h-4 inline mr-2" />
+            <div className="mx-auto mb-6 max-w-md">
+              <Label
+                htmlFor="filename"
+                className="mb-2 block text-sm font-medium text-gray-700"
+              >
+                <Edit3 className="mr-2 inline h-4 w-4" />
                 Nombre del archivo final
               </Label>
               <div className="relative">
@@ -467,38 +455,44 @@ export default function PDFMerger() {
                   placeholder="documento_final"
                   value={fileName}
                   onChange={(e) => handleFileNameChange(e.target.value)}
+                  aria-invalid={!!fileNameError}
+                  aria-describedby="filename-help"
                   className={cn(
-                    "pr-12",
-                    fileNameError && "border-red-300 focus:border-red-500 focus:ring-red-200"
+                    'pr-12',
+                    fileNameError && 'border-red-300 focus-visible:ring-red-200'
                   )}
                 />
-                <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
-                  <span className="text-gray-500 text-sm">.pdf</span>
+                <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3">
+                  <span className="text-sm text-gray-500">.pdf</span>
                 </div>
               </div>
-              {fileNameError && (
-                <p className="mt-2 text-sm text-red-600">{fileNameError}</p>
+              {fileNameError ? (
+                <p className="mt-2 text-sm text-red-600" id="filename-help">
+                  {fileNameError}
+                </p>
+              ) : (
+                <p className="mt-2 text-xs text-gray-500" id="filename-help">
+                  Si lo dejas vacío, se usará &quot;documento_final.pdf&quot;
+                </p>
               )}
-              <p className="mt-2 text-xs text-gray-500">
-                Si lo dejas vacío, se usará "documento_final.pdf"
-              </p>
             </div>
 
             <div className="text-center">
               <Button
                 onClick={mergePDFs}
                 disabled={isProcessing || !!fileNameError}
+                aria-busy={isProcessing}
                 size="lg"
-                className="bg-blue-600 hover:bg-blue-700"
+                className={accent.solid}
               >
                 {isProcessing ? (
                   <>
-                    <Loader2 className="w-5 h-5 mr-2 animate-spin" />
-                    Procesando...
+                    <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                    Procesando…
                   </>
                 ) : (
                   <>
-                    <FileText className="w-5 h-5 mr-2" />
+                    <FileText className="mr-2 h-5 w-5" />
                     {files.length > 1 ? 'Unir archivos' : 'Generar PDF'}
                   </>
                 )}
@@ -509,31 +503,26 @@ export default function PDFMerger() {
       )}
 
       {downloadUrl && (
-        <Card className="border-green-200 bg-green-50">
+        <Card className="border-green-200 bg-green-50 motion-safe:animate-slide-up">
           <CardContent className="p-6 text-center">
-            <div className="inline-flex items-center justify-center w-16 h-16 bg-green-100 rounded-full mb-4">
-              <Download className="w-8 h-8 text-green-600" />
+            <div className="mb-4 inline-flex h-16 w-16 items-center justify-center rounded-full bg-green-100">
+              <Download className="h-8 w-8 text-green-600" />
             </div>
-            <h3 className="text-lg font-semibold text-green-900 mb-2">
-              ¡Listo!
-            </h3>
-            <p className="text-green-800 mb-6">
-              Tu PDF unificado está listo para descargar como "{getValidFileName()}.pdf"
+            <h2 className="mb-2 text-lg font-semibold text-green-900">¡Listo!</h2>
+            <p className="mb-6 text-green-800">
+              Tu PDF unificado está listo para descargar como &quot;
+              {getValidFileName()}.pdf&quot;
             </p>
-            <div className="flex gap-4 justify-center">
+            <div className="flex flex-col justify-center gap-3 sm:flex-row">
               <Button
                 onClick={downloadMergedPDF}
                 size="lg"
-                className="bg-green-600 hover:bg-green-700"
+                className="bg-green-600 text-white hover:bg-green-700"
               >
-                <Download className="w-5 h-5 mr-2" />
+                <Download className="mr-2 h-5 w-5" />
                 Descargar {getValidFileName()}.pdf
               </Button>
-              <Button
-                variant="outline"
-                onClick={resetAll}
-                size="lg"
-              >
+              <Button variant="outline" onClick={resetAll} size="lg">
                 Crear otro PDF
               </Button>
             </div>
@@ -548,6 +537,6 @@ export default function PDFMerger() {
           onConfirm={handleCropConfirm}
         />
       )}
-    </div>
+    </ToolShell>
   );
 }

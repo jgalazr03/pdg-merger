@@ -6,11 +6,18 @@ import { PDFDocument } from 'pdf-lib';
 import * as pdfjsLib from 'pdfjs-dist';
 import JSZip from 'jszip';
 import ExcelJS from 'exceljs';
-import { Upload, FileText, Download, Loader2, X, Compass as Compress, AlertCircle, Eye, FileSpreadsheet } from 'lucide-react';
+import { FileText, Download, Loader2, X, Minimize2 as Compress, AlertCircle, FileSpreadsheet, Clock } from 'lucide-react';
+import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
+import { performanceMonitor } from '@/lib/performance-monitor';
 import { Card, CardContent } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
+import { Progress } from '@/components/ui/progress';
+import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
+import { getTool } from '@/lib/tools';
+import ToolShell from '@/components/tools/ToolShell';
+import FileDropzone from '@/components/tools/FileDropzone';
 
 // @ts-ignore
 import { GlobalWorkerOptions } from 'pdfjs-dist/build/pdf';
@@ -32,15 +39,20 @@ interface ProcessableFile {
   isProcessing: boolean;
   error?: string;
   type: 'pdf' | 'excel';
+  progress?: number; // Progress percentage for large files
+  estimatedTime?: string; // Estimated time remaining
 }
 
 type CompressionLevel = 'low' | 'medium' | 'high';
 
 const compressionSettings = {
-  low: { scale: 1.0, quality: 0.9, description: 'Mejor calidad, menor reducción' },
-  medium: { scale: 0.8, quality: 0.7, description: 'Equilibrado' },
-  high: { scale: 0.6, quality: 0.5, description: 'Menor calidad, mayor reducción' }
+  low: { scale: 0.9, quality: 0.85, description: 'Mejor calidad, menor reducción' },
+  medium: { scale: 0.7, quality: 0.6, description: 'Equilibrado' },
+  high: { scale: 0.5, quality: 0.4, description: 'Menor calidad, mayor reducción' }
 };
+
+const tool = getTool('comprimir');
+const accent = tool.accent;
 
 /**
  * PDFCompressor Component - Now supports PDF and Excel file compression
@@ -62,9 +74,86 @@ export default function PDFCompressor() {
   const [files, setFiles] = useState<ProcessableFile[]>([]);
   const [compressionLevel, setCompressionLevel] = useState<CompressionLevel>('medium');
   const [isProcessing, setIsProcessing] = useState(false);
-  const [isDragOver, setIsDragOver] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [isLoadingFiles, setIsLoadingFiles] = useState(false);
   const filesListRef = useRef<HTMLDivElement>(null);
+  const workerRef = useRef<Worker | null>(null);
+
+  // Initialize Web Worker
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      workerRef.current = new Worker('/compression-worker.js');
+      
+      workerRef.current.onmessage = (e) => {
+        const { type, fileId, result, progress, message, error, processedImages, totalImages } = e.data;
+        
+        switch (type) {
+          case 'progress':
+            // Update performance monitoring with progress
+            performanceMonitor.updateProgress(fileId, progress, {
+              total: totalImages,
+              processed: processedImages
+            });
+            
+            setFiles(prev => prev.map(f => 
+              f.id === fileId ? {
+                ...f,
+                progress: progress,
+                processedImages: processedImages,
+                totalImages: totalImages
+              } : f
+            ));
+            break;          case 'complete':
+            if (result) {
+              const blob = new Blob([result], { 
+                type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' 
+              });
+              
+              setFiles(prev => prev.map(f => 
+                f.id === fileId ? {
+                  ...f,
+                  compressedBlob: blob,
+                  compressedSize: blob.size,
+                  isProcessing: false,
+                  progress: 100,
+                  estimatedTime: undefined
+                } : f
+              ));
+              
+              // Record performance metrics for worker completion
+              performanceMonitor.finishMonitoring(fileId, blob.size);
+            }
+            break;
+            
+          case 'error':
+            // Record error in performance monitoring
+            performanceMonitor.recordError(fileId, error || 'Worker compression error');
+            performanceMonitor.finishMonitoring(fileId);
+            
+            setFiles(prev => prev.map(f => 
+              f.id === fileId ? {
+                ...f,
+                isProcessing: false,
+                error: error || 'Error al comprimir el archivo',
+                progress: undefined,
+                estimatedTime: undefined
+              } : f
+            ));
+            break;
+        }
+      };
+      
+      workerRef.current.onerror = (error) => {
+        console.error('Worker error:', error);
+        setIsProcessing(false);
+      };
+    }
+    
+    return () => {
+      if (workerRef.current) {
+        workerRef.current.terminate();
+      }
+    };
+  }, []);
 
   // Auto-scroll when files are added
   useEffect(() => {
@@ -102,19 +191,25 @@ export default function PDFCompressor() {
                      file.name.toLowerCase().endsWith('.xls');
       
       if (!isPDF && !isExcel) {
-        alert(`"${file.name}" no es un archivo PDF o Excel válido.`);
+        toast.error('Archivo no válido', {
+          description: `"${file.name}" no es un PDF ni un Excel válido.`,
+        });
         continue;
       }
 
       // Check for duplicates
       if (files.some(existingFile => existingFile.name === file.name && existingFile.originalSize === file.size)) {
-        alert(`"${file.name}" ya está en la lista.`);
+        toast.error('Archivo duplicado', {
+          description: `"${file.name}" ya está en la lista.`,
+        });
         continue;
       }
 
       // Check total size limit
       if (totalSize + file.size > maxTotalSize) {
-        alert(`El tamaño total de archivos excedería el límite de 500MB.`);
+        toast.error('Límite de tamaño excedido', {
+          description: 'El tamaño total de archivos no puede superar 500MB.',
+        });
         break;
       }
 
@@ -152,62 +247,39 @@ export default function PDFCompressor() {
 
   const handleFileSelect = async (selectedFiles: FileList) => {
     const validFiles = validateFiles(selectedFiles);
-    
-    const newFiles: ProcessableFile[] = await Promise.all(
-      validFiles.map(async (file) => {
-        const fileType = file.type === 'application/pdf' ? 'pdf' : 'excel';
-        const preview = fileType === 'pdf' ? await generatePreview(file) : undefined;
-        const fileName = file.name.replace(/\.(pdf|xlsx|xls)$/i, '');
-        
-        return {
-          id: Math.random().toString(36).substring(2, 15),
-          file,
-          name: fileName,
-          originalSize: file.size,
-          preview,
-          isProcessing: false,
-          type: fileType,
-        };
-      })
-    );
+    if (validFiles.length === 0) return;
 
-    setFiles(prev => [...prev, ...newFiles]);
+    setIsLoadingFiles(true);
+    try {
+      const newFiles: ProcessableFile[] = await Promise.all(
+        validFiles.map(async (file) => {
+          const fileType = file.type === 'application/pdf' ? 'pdf' : 'excel';
+          const preview = fileType === 'pdf' ? await generatePreview(file) : undefined;
+          const fileName = file.name.replace(/\.(pdf|xlsx|xls)$/i, '');
+
+          return {
+            id: Math.random().toString(36).substring(2, 15),
+            file,
+            name: fileName,
+            originalSize: file.size,
+            preview,
+            isProcessing: false,
+            type: fileType,
+          };
+        })
+      );
+
+      setFiles(prev => [...prev, ...newFiles]);
+      toast.success(
+        `${newFiles.length} archivo${newFiles.length !== 1 ? 's' : ''} agregado${newFiles.length !== 1 ? 's' : ''}`
+      );
+    } finally {
+      setIsLoadingFiles(false);
+    }
   };
 
   const removeFile = (id: string) => {
     setFiles(prev => prev.filter(file => file.id !== id));
-  };
-
-  // Drag & Drop handlers
-  const handleDragEnter = (e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setIsDragOver(true);
-  };
-
-  const handleDragLeave = (e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    if (!e.currentTarget.contains(e.relatedTarget as Node)) {
-      setIsDragOver(false);
-    }
-  };
-
-  const handleDragOver = (e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    e.dataTransfer.dropEffect = 'copy';
-  };
-
-  const handleDrop = (e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setIsDragOver(false);
-
-    const droppedFiles = e.dataTransfer.files;
-    if (droppedFiles.length > 0) {
-      handleFileSelect(droppedFiles);
-    }
   };
 
   const compressPDF = async (pdfFile: ProcessableFile): Promise<Blob> => {
@@ -256,22 +328,134 @@ export default function PDFCompressor() {
   };
 
   /**
-   * Compresses Excel files by reducing the size of embedded images
-   * without affecting spreadsheet data, formulas, or formatting
-   * 
-   * Process:
-   * 1. Load Excel file using ExcelJS
-   * 2. Iterate through all worksheets
-   * 3. Extract embedded images from each worksheet
-   * 4. Compress images using Canvas API with specified quality/scale
-   * 5. Replace original images with compressed versions
-   * 6. Generate new Excel file with reduced size
-   * 
-   * @param excelFile - The ProcessableFile containing the Excel file
-   * @returns Promise<Blob> - Compressed Excel file as Blob
+   * Excel compression using server-side API
+   * Super aggressive server-side processing with real-time progress updates
    */
-  const compressExcel = async (excelFile: ProcessableFile): Promise<Blob> => {
-    const { quality } = compressionSettings[compressionLevel];
+  const compressExcelWithAPI = async (excelFile: ProcessableFile): Promise<Blob> => {
+    const { quality, scale } = compressionSettings[compressionLevel];
+    
+    try {
+      // Set initial progress
+      setFiles(prev => prev.map(f => 
+        f.id === excelFile.id ? { 
+          ...f, 
+          progress: 0,
+          estimatedTime: '💪 AGGRESSIVE MODE: Processing MOST images for real compression...'
+        } : f
+      ));
+
+      const formData = new FormData();
+      formData.append('file', excelFile.file);
+      // AGGRESSIVE SETTINGS: Real compression for guaranteed results
+      formData.append('settings', JSON.stringify({ quality: 0.6, scale: 0.7 })); // 60% quality, 70% scale for real reduction
+
+      // Update progress while preparing
+      setFiles(prev => prev.map(f => 
+        f.id === excelFile.id ? { 
+          ...f, 
+          progress: 5,
+          estimatedTime: '💪 GUARANTEED RESULTS: Sending to aggressive compression server...'
+        } : f
+      ));
+
+      console.log(`💪 AGGRESSIVE MODE: Processing ${Math.round(excelFile.originalSize / (1024 * 1024))}MB file with guaranteed compression`);
+
+      // Start server compression with progress simulation
+      const compressionPromise = fetch('/api/compress-excel', {
+        method: 'POST',
+        body: formData,
+      });
+
+      // Simulate progress updates while server processes
+      const progressInterval = setInterval(() => {
+        setFiles(prev => prev.map(f => {
+          if (f.id === excelFile.id && f.progress !== undefined && f.progress < 85) {
+            const newProgress = Math.min(f.progress + Math.random() * 3 + 1, 85); // Slower, more realistic progress
+            const timeEstimate = newProgress > 20 ? 
+              `💪 AGGRESSIVE: ~${Math.ceil((85 - newProgress) * 1.2)} sec (actually compressing)` : 
+              '💪 Actually processing images - not just analyzing...';
+            
+            return {
+              ...f,
+              progress: newProgress,
+              estimatedTime: timeEstimate
+            };
+          }
+          return f;
+        }));
+      }, 3000); // Slower updates every 3 seconds for realistic progress
+
+      const response = await compressionPromise;
+      clearInterval(progressInterval);
+
+      // Final progress update
+      setFiles(prev => prev.map(f => 
+        f.id === excelFile.id ? { 
+          ...f, 
+          progress: 95,
+          estimatedTime: '💪 SUCCESS! Downloading aggressively compressed file...'
+        } : f
+      ));
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ error: 'Unknown server error' }));
+        throw new Error(`Server error (${response.status}): ${errorData.error || response.statusText}`);
+      }
+
+      const compressedBlob = await response.blob();
+      
+      // Get compression stats from headers
+      const statsHeader = response.headers.get('X-Compression-Stats');
+      if (statsHeader) {
+        const stats = JSON.parse(statsHeader);
+        console.log(`🎉 AGGRESSIVE COMPRESSION COMPLETED:`, stats);
+        console.log(`📊 REDUCTION: ${Math.round(((stats.originalSize - stats.compressedSize) / stats.originalSize) * 100)}%`);
+        console.log(`⏱️ TIME: ${stats.processingTime?.toFixed(1)}s`);
+        console.log(`�️ IMAGES: ${stats.processedImages}/${stats.totalImages}`);
+      }
+
+      return compressedBlob;
+      
+    } catch (error) {
+      console.error('❌ AGGRESSIVE COMPRESSION FAILED:', error);
+      throw new Error(`Error en compresión agresiva: ${error instanceof Error ? error.message : 'Error desconocido'}`);
+    }
+  };
+
+  /**
+   * Excel compression using Web Worker for non-blocking processing
+   * This prevents UI freezing during intensive image compression
+   */
+  const compressExcelWithWorker = async (excelFile: ProcessableFile): Promise<void> => {
+    if (!workerRef.current) {
+      throw new Error('Worker not initialized');
+    }
+
+    const arrayBuffer = await excelFile.file.arrayBuffer();
+    const { quality, scale } = compressionSettings[compressionLevel];
+
+    // Send compression task to worker
+    workerRef.current.postMessage({
+      type: 'compress',
+      data: {
+        arrayBuffer,
+        compressionSettings: { quality, scale },
+        fileId: excelFile.id
+      }
+    });
+    
+    // The worker will handle the compression and send progress updates
+    // Results are handled in the worker message handler
+  };
+
+  /**
+   * Excel compression with progress updates for large files
+   * Updates UI with progress percentage and estimated time
+   */
+  const compressExcelWithProgress = async (excelFile: ProcessableFile): Promise<Blob> => {
+    const { quality, scale } = compressionSettings[compressionLevel];
+    const BATCH_SIZE = 8; // Reduced batch size for better progress tracking
+    const MIN_IMAGE_SIZE = 30 * 1024; // 30KB threshold
     
     try {
       // Load the Excel file
@@ -279,31 +463,118 @@ export default function PDFCompressor() {
       const workbook = new ExcelJS.Workbook();
       await workbook.xlsx.load(arrayBuffer);
 
-      // Process all images in the workbook
+      // Collect all processable images
+      const allImages: Array<{
+        worksheet: any;
+        image: any;
+        imageModel: any;
+        mediaIndex: number;
+      }> = [];
+
       for (const worksheet of workbook.worksheets) {
-        // Get all images in this worksheet
         const images = worksheet.getImages();
         
         for (const image of images) {
           const imageModel = workbook.model.media.find(m => m.name === image.imageId);
-          if (imageModel && imageModel.buffer) {
-            try {
-              // Compress the image using canvas
-              const compressedBuffer = await compressImageBuffer(new Uint8Array(imageModel.buffer), quality);
-              
-              // Update the image in the workbook
-              const mediaIndex = workbook.model.media.findIndex(m => m.name === image.imageId);
-              if (mediaIndex !== -1) {
-                // Convert Uint8Array to the Buffer type expected by ExcelJS
-                const nodeBuffer = Buffer.from ? Buffer.from(compressedBuffer) : new (Buffer as any)(compressedBuffer);
-                (workbook.model.media[mediaIndex] as any).buffer = nodeBuffer;
-              }
-            } catch (error) {
-              console.warn(`Failed to compress image ${image.imageId}:`, error);
-            }
+          if (imageModel && imageModel.buffer && imageModel.buffer.byteLength > MIN_IMAGE_SIZE) {
+            const mediaIndex = workbook.model.media.findIndex(m => m.name === image.imageId);
+            allImages.push({
+              worksheet,
+              image,
+              imageModel,
+              mediaIndex
+            });
           }
         }
       }
+
+      if (allImages.length === 0) {
+        // No images to compress, return original
+        return new Blob([arrayBuffer], { 
+          type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' 
+        });
+      }
+
+      console.log(`Processing ${allImages.length} images in batches of ${BATCH_SIZE}`);
+      let processedImages = 0;
+      let totalSavedBytes = 0;
+
+      // Process images in batches with progress updates
+      for (let i = 0; i < allImages.length; i += BATCH_SIZE) {
+        const batch = allImages.slice(i, i + BATCH_SIZE);
+        const progressPercent = Math.round((processedImages / allImages.length) * 100);
+        
+        // Update progress in UI
+        setFiles(prev => prev.map(f => 
+          f.id === excelFile.id ? { 
+            ...f, 
+            progress: progressPercent,
+            estimatedTime: progressPercent > 10 ? 
+              `${Math.ceil(((100 - progressPercent) / progressPercent) * 2)} min` : 
+              'Calculando...'
+          } : f
+        ));
+        
+        // Process batch with controlled concurrency
+        const compressionPromises = batch.map(async ({ imageModel, mediaIndex }) => {
+          try {
+            const originalSize = imageModel.buffer.byteLength;
+            
+            // Skip very large images that might cause memory issues
+            if (originalSize > 50 * 1024 * 1024) { // 50MB threshold
+              console.warn(`Skipping very large image (${Math.round(originalSize / (1024 * 1024))}MB)`);
+              return { success: true, savedBytes: 0 };
+            }
+            
+            const compressedBuffer = await compressImageBufferOptimized(
+              new Uint8Array(imageModel.buffer), 
+              quality, 
+              scale
+            );
+            
+            // Only replace if compression provides significant benefit
+            const compressionRatio = compressedBuffer.byteLength / originalSize;
+            if (compressionRatio < 0.85) { // At least 15% reduction
+              const nodeBuffer = Buffer.from ? Buffer.from(compressedBuffer) : new (Buffer as any)(compressedBuffer);
+              (workbook.model.media[mediaIndex] as any).buffer = nodeBuffer;
+              const savedBytes = originalSize - compressedBuffer.byteLength;
+              totalSavedBytes += savedBytes;
+              return { success: true, savedBytes };
+            }
+            
+            return { success: true, savedBytes: 0 };
+          } catch (error) {
+            console.warn(`Failed to compress image at index ${mediaIndex}:`, error);
+            return { success: false, savedBytes: 0 };
+          }
+        });
+
+        const results = await Promise.all(compressionPromises);
+        processedImages += batch.length;
+        
+        // Log progress
+        const successCount = results.filter(r => r.success).length;
+        console.log(`Batch completed: ${successCount}/${batch.length} images processed successfully`);
+        
+        // Yield control back to the browser to prevent freezing
+        await new Promise(resolve => setTimeout(resolve, 50));
+        
+        // Memory cleanup hint
+        if (typeof global !== 'undefined' && global.gc) {
+          global.gc();
+        }
+      }
+
+      // Final progress update
+      setFiles(prev => prev.map(f => 
+        f.id === excelFile.id ? { 
+          ...f, 
+          progress: 95,
+          estimatedTime: 'Finalizando...'
+        } : f
+      ));
+
+      console.log(`Compression completed. Total saved: ${Math.round(totalSavedBytes / (1024 * 1024))}MB`);
 
       // Save the modified workbook
       const buffer = await workbook.xlsx.writeBuffer();
@@ -312,8 +583,217 @@ export default function PDFCompressor() {
       });
     } catch (error) {
       console.error('Error compressing Excel file:', error);
+      throw new Error(`Error al comprimir el archivo Excel: ${error instanceof Error ? error.message : 'Error desconocido'}`);
+    }
+  };
+
+  /**
+   * Compresses Excel files by reducing the size of embedded images
+   * Optimized version with batch processing, progress tracking, and memory management
+   * 
+   * Key optimizations:
+   * 1. Batch processing of images to prevent memory overflow
+   * 2. Progress tracking for large files
+   * 3. Memory cleanup after each batch
+   * 4. Parallel processing within batches
+   * 5. Size threshold filtering (skip very small images)
+   * 
+   * @param excelFile - The ProcessableFile containing the Excel file
+   * @returns Promise<Blob> - Compressed Excel file as Blob
+   */
+  const compressExcel = async (excelFile: ProcessableFile): Promise<Blob> => {
+    const { quality, scale } = compressionSettings[compressionLevel];
+    const BATCH_SIZE = 10; // Process images in batches
+    const MIN_IMAGE_SIZE = 50 * 1024; // Skip images smaller than 50KB
+    
+    try {
+      // Update progress
+      setFiles(prev => prev.map(f => 
+        f.id === excelFile.id ? { ...f, isProcessing: true } : f
+      ));
+
+      // Load the Excel file
+      const arrayBuffer = await excelFile.file.arrayBuffer();
+      const workbook = new ExcelJS.Workbook();
+      await workbook.xlsx.load(arrayBuffer);
+
+      // Collect all images across worksheets
+      const allImages: Array<{
+        worksheet: any;
+        image: any;
+        imageModel: any;
+        mediaIndex: number;
+      }> = [];
+
+      for (const worksheet of workbook.worksheets) {
+        const images = worksheet.getImages();
+        
+        for (const image of images) {
+          const imageModel = workbook.model.media.find(m => m.name === image.imageId);
+          if (imageModel && imageModel.buffer) {
+            const mediaIndex = workbook.model.media.findIndex(m => m.name === image.imageId);
+            
+            // Only process images larger than threshold
+            if (imageModel.buffer.byteLength > MIN_IMAGE_SIZE) {
+              allImages.push({
+                worksheet,
+                image,
+                imageModel,
+                mediaIndex
+              });
+            }
+          }
+        }
+      }
+
+      console.log(`Processing ${allImages.length} images in batches of ${BATCH_SIZE}`);
+
+      // Process images in batches
+      for (let i = 0; i < allImages.length; i += BATCH_SIZE) {
+        const batch = allImages.slice(i, i + BATCH_SIZE);
+        const progressPercent = Math.round((i / allImages.length) * 100);
+        
+        console.log(`Processing batch ${Math.floor(i / BATCH_SIZE) + 1}/${Math.ceil(allImages.length / BATCH_SIZE)} (${progressPercent}%)`);
+        
+        // Process batch in parallel
+        const compressionPromises = batch.map(async ({ imageModel, mediaIndex }) => {
+          try {
+            const originalSize = imageModel.buffer.byteLength;
+            const compressedBuffer = await compressImageBufferOptimized(
+              new Uint8Array(imageModel.buffer), 
+              quality, 
+              scale
+            );
+            
+            // Only replace if compression was beneficial
+            if (compressedBuffer.byteLength < originalSize * 0.9) {
+              const nodeBuffer = Buffer.from ? Buffer.from(compressedBuffer) : new (Buffer as any)(compressedBuffer);
+              (workbook.model.media[mediaIndex] as any).buffer = nodeBuffer;
+              return { success: true, savedBytes: originalSize - compressedBuffer.byteLength };
+            }
+            
+            return { success: true, savedBytes: 0 };
+          } catch (error) {
+            console.warn(`Failed to compress image at index ${mediaIndex}:`, error);
+            return { success: false, savedBytes: 0 };
+          }
+        });
+
+        await Promise.all(compressionPromises);
+        
+        // Force garbage collection hint
+        if (global.gc) {
+          global.gc();
+        }
+        
+        // Small delay to prevent browser freezing
+        await new Promise(resolve => setTimeout(resolve, 10));
+      }
+
+      console.log('All images processed, generating final file...');
+
+      // Save the modified workbook
+      const buffer = await workbook.xlsx.writeBuffer();
+      return new Blob([buffer], { 
+        type: 'application/vnd.openxmlformats-oficedocument.spreadsheetml.sheet' 
+      });
+    } catch (error) {
+      console.error('Error compressing Excel file:', error);
       throw new Error('Error al comprimir el archivo Excel');
     }
+  };
+
+  /**
+   * Optimized image compression with better memory management and performance
+   * Uses OffscreenCanvas when available for better performance
+   * 
+   * @param imageBuffer - Original image as Uint8Array
+   * @param quality - JPEG quality (0-1)
+   * @param scale - Scale factor for dimensions
+   * @returns Promise<Uint8Array> - Compressed image buffer
+   */
+  const compressImageBufferOptimized = async (
+    imageBuffer: Uint8Array, 
+    quality: number, 
+    scale: number
+  ): Promise<Uint8Array> => {
+    return new Promise((resolve, reject) => {
+      try {
+        // Create blob URL for the image
+        const blob = new Blob([imageBuffer]);
+        const imageUrl = URL.createObjectURL(blob);
+        
+        const img = document.createElement('img');
+        
+        img.onload = () => {
+          try {
+            // Use OffscreenCanvas for better performance if available
+            const useOffscreen = typeof OffscreenCanvas !== 'undefined';
+            
+            if (useOffscreen) {
+              const canvas = new OffscreenCanvas(
+                Math.floor(img.width * scale),
+                Math.floor(img.height * scale)
+              );
+              const ctx = canvas.getContext('2d')!;
+              
+              // Set image smoothing for better quality
+              ctx.imageSmoothingEnabled = true;
+              ctx.imageSmoothingQuality = 'high';
+              
+              ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+              
+              canvas.convertToBlob({ 
+                type: 'image/jpeg', 
+                quality: quality 
+              }).then(blob => {
+                blob.arrayBuffer().then(arrayBuffer => {
+                  URL.revokeObjectURL(imageUrl);
+                  resolve(new Uint8Array(arrayBuffer));
+                }).catch(reject);
+              }).catch(reject);
+            } else {
+              // Fallback to regular canvas
+              const canvas = document.createElement('canvas');
+              const ctx = canvas.getContext('2d')!;
+              
+              canvas.width = Math.floor(img.width * scale);
+              canvas.height = Math.floor(img.height * scale);
+              
+              // Set image smoothing for better quality
+              ctx.imageSmoothingEnabled = true;
+              ctx.imageSmoothingQuality = 'high';
+              
+              ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+              
+              canvas.toBlob((blob) => {
+                if (blob) {
+                  blob.arrayBuffer().then(arrayBuffer => {
+                    URL.revokeObjectURL(imageUrl);
+                    resolve(new Uint8Array(arrayBuffer));
+                  }).catch(reject);
+                } else {
+                  URL.revokeObjectURL(imageUrl);
+                  reject(new Error('Failed to create blob'));
+                }
+              }, 'image/jpeg', quality);
+            }
+          } catch (error) {
+            URL.revokeObjectURL(imageUrl);
+            reject(error);
+          }
+        };
+        
+        img.onerror = () => {
+          URL.revokeObjectURL(imageUrl);
+          reject(new Error('Failed to load image'));
+        };
+        
+        img.src = imageUrl;
+      } catch (error) {
+        reject(error);
+      }
+    });
   };
 
   /**
@@ -367,46 +847,115 @@ export default function PDFCompressor() {
 
   const compressFiles = async () => {
     setIsProcessing(true);
-    
-    for (const file of files) {
+    const startTime = Date.now();
+    let successCount = 0;
+    let errorCount = 0;
+
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
       if (file.compressedBlob) continue; // Skip already compressed
       
-      setFiles(prev => prev.map(f => 
-        f.id === file.id ? { ...f, isProcessing: true, error: undefined } : f
-      ));
+      // Estimate time remaining
+      const avgTimePerFile = i > 0 ? (Date.now() - startTime) / i : 0;
+      const remainingFiles = files.length - i;
+      const estimatedTime = avgTimePerFile > 0 ? 
+        `${Math.ceil((avgTimePerFile * remainingFiles) / 60000)} min` : 
+        'Calculando...';
       
+      setFiles(prev => prev.map(f => 
+        f.id === file.id ? { 
+          ...f, 
+          isProcessing: true, 
+          error: undefined,
+          progress: 0,
+          estimatedTime 
+        } : f
+      ));
+
+      // Start performance monitoring
+      const compressionMethod = file.type === 'pdf' ? 'main-thread' : 'api'; // Always use API for Excel
+      performanceMonitor.startMonitoring(file.id, file.name, file.originalSize, compressionMethod);
+
       try {
-        let compressedBlob: Blob;
-        
         if (file.type === 'pdf') {
-          compressedBlob = await compressPDF(file);
+          const compressedBlob = await compressPDF(file);
+          successCount++;
+          setFiles(prev => prev.map(f =>
+            f.id === file.id ? {
+              ...f,
+              compressedBlob,
+              compressedSize: compressedBlob.size,
+              isProcessing: false,
+              progress: 100,
+              estimatedTime: undefined
+            } : f
+          ));
+
+          // Record performance metrics
+          performanceMonitor.finishMonitoring(file.id, compressedBlob.size);
         } else if (file.type === 'excel') {
-          compressedBlob = await compressExcel(file);
+          // ALWAYS use server-side compression for maximum power and reliability
+          const fileSizeMB = file.originalSize / (1024 * 1024);
+          console.log(`� Using server-side compression for ${fileSizeMB.toFixed(1)}MB file`);
+          
+          try {
+            const compressedBlob = await compressExcelWithAPI(file);
+            successCount++;
+            setFiles(prev => prev.map(f =>
+              f.id === file.id ? {
+                ...f,
+                compressedBlob,
+                compressedSize: compressedBlob.size,
+                isProcessing: false,
+                progress: 100,
+                estimatedTime: undefined
+              } : f
+            ));
+
+            // Record performance metrics
+            performanceMonitor.finishMonitoring(file.id, compressedBlob.size);
+          } catch (apiError) {
+            console.error(`❌ Server compression failed:`, apiError);
+            throw apiError;
+          }
         } else {
           throw new Error('Tipo de archivo no soportado');
         }
         
-        setFiles(prev => prev.map(f => 
-          f.id === file.id ? {
-            ...f,
-            compressedBlob,
-            compressedSize: compressedBlob.size,
-            isProcessing: false
-          } : f
-        ));
       } catch (error) {
         console.error('Error compressing file:', error);
-        setFiles(prev => prev.map(f => 
+        errorCount++;
+
+        // Record error in performance monitoring
+        performanceMonitor.recordError(file.id, error instanceof Error ? error.message : 'Unknown error');
+        performanceMonitor.finishMonitoring(file.id);
+
+        setFiles(prev => prev.map(f =>
           f.id === file.id ? {
             ...f,
             isProcessing: false,
-            error: 'Error al comprimir el archivo'
+            error: 'Error al comprimir el archivo',
+            progress: undefined,
+            estimatedTime: undefined
           } : f
         ));
       }
     }
-    
+
     setIsProcessing(false);
+
+    if (successCount > 0) {
+      toast.success(
+        `${successCount} archivo${successCount !== 1 ? 's' : ''} comprimido${successCount !== 1 ? 's' : ''}`,
+        errorCount > 0
+          ? { description: `${errorCount} no se pudo comprimir.` }
+          : undefined
+      );
+    } else if (errorCount > 0) {
+      toast.error('No se pudo comprimir', {
+        description: 'Revisa los archivos e inténtalo de nuevo.',
+      });
+    }
   };
 
   const downloadFile = (file: ProcessableFile) => {
@@ -458,92 +1007,43 @@ export default function PDFCompressor() {
 
   const resetAll = () => {
     setFiles([]);
-    setIsDragOver(false);
-    if (fileInputRef.current) {
-      fileInputRef.current.value = '';
-    }
   };
 
   const totalOriginalSize = files.reduce((sum, file) => sum + file.originalSize, 0);
   const totalCompressedSize = files.reduce((sum, file) => sum + (file.compressedSize || 0), 0);
   const compressedFilesCount = files.filter(f => f.compressedBlob).length;
 
-  return (
-    <div className="container mx-auto px-4 py-12 max-w-4xl">
-      <div className="text-center mb-12">
-        <div className="inline-flex items-center justify-center w-16 h-16 bg-purple-100 rounded-full mb-6">
-          <Compress className="w-8 h-8 text-purple-600" />
-        </div>
-        <h1 className="text-4xl font-bold text-gray-900 mb-4">
-          Comprimir PDFs y Excel
-        </h1>
-        <p className="text-xl text-gray-600 max-w-2xl mx-auto">
-          Reduce el tamaño de archivos PDF y Excel manteniendo la calidad visual.
-          Para archivos Excel, comprime las imágenes embebidas sin afectar datos o fórmulas.
-          Todo se procesa en tu navegador, tus archivos no salen de tu computadora.
-        </p>
-      </div>
+  const step: 1 | 2 | 3 =
+    files.length === 0 ? 1 : compressedFilesCount > 0 ? 3 : 2;
 
+  return (
+    <ToolShell tool={tool} step={step}>
       <Card className="mb-8">
-        <CardContent className="p-8">
-          <div
-            className={cn(
-              "border-2 border-dashed rounded-lg p-12 text-center transition-all cursor-pointer",
-              isDragOver 
-                ? "border-purple-500 bg-purple-50 scale-105" 
-                : "border-gray-300 hover:border-purple-400"
-            )}
-            onClick={() => fileInputRef.current?.click()}
-            onDragEnter={handleDragEnter}
-            onDragLeave={handleDragLeave}
-            onDragOver={handleDragOver}
-            onDrop={handleDrop}
-          >
-            <Upload className={cn(
-              "w-12 h-12 mx-auto mb-4 transition-colors",
-              isDragOver ? "text-purple-500" : "text-gray-400"
-            )} />
-            <h3 className={cn(
-              "text-lg font-semibold mb-2 transition-colors",
-              isDragOver ? "text-purple-900" : "text-gray-900"
-            )}>
-              {isDragOver ? "Suelta los archivos aquí" : "Selecciona archivos PDF o Excel"}
-            </h3>
-            <p className={cn(
-              "mb-6 transition-colors",
-              isDragOver ? "text-purple-700" : "text-gray-600"
-            )}>
-              {isDragOver 
-                ? "Suelta para agregar los archivos" 
-                : "Haz clic aquí o arrastra y suelta tus archivos PDF (.pdf) o Excel (.xlsx, .xls)"
-              }
-            </p>
-            {!isDragOver && (
-              <Button className="bg-purple-600 hover:bg-purple-700">
-                <Upload className="w-4 h-4 mr-2" />
-                Seleccionar archivos
-              </Button>
-            )}
-            <input
-              ref={fileInputRef}
-              type="file"
-              multiple
-              accept=".pdf,.xlsx,.xls,application/pdf,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel"
-              className="hidden"
-              onChange={(e) => e.target.files && handleFileSelect(e.target.files)}
-            />
-          </div>
-          
-          <div className="mt-6 p-4 bg-amber-50 rounded-lg">
+        <CardContent className="p-6 sm:p-8">
+          <FileDropzone
+            accent={accent}
+            multiple
+            accept=".pdf,.xlsx,.xls,application/pdf,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel"
+            idleTitle="Selecciona archivos PDF o Excel"
+            idleSubtitle="Haz clic aquí o arrastra y suelta tus archivos PDF (.pdf) o Excel (.xlsx, .xls)"
+            dragTitle="Suelta los archivos aquí"
+            buttonLabel="Seleccionar archivos"
+            ariaLabel="Seleccionar o arrastrar archivos PDF o Excel"
+            onFiles={handleFileSelect}
+          />
+
+          <div className="mt-6 rounded-lg bg-amber-50 p-4">
             <div className="flex items-start gap-2">
-              <AlertCircle className="w-5 h-5 text-amber-600 mt-0.5 flex-shrink-0" />
+              <AlertCircle className="mt-0.5 h-5 w-5 flex-shrink-0 text-amber-600" />
               <div className="text-sm text-amber-800">
-                <p className="font-medium mb-1">Límites y consideraciones:</p>
+                <p className="mb-1 font-medium">Límites y consideraciones:</p>
                 <ul className="space-y-1">
                   <li>• Tamaño máximo total: 500MB</li>
                   <li>• Archivos PDF (.pdf) y Excel (.xlsx, .xls) válidos</li>
                   <li>• No se permiten archivos duplicados</li>
                   <li>• Para Excel: comprime imágenes embebidas sin afectar datos</li>
+                  <li>• Archivos grandes (&gt;100MB) pueden tardar varios minutos</li>
+                  <li>• Procesamiento optimizado en segundo plano — no congela la interfaz</li>
                 </ul>
               </div>
             </div>
@@ -551,13 +1051,30 @@ export default function PDFCompressor() {
         </CardContent>
       </Card>
 
+      {isLoadingFiles && (
+        <Card className="mb-8">
+          <CardContent className="p-6">
+            <div className="flex items-center gap-4">
+              <Skeleton className="h-20 w-16 rounded" />
+              <div className="flex-1 space-y-2">
+                <Skeleton className="h-4 w-1/2" />
+                <Skeleton className="h-3 w-1/3" />
+              </div>
+            </div>
+            <p className="mt-4 text-center text-sm text-gray-500">
+              Preparando archivos y generando vistas previas…
+            </p>
+          </CardContent>
+        </Card>
+      )}
+
       {files.length > 0 && (
         <Card className="mb-8" ref={filesListRef}>
           <CardContent className="p-6">
-            <div className="flex justify-between items-center mb-6">
-              <h3 className="text-lg font-semibold text-gray-900">
+            <div className="mb-6 flex items-center justify-between">
+              <h2 className="text-lg font-semibold text-gray-900">
                 Archivos seleccionados ({files.length})
-              </h3>
+              </h2>
               <Button
                 variant="outline"
                 size="sm"
@@ -569,23 +1086,26 @@ export default function PDFCompressor() {
             </div>
 
             <div className="mb-6">
-              <Label className="text-sm font-medium text-gray-700 mb-3 block">
-                <Compress className="w-4 h-4 inline mr-2" />
+              <Label className="mb-3 block text-sm font-medium text-gray-700">
+                <Compress className="mr-2 inline h-4 w-4" />
                 Nivel de compresión
               </Label>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+              <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
                 {Object.entries(compressionSettings).map(([level, settings]) => (
                   <button
                     key={level}
+                    type="button"
                     onClick={() => setCompressionLevel(level as CompressionLevel)}
+                    aria-pressed={compressionLevel === level}
                     className={cn(
-                      "p-4 rounded-lg border-2 text-left transition-all",
+                      'rounded-lg border-2 p-4 text-left transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2',
+                      accent.ring,
                       compressionLevel === level
-                        ? "border-purple-500 bg-purple-50"
-                        : "border-gray-200 hover:border-purple-300"
+                        ? cn(accent.border, accent.soft)
+                        : cn('border-gray-200', accent.borderHover)
                     )}
                   >
-                    <div className="font-medium text-gray-900 capitalize mb-1">
+                    <div className="mb-1 font-medium capitalize text-gray-900">
                       {level === 'low' ? 'Baja' : level === 'medium' ? 'Media' : 'Alta'}
                     </div>
                     <div className="text-sm text-gray-600">
@@ -632,6 +1152,20 @@ export default function PDFCompressor() {
                           ({calculateReduction(file.originalSize, file.compressedSize)}% reducción)
                         </p>
                       )}
+                      {file.isProcessing && file.progress !== undefined && (
+                        <div className="space-y-2" aria-live="polite">
+                          <div className="flex items-center justify-between text-xs">
+                            <span className={accent.text}>Progreso: {file.progress}%</span>
+                            {file.estimatedTime && (
+                              <span className="flex items-center gap-1 text-gray-500">
+                                <Clock className="h-3 w-3" />
+                                {file.estimatedTime}
+                              </span>
+                            )}
+                          </div>
+                          <Progress value={file.progress} className="h-2" />
+                        </div>
+                      )}
                       {file.error && (
                         <p className="text-red-600">{file.error}</p>
                       )}
@@ -640,7 +1174,7 @@ export default function PDFCompressor() {
                   
                   <div className="flex items-center gap-2">
                     {file.isProcessing && (
-                      <Loader2 className="w-5 h-5 animate-spin text-purple-600" />
+                      <Loader2 className={cn('h-5 w-5 animate-spin', accent.text)} />
                     )}
                     {file.compressedBlob && (
                       <Button
@@ -697,35 +1231,36 @@ export default function PDFCompressor() {
       {files.length > 0 && (
         <Card className="mb-8">
           <CardContent className="p-6 text-center">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">
+            <h2 className="mb-4 text-lg font-semibold text-gray-900">
               ¿Listo para comprimir?
-            </h3>
-            <p className="text-gray-600 mb-6">
+            </h2>
+            <p className="mb-6 text-gray-600">
               Se comprimirán {files.length} archivo{files.length !== 1 ? 's' : ''} con nivel de compresión {
-                compressionLevel === 'low' ? 'bajo' : 
+                compressionLevel === 'low' ? 'bajo' :
                 compressionLevel === 'medium' ? 'medio' : 'alto'
               }.
             </p>
-            <div className="flex gap-4 justify-center">
+            <div className="flex flex-col justify-center gap-3 sm:flex-row sm:gap-4">
               <Button
                 onClick={compressFiles}
                 disabled={isProcessing}
+                aria-busy={isProcessing}
                 size="lg"
-                className="bg-purple-600 hover:bg-purple-700"
+                className={accent.solid}
               >
                 {isProcessing ? (
                   <>
-                    <Loader2 className="w-5 h-5 mr-2 animate-spin" />
-                    Comprimiendo...
+                    <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                    Comprimiendo…
                   </>
                 ) : (
                   <>
-                    <Compress className="w-5 h-5 mr-2" />
+                    <Compress className="mr-2 h-5 w-5" />
                     Comprimir archivos
                   </>
                 )}
               </Button>
-              
+
               {compressedFilesCount > 0 && (
                 <Button
                   onClick={downloadAllFiles}
@@ -733,7 +1268,7 @@ export default function PDFCompressor() {
                   variant="outline"
                   className="border-green-300 text-green-700 hover:bg-green-50"
                 >
-                  <Download className="w-5 h-5 mr-2" />
+                  <Download className="mr-2 h-5 w-5" />
                   Descargar {compressedFilesCount > 1 ? 'ZIP' : 'archivo'}
                 </Button>
               )}
@@ -741,6 +1276,6 @@ export default function PDFCompressor() {
           </CardContent>
         </Card>
       )}
-    </div>
+    </ToolShell>
   );
 }

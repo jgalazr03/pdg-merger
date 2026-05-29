@@ -2,12 +2,19 @@
 
 import { useState, useRef, useEffect } from 'react';
 import { PDFDocument } from 'pdf-lib';
-import { Upload, FileText, Download, Loader2, X, Scissors, AlertCircle } from 'lucide-react';
+import { FileText, Download, Loader2, X, Scissors, AlertCircle } from 'lucide-react';
+import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
+import { getTool } from '@/lib/tools';
+import ToolShell from '@/components/tools/ToolShell';
+import FileDropzone from '@/components/tools/FileDropzone';
+
+const tool = getTool('dividir');
+const accent = tool.accent;
 
 interface SplitPDF {
   id: string;
@@ -23,17 +30,15 @@ export default function PDFSplitter() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [splitPDFs, setSplitPDFs] = useState<SplitPDF[]>([]);
   const [rangeError, setRangeError] = useState<string>('');
-  const [isDragOver, setIsDragOver] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
   const fileInfoRef = useRef<HTMLDivElement>(null);
 
   // Auto-scroll when file is selected
   useEffect(() => {
     if (selectedFile && fileInfoRef.current) {
       setTimeout(() => {
-        fileInfoRef.current?.scrollIntoView({ 
-          behavior: 'smooth', 
-          block: 'start' 
+        fileInfoRef.current?.scrollIntoView({
+          behavior: 'smooth',
+          block: 'start',
         });
       }, 100);
     }
@@ -46,8 +51,10 @@ export default function PDFSplitter() {
   };
 
   const handleFileSelect = async (file: File) => {
-    if (file.type !== 'application/pdf') {
-      alert('Por favor selecciona un archivo PDF válido.');
+    if (file.type !== 'application/pdf' && !/\.pdf$/i.test(file.name)) {
+      toast.error('Archivo no válido', {
+        description: 'Por favor selecciona un archivo PDF.',
+      });
       return;
     }
 
@@ -62,40 +69,11 @@ export default function PDFSplitter() {
       setTotalPages(pdf.getPageCount());
     } catch (error) {
       console.error('Error loading PDF:', error);
-      alert('Error al cargar el PDF. Asegúrate de que sea un archivo válido.');
+      toast.error('No se pudo cargar el PDF', {
+        description: 'Asegúrate de que sea un archivo válido.',
+      });
       setSelectedFile(null);
       setTotalPages(0);
-    }
-  };
-
-  const handleDragEnter = (e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setIsDragOver(true);
-  };
-
-  const handleDragLeave = (e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    if (!e.currentTarget.contains(e.relatedTarget as Node)) {
-      setIsDragOver(false);
-    }
-  };
-
-  const handleDragOver = (e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    e.dataTransfer.dropEffect = 'copy';
-  };
-
-  const handleDrop = (e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setIsDragOver(false);
-
-    const droppedFiles = e.dataTransfer.files;
-    if (droppedFiles.length > 0) {
-      handleFileSelect(droppedFiles[0]);
     }
   };
 
@@ -105,46 +83,46 @@ export default function PDFSplitter() {
     }
 
     const ranges: number[][] = [];
-    const parts = rangeString.split(',').map(part => part.trim());
+    const parts = rangeString.split(',').map((part) => part.trim());
 
     for (const part of parts) {
       if (part.includes('-')) {
         // Range format: "1-3"
-        const [start, end] = part.split('-').map(num => parseInt(num.trim()));
-        
+        const [start, end] = part.split('-').map((num) => parseInt(num.trim()));
+
         if (isNaN(start) || isNaN(end)) {
           throw new Error(`Rango inválido: "${part}". Usa formato como "1-3".`);
         }
-        
+
         if (start < 1 || end < 1) {
           throw new Error(`Las páginas deben ser números positivos. Error en: "${part}".`);
         }
-        
+
         if (start > totalPages || end > totalPages) {
           throw new Error(`Las páginas no pueden ser mayores a ${totalPages}. Error en: "${part}".`);
         }
-        
+
         if (start > end) {
           throw new Error(`El inicio del rango no puede ser mayor al final. Error en: "${part}".`);
         }
-        
+
         ranges.push([start, end]);
       } else {
         // Single page format: "5"
         const page = parseInt(part);
-        
+
         if (isNaN(page)) {
           throw new Error(`Página inválida: "${part}". Debe ser un número.`);
         }
-        
+
         if (page < 1) {
           throw new Error(`Las páginas deben ser números positivos. Error en: "${part}".`);
         }
-        
+
         if (page > totalPages) {
           throw new Error(`La página ${page} no existe. El PDF tiene ${totalPages} páginas.`);
         }
-        
+
         ranges.push([page, page]);
       }
     }
@@ -185,23 +163,24 @@ export default function PDFSplitter() {
       for (let i = 0; i < ranges.length; i++) {
         const [startPage, endPage] = ranges[i];
         const newPdf = await PDFDocument.create();
-        
+
         // Copy pages (pdf-lib uses 0-based indexing)
         const pageIndices = [];
         for (let pageNum = startPage; pageNum <= endPage; pageNum++) {
           pageIndices.push(pageNum - 1);
         }
-        
+
         const copiedPages = await newPdf.copyPages(originalPdf, pageIndices);
-        copiedPages.forEach(page => newPdf.addPage(page));
-        
+        copiedPages.forEach((page) => newPdf.addPage(page));
+
         const pdfBytes = await newPdf.save();
         const blob = new Blob([pdfBytes], { type: 'application/pdf' });
-        
-        const pagesDescription = startPage === endPage 
-          ? `página ${startPage}` 
-          : `páginas ${startPage}-${endPage}`;
-        
+
+        const pagesDescription =
+          startPage === endPage
+            ? `página ${startPage}`
+            : `páginas ${startPage}-${endPage}`;
+
         newSplitPDFs.push({
           id: Math.random().toString(36).substring(2, 15),
           name: `${selectedFile.name.replace('.pdf', '')}_${pagesDescription}.pdf`,
@@ -211,9 +190,14 @@ export default function PDFSplitter() {
       }
 
       setSplitPDFs(newSplitPDFs);
+      toast.success(
+        `Se ${newSplitPDFs.length === 1 ? 'creó' : 'crearon'} ${newSplitPDFs.length} archivo${newSplitPDFs.length !== 1 ? 's' : ''} PDF`
+      );
     } catch (error) {
       console.error('Error splitting PDF:', error);
-      alert('Error al dividir el PDF. Por favor, intenta de nuevo.');
+      toast.error('No se pudo dividir el PDF', {
+        description: 'Inténtalo de nuevo.',
+      });
     } finally {
       setIsProcessing(false);
     }
@@ -231,7 +215,7 @@ export default function PDFSplitter() {
   };
 
   const downloadAllPDFs = () => {
-    splitPDFs.forEach(pdf => {
+    splitPDFs.forEach((pdf) => {
       setTimeout(() => downloadPDF(pdf), 100);
     });
   };
@@ -242,101 +226,46 @@ export default function PDFSplitter() {
     setSplitRanges('');
     setSplitPDFs([]);
     setRangeError('');
-    setIsDragOver(false);
-    if (fileInputRef.current) {
-      fileInputRef.current.value = '';
-    }
   };
 
-  return (
-    <div className="container mx-auto px-4 py-12 max-w-4xl">
-      <div className="text-center mb-12">
-        <div className="inline-flex items-center justify-center w-16 h-16 bg-orange-100 rounded-full mb-6">
-          <Scissors className="w-8 h-8 text-orange-600" />
-        </div>
-        <h1 className="text-4xl font-bold text-gray-900 mb-4">
-          Dividir PDF
-        </h1>
-        <p className="text-xl text-gray-600 max-w-2xl mx-auto">
-          Divide un archivo PDF en múltiples documentos especificando páginas o rangos.
-          Todo se procesa en tu navegador, tus archivos no salen de tu computadora.
-        </p>
-      </div>
+  const step: 1 | 2 | 3 = !selectedFile ? 1 : splitPDFs.length > 0 ? 3 : 2;
 
+  return (
+    <ToolShell tool={tool} step={step}>
       <Card className="mb-8">
-        <CardContent className="p-8">
-          <div
-            className={cn(
-              "border-2 border-dashed rounded-lg p-12 text-center transition-all cursor-pointer",
-              isDragOver 
-                ? "border-orange-500 bg-orange-50 scale-105" 
-                : "border-gray-300 hover:border-orange-400"
-            )}
-            onClick={() => fileInputRef.current?.click()}
-            onDragEnter={handleDragEnter}
-            onDragLeave={handleDragLeave}
-            onDragOver={handleDragOver}
-            onDrop={handleDrop}
-          >
-            <Upload className={cn(
-              "w-12 h-12 mx-auto mb-4 transition-colors",
-              isDragOver ? "text-orange-500" : "text-gray-400"
-            )} />
-            <h3 className={cn(
-              "text-lg font-semibold mb-2 transition-colors",
-              isDragOver ? "text-orange-900" : "text-gray-900"
-            )}>
-              {isDragOver ? "Suelta el archivo PDF aquí" : "Selecciona un archivo PDF"}
-            </h3>
-            <p className={cn(
-              "mb-6 transition-colors",
-              isDragOver ? "text-orange-700" : "text-gray-600"
-            )}>
-              {isDragOver 
-                ? "Suelta para cargar el archivo PDF" 
-                : "Haz clic aquí o arrastra y suelta tu archivo PDF"
-              }
-            </p>
-            {!isDragOver && (
-              <Button className="bg-orange-600 hover:bg-orange-700">
-                <Upload className="w-4 h-4 mr-2" />
-                Seleccionar archivo
-              </Button>
-            )}
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept=".pdf,application/pdf"
-              className="hidden"
-              onChange={(e) => e.target.files?.[0] && handleFileSelect(e.target.files[0])}
-            />
-          </div>
+        <CardContent className="p-6 sm:p-8">
+          <FileDropzone
+            accent={accent}
+            accept=".pdf,application/pdf"
+            idleTitle="Selecciona un archivo PDF"
+            idleSubtitle="Haz clic aquí o arrastra y suelta tu archivo PDF"
+            dragTitle="Suelta el archivo PDF aquí"
+            buttonLabel="Seleccionar archivo"
+            ariaLabel="Seleccionar o arrastrar un archivo PDF"
+            onFiles={(files) => handleFileSelect(files[0])}
+          />
         </CardContent>
       </Card>
 
       {selectedFile && (
-        <Card className="mb-8" ref={fileInfoRef}>
+        <Card className="mb-8 motion-safe:animate-slide-up" ref={fileInfoRef}>
           <CardContent className="p-6">
-            <div className="flex justify-between items-center mb-6">
-              <h3 className="text-lg font-semibold text-gray-900">
+            <div className="mb-6 flex items-center justify-between">
+              <h2 className="text-lg font-semibold text-gray-900">
                 Archivo seleccionado
-              </h3>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={resetAll}
-              >
-                <X className="w-4 h-4 mr-2" />
+              </h2>
+              <Button variant="outline" size="sm" onClick={resetAll}>
+                <X className="mr-2 h-4 w-4" />
                 Cambiar archivo
               </Button>
             </div>
-            
-            <div className="flex items-center gap-4 p-4 bg-gray-50 rounded-lg">
-              <div className="flex items-center justify-center w-12 h-12 bg-red-100 rounded">
-                <FileText className="w-6 h-6 text-red-600" />
+
+            <div className="flex items-center gap-4 rounded-lg bg-gray-50 p-4">
+              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded bg-red-100">
+                <FileText className="h-6 w-6 text-red-600" />
               </div>
-              <div className="flex-1">
-                <p className="font-medium text-gray-900">
+              <div className="min-w-0 flex-1">
+                <p className="truncate font-medium text-gray-900">
                   {selectedFile.name}
                 </p>
                 <p className="text-sm text-gray-500">
@@ -346,8 +275,11 @@ export default function PDFSplitter() {
             </div>
 
             <div className="mt-6">
-              <Label htmlFor="ranges" className="text-sm font-medium text-gray-700 mb-2 block">
-                <Scissors className="w-4 h-4 inline mr-2" />
+              <Label
+                htmlFor="ranges"
+                className="mb-2 block text-sm font-medium text-gray-700"
+              >
+                <Scissors className="mr-2 inline h-4 w-4" />
                 Especifica las páginas o rangos a extraer
               </Label>
               <Input
@@ -356,24 +288,29 @@ export default function PDFSplitter() {
                 placeholder="Ej: 1-3, 5, 7-10"
                 value={splitRanges}
                 onChange={(e) => handleRangeChange(e.target.value)}
+                aria-invalid={!!rangeError}
+                aria-describedby="ranges-help"
                 className={cn(
-                  rangeError && "border-red-300 focus:border-red-500 focus:ring-red-200"
+                  rangeError && 'border-red-300 focus-visible:ring-red-200'
                 )}
               />
               {rangeError && (
-                <div className="mt-2 flex items-start gap-2 text-sm text-red-600">
-                  <AlertCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />
+                <div
+                  className="mt-2 flex items-start gap-2 text-sm text-red-600"
+                  id="ranges-help"
+                >
+                  <AlertCircle className="mt-0.5 h-4 w-4 flex-shrink-0" />
                   <span>{rangeError}</span>
                 </div>
               )}
-              <div className="mt-2 p-3 bg-blue-50 rounded-lg">
-                <p className="text-sm text-blue-800">
-                  <strong>Ejemplos:</strong>
+              <div className={cn('mt-3 rounded-lg p-3', accent.soft)}>
+                <p className={cn('text-sm font-medium', accent.softText)}>
+                  Ejemplos:
                 </p>
-                <ul className="text-sm text-blue-700 mt-1 space-y-1">
-                  <li>• <code>1-3</code> - Páginas de la 1 a la 3</li>
-                  <li>• <code>1, 3, 5</code> - Páginas individuales 1, 3 y 5</li>
-                  <li>• <code>1-2, 5, 8-10</code> - Combina rangos y páginas individuales</li>
+                <ul className={cn('mt-1 space-y-1 text-sm', accent.softText)}>
+                  <li>• <code>1-3</code> — Páginas de la 1 a la 3</li>
+                  <li>• <code>1, 3, 5</code> — Páginas individuales 1, 3 y 5</li>
+                  <li>• <code>1-2, 5, 8-10</code> — Combina rangos y páginas</li>
                 </ul>
               </div>
             </div>
@@ -381,29 +318,31 @@ export default function PDFSplitter() {
         </Card>
       )}
 
-      {selectedFile && splitRanges && !rangeError && (
+      {selectedFile && splitRanges && !rangeError && splitPDFs.length === 0 && (
         <Card className="mb-8">
           <CardContent className="p-6 text-center">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">
+            <h2 className="mb-4 text-lg font-semibold text-gray-900">
               ¿Listo para dividir?
-            </h3>
-            <p className="text-gray-600 mb-6">
-              Se crearán {parseRanges(splitRanges).length} archivos PDF según los rangos especificados.
+            </h2>
+            <p className="mb-6 text-gray-600">
+              Se crearán {parseRanges(splitRanges).length} archivos PDF según los
+              rangos especificados.
             </p>
             <Button
               onClick={splitPDF}
               disabled={isProcessing}
+              aria-busy={isProcessing}
               size="lg"
-              className="bg-orange-600 hover:bg-orange-700"
+              className={accent.solid}
             >
               {isProcessing ? (
                 <>
-                  <Loader2 className="w-5 h-5 mr-2 animate-spin" />
-                  Dividiendo...
+                  <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                  Dividiendo…
                 </>
               ) : (
                 <>
-                  <Scissors className="w-5 h-5 mr-2" />
+                  <Scissors className="mr-2 h-5 w-5" />
                   Dividir PDF
                 </>
               )}
@@ -413,73 +352,67 @@ export default function PDFSplitter() {
       )}
 
       {splitPDFs.length > 0 && (
-        <Card className="border-green-200 bg-green-50">
+        <Card className="border-green-200 bg-green-50 motion-safe:animate-slide-up">
           <CardContent className="p-6">
-            <div className="text-center mb-6">
-              <div className="inline-flex items-center justify-center w-16 h-16 bg-green-100 rounded-full mb-4">
-                <Download className="w-8 h-8 text-green-600" />
+            <div className="mb-6 text-center">
+              <div className="mb-4 inline-flex h-16 w-16 items-center justify-center rounded-full bg-green-100">
+                <Download className="h-8 w-8 text-green-600" />
               </div>
-              <h3 className="text-lg font-semibold text-green-900 mb-2">
+              <h2 className="mb-2 text-lg font-semibold text-green-900">
                 ¡División completada!
-              </h3>
-              <p className="text-green-800 mb-4">
+              </h2>
+              <p className="mb-4 text-green-800">
                 Se han creado {splitPDFs.length} archivos PDF.
               </p>
               <Button
                 onClick={downloadAllPDFs}
                 size="lg"
-                className="bg-green-600 hover:bg-green-700 mb-6"
+                className="bg-green-600 text-white hover:bg-green-700"
               >
-                <Download className="w-5 h-5 mr-2" />
+                <Download className="mr-2 h-5 w-5" />
                 Descargar todos los archivos
               </Button>
             </div>
 
             <div className="space-y-3">
-              <h4 className="font-medium text-gray-900 mb-3">Archivos generados:</h4>
+              <h3 className="mb-3 font-medium text-gray-900">Archivos generados:</h3>
               {splitPDFs.map((pdf) => (
                 <div
                   key={pdf.id}
-                  className="flex items-center justify-between p-4 bg-white rounded-lg border"
+                  className="flex items-center justify-between gap-3 rounded-lg border bg-white p-4"
                 >
-                  <div className="flex items-center gap-3">
-                    <div className="flex items-center justify-center w-10 h-10 bg-green-100 rounded">
-                      <FileText className="w-5 h-5 text-green-600" />
+                  <div className="flex min-w-0 items-center gap-3">
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded bg-green-100">
+                      <FileText className="h-5 w-5 text-green-600" />
                     </div>
-                    <div>
-                      <p className="font-medium text-gray-900 text-sm">
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-medium text-gray-900">
                         {pdf.name}
                       </p>
-                      <p className="text-xs text-gray-500">
-                        {pdf.pages}
-                      </p>
+                      <p className="text-xs text-gray-500">{pdf.pages}</p>
                     </div>
                   </div>
                   <Button
                     onClick={() => downloadPDF(pdf)}
                     size="sm"
                     variant="outline"
-                    className="border-green-300 text-green-700 hover:bg-green-50"
+                    className="shrink-0 border-green-300 text-green-700 hover:bg-green-50"
                   >
-                    <Download className="w-4 h-4 mr-2" />
+                    <Download className="mr-2 h-4 w-4" />
                     Descargar
                   </Button>
                 </div>
               ))}
             </div>
 
-            <div className="text-center mt-6">
-              <Button
-                variant="outline"
-                onClick={resetAll}
-                size="lg"
-              >
+            <div className="mt-6 text-center">
+              <Button variant="outline" onClick={resetAll} size="lg">
                 Dividir otro PDF
               </Button>
             </div>
           </CardContent>
         </Card>
       )}
-    </div>
+    </ToolShell>
   );
 }
