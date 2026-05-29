@@ -26,6 +26,12 @@ export const metadata: Metadata = {
   title: 'Herramientas PDF y Excel | GAINCO',
   description:
     'Une, divide y comprime archivos PDF y Excel de forma rápida y segura, directo desde tu navegador.',
+  // Favicon: isotipo de marca en SVG que cambia de color con el tema del sistema
+  // (claro/oscuro) mediante prefers-color-scheme embebido en el propio archivo.
+  // Next.js genera <link rel="icon" type="image/svg+xml" href="/favicon.svg">.
+  icons: {
+    icon: { url: '/favicon.svg', type: 'image/svg+xml' },
+  },
 };
 
 export default function RootLayout({
