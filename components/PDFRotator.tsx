@@ -286,18 +286,40 @@ export default function PDFRotator() {
               </Button>
             </div>
 
-            {/* Controles globales: dos polos limpios — label a la izquierda,
-                grupo de controles a la derecha. "Restablecer" (acción terciaria)
-                es un botón de ÍCONO discreto (ghost, sin borde para no competir
-                con el segmentado bordeado), agrupado con los controles. Reserva
-                su lugar siempre (invisible cuando no aplica): nunca desplaza ni
-                roba ancho. El segmentado va en grid-cols-2 (no recorta). */}
+            {/* Controles globales. MÓVIL: cabecera "label … Restablecer"
+                (texto, alineado al borde derecho = donde termina el botón
+                Derecha) y el segmentado a ancho completo debajo. ESCRITORIO
+                (sin cambios): una fila, Restablecer como ícono discreto junto al
+                segmentado. "Restablecer" reserva su lugar siempre (invisible si
+                no aplica): sin layout shift. Dos instancias del reset, cada una
+                acotada a su breakpoint. */}
             <div className="mb-6 rounded-lg border-3 border-ink bg-surface p-3">
               <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                <span className="text-sm font-bold text-ink">
-                  Girar todas las páginas
-                </span>
+                {/* Cabecera: en móvil es una fila label↔Restablecer; en
+                    escritorio queda solo el label (el reset móvil es sm:hidden). */}
+                <div className="flex items-center justify-between gap-3 sm:block">
+                  <span className="text-sm font-bold text-ink">
+                    Girar todas las páginas
+                  </span>
+                  {/* Restablecer — MÓVIL (texto, alineado al borde derecho) */}
+                  <button
+                    type="button"
+                    onClick={resetRotations}
+                    disabled={isProcessing || !anyRotated}
+                    aria-hidden={!anyRotated}
+                    tabIndex={anyRotated ? 0 : -1}
+                    className={cn(
+                      'shrink-0 whitespace-nowrap text-sm font-bold underline-offset-4 transition-colors hover:text-ink hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink focus-visible:ring-offset-2 sm:hidden',
+                      anyRotated ? 'text-muted-foreground' : 'invisible pointer-events-none'
+                    )}
+                  >
+                    Restablecer
+                  </button>
+                </div>
+
+                {/* Grupo derecho: Restablecer (ícono, solo escritorio) + segmentado */}
                 <div className="flex items-center gap-2">
+                  {/* Restablecer — ESCRITORIO (ícono) */}
                   <button
                     type="button"
                     onClick={resetRotations}
@@ -307,13 +329,13 @@ export default function PDFRotator() {
                     aria-label="Restablecer rotación"
                     title="Restablecer rotación"
                     className={cn(
-                      'flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-muted-foreground transition-colors duration-150 ease-out hover:bg-muted hover:text-ink active:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink focus-visible:ring-offset-2',
-                      anyRotated ? '' : 'invisible pointer-events-none'
+                      'hidden h-10 w-10 shrink-0 items-center justify-center rounded-lg text-muted-foreground transition-colors duration-150 ease-out hover:bg-muted hover:text-ink active:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink focus-visible:ring-offset-2 sm:flex',
+                      anyRotated ? '' : 'sm:invisible sm:pointer-events-none'
                     )}
                   >
                     <Undo2 className="h-4 w-4" />
                   </button>
-                  <div className="grid flex-1 grid-cols-2 overflow-hidden rounded-lg border-3 border-ink sm:w-64 sm:flex-none">
+                  <div className="grid w-full grid-cols-2 overflow-hidden rounded-lg border-3 border-ink sm:w-64">
                     <button
                       type="button"
                       onClick={() => rotateAll(-90)}
@@ -412,9 +434,10 @@ export default function PDFRotator() {
                   </>
                 )}
               </Button>
-              {/* Ayuda breve fuera del botón (antes el texto largo desbordaba). */}
+              {/* Ayuda breve: solo en escritorio (en móvil el usuario la
+                  consideró innecesaria; el botón deshabilitado ya comunica). */}
               {!anyRotated && !isProcessing && (
-                <p className="mt-3 text-sm text-muted-foreground">
+                <p className="mt-3 hidden text-sm text-muted-foreground sm:block">
                   Gira al menos una página para guardar.
                 </p>
               )}
