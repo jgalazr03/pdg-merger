@@ -98,6 +98,7 @@ const config: Config = {
         // Tintes suaves por herramienta (cajas de ayuda), mismo registro que highlight-soft.
         'ocean-soft': 'hsl(var(--ocean-soft) / <alpha-value>)',
         'amber-soft': 'hsl(var(--amber-soft) / <alpha-value>)',
+        'indigo-soft': 'hsl(var(--indigo-soft) / <alpha-value>)',
         background: 'hsl(var(--background))',
         foreground: 'hsl(var(--foreground))',
         card: {

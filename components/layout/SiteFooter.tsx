@@ -29,8 +29,8 @@ export default function SiteFooter() {
               className="h-8 w-auto"
             />
             <p className="mt-5 text-sm leading-relaxed text-white/70">
-              Une, divide y comprime archivos PDF y Excel, directo desde tu
-              navegador.
+              Une, divide, comprime y convierte archivos PDF y Excel, directo
+              desde tu navegador.
             </p>
             <p className="mt-6 flex items-center gap-2.5 text-sm font-bold text-white">
               <ShieldCheck

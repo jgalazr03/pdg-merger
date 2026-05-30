@@ -21,7 +21,7 @@ export const metadata: Metadata = {
     template: '%s | GAINCO',
   },
   description:
-    'Une, divide y comprime archivos PDF y Excel de forma rápida y segura, directo desde tu navegador.',
+    'Une, divide, comprime y convierte archivos PDF y Excel de forma rápida y segura, directo desde tu navegador.',
   // Favicon: isotipo de marca en SVG que cambia de color con el tema del sistema
   // (claro/oscuro) mediante prefers-color-scheme embebido en el propio archivo.
   // Next.js genera <link rel="icon" type="image/svg+xml" href="/favicon.svg">.

@@ -1,6 +1,6 @@
-import { Combine, Scissors, Minimize2, type LucideIcon } from 'lucide-react';
+import { Combine, Scissors, Minimize2, FileImage, type LucideIcon } from 'lucide-react';
 
-export type ToolSlug = 'unir' | 'dividir' | 'comprimir';
+export type ToolSlug = 'unir' | 'dividir' | 'comprimir' | 'pdf-a-jpg';
 
 /**
  * Sistema de acento.
@@ -13,8 +13,9 @@ export type ToolSlug = 'unir' | 'dividir' | 'comprimir';
  *
  * Paleta de herramientas (peso -700 para pasar contraste AA con glifo blanco):
  *   unir → océano #004b7d · dividir → ámbar #b45309 · comprimir → teal #0f766e
+ *   · PDF a JPG → índigo #4338ca
  * Las cajas de ayuda usan el tinte suave del MISMO matiz (ocean/amber/highlight
- * -soft, todos en el registro apagado S~45%/L~82%) con texto ink.
+ * /indigo-soft, todos en el registro apagado S~45%/L~82%) con texto ink.
  *
  * Todas las clases son literales para que el JIT de Tailwind las detecte.
  */
@@ -139,6 +140,32 @@ export const TOOLS: ToolDef[] = [
       line: 'bg-teal-700',
       onDark: 'text-teal-400',
       soft: 'bg-highlight-soft',
+      softText: 'text-ink',
+    },
+  },
+  {
+    slug: 'pdf-a-jpg',
+    href: '/pdf-a-jpg',
+    name: 'PDF a JPG',
+    title: 'Convertir PDF a JPG',
+    tagline: 'Convierte cada página de un PDF en una imagen JPG.',
+    description:
+      'Transforma las páginas de un PDF en imágenes JPG de alta calidad y descárgalas una a una o todas en un ZIP. Todo ocurre en tu navegador.',
+    Icon: FileImage,
+    constraints: [
+      'Formato: PDF (un archivo a la vez)',
+      'Genera una imagen JPG por página',
+      'Elige la resolución antes de convertir',
+      'Descarga individual o todas en un ZIP',
+    ],
+    accent: {
+      ...BRAND,
+      solid: 'bg-indigo-700 text-white hover:opacity-85',
+      iconBg: 'bg-indigo-700',
+      text: 'text-indigo-700',
+      line: 'bg-indigo-700',
+      onDark: 'text-indigo-400',
+      soft: 'bg-indigo-soft',
       softText: 'text-ink',
     },
   },

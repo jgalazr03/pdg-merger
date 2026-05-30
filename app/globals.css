@@ -37,6 +37,7 @@
      * (S~45%, L~82%), solo cambia el matiz al color de la herramienta. */
     --ocean-soft: 204 42% 83%;    /* ~#c2d8ea océano pastel: cajas de ayuda (unir) */
     --amber-soft: 34 55% 83%;     /* ~#ebd8be ámbar pastel: cajas de ayuda (dividir) */
+    --indigo-soft: 239 44% 86%;   /* ~#cdd0ef índigo pastel: cajas de ayuda (PDF a JPG) */
 
     /* ---- Semánticos GAINCO (un tono, se modula con opacidad) ---- */
     --success: 142 72% 26%;

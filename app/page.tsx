@@ -13,8 +13,8 @@ export default function Home() {
           <br className="hidden min-[400px]:block" /> resueltos al instante.
         </h1>
         <p className="mt-5 max-w-xl text-base leading-relaxed text-muted-foreground sm:mt-6 sm:text-lg">
-          Une, divide y comprime documentos en segundos, directo desde tu
-          navegador.
+          Une, divide, comprime y convierte documentos en segundos, directo
+          desde tu navegador.
         </p>
       </section>
 
