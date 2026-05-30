@@ -43,7 +43,15 @@ export default function GrayscaleConverter() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [progress, setProgress] = useState(0);
   const [result, setResult] = useState<ResultPDF | null>(null);
+  const fileInfoRef = useRef<HTMLDivElement>(null);
   const resultRef = useRef<HTMLDivElement>(null);
+
+  // Al seleccionar el archivo, baja a su información (como en las primeras herramientas).
+  useEffect(() => {
+    if (selectedFile) {
+      setTimeout(() => scrollIntoViewSafe(fileInfoRef.current), 100);
+    }
+  }, [selectedFile]);
 
   useEffect(() => {
     if (result) {
@@ -223,7 +231,7 @@ export default function GrayscaleConverter() {
       <ToolConstraints items={tool.constraints} />
 
       {selectedFile && (
-        <Card className="mb-8 motion-safe:animate-slide-up">
+        <Card ref={fileInfoRef} className="mb-8 motion-safe:animate-slide-up">
           <CardContent className="p-4 sm:p-6">
             <div className="mb-6 flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:justify-between">
               <h2 className="font-display text-lg font-bold text-ink">

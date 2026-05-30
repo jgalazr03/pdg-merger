@@ -99,7 +99,16 @@ export default function CsvToPDF() {
   const [fileName, setFileName] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [result, setResult] = useState<GeneratedPDF | null>(null);
+  const inputRef = useRef<HTMLDivElement>(null);
   const resultRef = useRef<HTMLDivElement>(null);
+
+  // Al CARGAR un archivo CSV, baja a los datos cargados. No al pegar (fileName
+  // queda null), para no interrumpir la escritura en el textarea.
+  useEffect(() => {
+    if (fileName) {
+      setTimeout(() => scrollIntoViewSafe(inputRef.current), 100);
+    }
+  }, [fileName]);
 
   useEffect(() => {
     if (result) {
@@ -316,7 +325,7 @@ export default function CsvToPDF() {
         onFiles={(files) => handleFileSelect(files[0])}
       />
 
-      <Card className="mb-4">
+      <Card ref={inputRef} className="mb-4">
         <CardContent className="p-4 sm:p-6">
           <div className="mb-2 flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:justify-between">
             <Label

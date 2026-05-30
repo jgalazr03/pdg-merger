@@ -333,7 +333,7 @@ export const TOOLS: ToolDef[] = [
     slug: 'comprimir',
     href: '/comprimir',
     category: 'optimizar',
-    name: 'Comprimir',
+    name: 'Comprimir PDF',
     title: 'Comprimir PDFs y Excel',
     tagline: 'Reduce el peso de archivos PDF y Excel manteniendo la calidad.',
     description:
@@ -352,7 +352,7 @@ export const TOOLS: ToolDef[] = [
     slug: 'convertir',
     href: '/convertir',
     category: 'convertir',
-    name: 'Convertir',
+    name: 'Convertir archivos',
     title: 'Convertir archivos',
     tagline: 'Convierte entre PDF e imágenes (JPG, PNG, WebP) en tu navegador.',
     description:
@@ -427,7 +427,7 @@ export const TOOLS: ToolDef[] = [
     slug: 'unir-alternado',
     href: '/unir-alternado',
     category: 'organizar',
-    name: 'Unir alternando',
+    name: 'Intercalar PDF',
     title: 'Unir PDFs alternando páginas',
     tagline: 'Intercala dos PDFs página a página (A1, B1, A2, B2…).',
     description:
@@ -444,7 +444,7 @@ export const TOOLS: ToolDef[] = [
     slug: 'marca-de-agua',
     href: '/marca-de-agua',
     category: 'editar',
-    name: 'Marca de agua',
+    name: 'Añadir marca de agua',
     title: 'Añadir marca de agua',
     tagline: 'Estampa un texto en diagonal sobre todas las páginas.',
     description:
@@ -478,7 +478,7 @@ export const TOOLS: ToolDef[] = [
     slug: 'encabezado-pie',
     href: '/encabezado-pie',
     category: 'editar',
-    name: 'Encabezado y pie',
+    name: 'Añadir encabezado y pie',
     title: 'Encabezado y pie de página',
     tagline: 'Agrega texto en la cabecera y el pie de cada página.',
     description:
@@ -495,7 +495,7 @@ export const TOOLS: ToolDef[] = [
     slug: 'sello-imagen',
     href: '/sello-imagen',
     category: 'editar',
-    name: 'Sello / Logo',
+    name: 'Añadir sello',
     title: 'Estampar imagen o logo',
     tagline: 'Coloca una imagen (PNG/JPG) o logo sobre las páginas.',
     description:
@@ -546,7 +546,7 @@ export const TOOLS: ToolDef[] = [
     slug: 'redimensionar-pdf',
     href: '/redimensionar-pdf',
     category: 'editar',
-    name: 'Redimensionar',
+    name: 'Redimensionar PDF',
     title: 'Redimensionar páginas de un PDF',
     tagline: 'Cambia el tamaño de página a A4, Carta, Oficio o un porcentaje.',
     description:
@@ -563,7 +563,7 @@ export const TOOLS: ToolDef[] = [
     slug: 'nup-pdf',
     href: '/nup-pdf',
     category: 'editar',
-    name: '2 por hoja',
+    name: 'Páginas por hoja',
     title: 'Varias páginas por hoja',
     tagline: 'Combina 2 o 4 páginas en una sola hoja (imposición).',
     description:
@@ -580,7 +580,7 @@ export const TOOLS: ToolDef[] = [
     slug: 'paginas-en-blanco',
     href: '/paginas-en-blanco',
     category: 'editar',
-    name: 'Páginas en blanco',
+    name: 'Insertar páginas en blanco',
     title: 'Insertar páginas en blanco',
     tagline: 'Agrega páginas en blanco en las posiciones que indiques.',
     description:
