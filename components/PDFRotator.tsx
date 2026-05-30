@@ -434,13 +434,6 @@ export default function PDFRotator() {
                   </>
                 )}
               </Button>
-              {/* Ayuda breve: solo en escritorio (en móvil el usuario la
-                  consideró innecesaria; el botón deshabilitado ya comunica). */}
-              {!anyRotated && !isProcessing && (
-                <p className="mt-3 hidden text-sm text-muted-foreground sm:block">
-                  Gira al menos una página para guardar.
-                </p>
-              )}
             </div>
           </CardContent>
         </Card>
