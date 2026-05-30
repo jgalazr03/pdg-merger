@@ -483,7 +483,9 @@ export default function FileConverter() {
               <div className="mt-6">
                 <Label className="mb-3 block text-sm font-medium text-ink">
                   <Settings2 className="mr-2 inline h-4 w-4" />
-                  {hasPdf && target !== 'pdf' ? 'Resolución y calidad' : 'Calidad'}
+                  {/* Dentro de showLevel, target ya está acotado a imagen (TS
+                      reduce por la condición aliased), por eso basta `hasPdf`. */}
+                  {hasPdf ? 'Resolución y calidad' : 'Calidad'}
                 </Label>
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
                   {(Object.keys(LEVELS) as Level[]).map((lv) => (
