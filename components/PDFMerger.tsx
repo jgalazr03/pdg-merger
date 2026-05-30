@@ -322,11 +322,18 @@ export default function PDFMerger() {
       {files.length > 0 && (
         <Card className="mb-8 motion-safe:animate-slide-up" ref={filesListRef}>
           <CardContent className="p-4 sm:p-6">
-            <div className="mb-6 flex items-center justify-between">
+            {/* Encabezado + acción: apilados en móvil (el título mono envuelve
+                y chocaba con el botón); en una fila a partir de sm. */}
+            <div className="mb-6 flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:justify-between">
               <h2 className="font-display text-lg font-bold text-ink">
                 Archivos seleccionados ({files.length})
               </h2>
-              <Button variant="outline" size="sm" onClick={clearAll}>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={clearAll}
+                className="shrink-0"
+              >
                 <X className="mr-2 h-4 w-4" />
                 Limpiar todo
               </Button>
