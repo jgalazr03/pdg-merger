@@ -259,7 +259,9 @@ export default function PDFRotator() {
           <CardContent className="p-4 sm:p-6">
             {/* Encabezado + cambiar archivo: apilado en móvil. */}
             <div className="mb-5 flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:justify-between">
-              <div className="flex min-w-0 items-center gap-3">
+              {/* w-full + min-w-0 (sm:flex-1) para que `truncate` tenga un ancho
+                  que respetar; sin esto el nombre largo desbordaba la tarjeta. */}
+              <div className="flex w-full min-w-0 items-center gap-3 sm:flex-1">
                 <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded border-2 border-ink bg-card">
                   <FileText className="h-5 w-5 text-ink" />
                 </div>
@@ -283,28 +285,46 @@ export default function PDFRotator() {
               </Button>
             </div>
 
-            {/* Controles globales: girar todo. */}
-            <div className="mb-6 flex flex-wrap items-center gap-2.5 rounded-lg border-3 border-ink bg-surface p-3">
-              <span className="mr-1 text-sm font-bold text-ink">Girar todo:</span>
-              <Button variant="outline" size="sm" onClick={() => rotateAll(-90)} disabled={isProcessing}>
-                <RotateCcw className="mr-2 h-4 w-4" />
-                Izquierda
-              </Button>
-              <Button variant="outline" size="sm" onClick={() => rotateAll(90)} disabled={isProcessing}>
-                <RotateCw className="mr-2 h-4 w-4" />
-                Derecha
-              </Button>
-              {anyRotated && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={resetRotations}
-                  disabled={isProcessing}
-                  className="text-muted-foreground hover:text-ink"
-                >
-                  Restablecer
-                </Button>
-              )}
+            {/* Controles globales: control SEGMENTADO simétrico (divisor navy al
+                centro) en vez de botones sueltos; reset como acción sutil. */}
+            <div className="mb-6 rounded-lg border-3 border-ink bg-surface p-3">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <span className="text-sm font-bold text-ink">
+                  Girar todas las páginas
+                </span>
+                <div className="flex items-center gap-3">
+                  <div className="flex flex-1 overflow-hidden rounded-lg border-3 border-ink sm:flex-none">
+                    <button
+                      type="button"
+                      onClick={() => rotateAll(-90)}
+                      disabled={isProcessing}
+                      className="flex flex-1 items-center justify-center gap-2 border-r-3 border-ink px-4 py-2 text-sm font-bold text-ink transition-colors duration-150 ease-out hover:bg-muted active:bg-muted disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ink sm:flex-none"
+                    >
+                      <RotateCcw className="h-4 w-4" />
+                      Izquierda
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => rotateAll(90)}
+                      disabled={isProcessing}
+                      className="flex flex-1 items-center justify-center gap-2 px-4 py-2 text-sm font-bold text-ink transition-colors duration-150 ease-out hover:bg-muted active:bg-muted disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ink sm:flex-none"
+                    >
+                      <RotateCw className="h-4 w-4" />
+                      Derecha
+                    </button>
+                  </div>
+                  {anyRotated && (
+                    <button
+                      type="button"
+                      onClick={resetRotations}
+                      disabled={isProcessing}
+                      className="shrink-0 text-sm font-bold text-muted-foreground underline-offset-4 transition-colors hover:text-ink hover:underline disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink focus-visible:ring-offset-2"
+                    >
+                      Restablecer
+                    </button>
+                  )}
+                </div>
+              </div>
             </div>
 
             {/* Rejilla de páginas: 2 cols móvil → 4 escritorio. Cada miniatura es
@@ -317,42 +337,42 @@ export default function PDFRotator() {
                 >
                   <div className="flex aspect-square items-center justify-center overflow-hidden border-b-3 border-ink bg-card p-3">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
+                    {/* La hoja rota EN pantalla (no entra/sale) → ease-in-out,
+                        300ms (regla de Emil: movimiento on-screen). Sin sombra
+                        (invariante del sistema). reduced-motion lo neutraliza el
+                        catch-all global. */}
                     <img
                       src={p.thumbnail}
                       alt={`Página ${p.pageNumber}`}
-                      className="max-h-full max-w-full object-contain shadow-sm transition-transform duration-200 ease-out"
+                      className="max-h-full max-w-full object-contain transition-transform duration-300 ease-in-out"
                       style={{ transform: `rotate(${p.rotation}deg)` }}
                       loading="lazy"
                     />
                   </div>
-                  <div className="flex items-center justify-between gap-1 p-2">
+                  <div className="flex items-center justify-between gap-2 p-2">
                     <span className="text-xs font-bold text-ink">
                       Pág. {p.pageNumber}
                     </span>
-                    <div className="flex items-center gap-1">
+                    {/* Par segmentado simétrico (divisor navy al centro), mismo
+                        lenguaje que los controles globales pero a menor escala. */}
+                    <div className="flex shrink-0 overflow-hidden rounded-md border-2 border-ink">
                       <button
                         type="button"
                         onClick={() => rotatePage(p.pageNumber, -90)}
                         disabled={isProcessing}
                         aria-label={`Girar página ${p.pageNumber} a la izquierda`}
-                        className={cn(
-                          'flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-ink disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-1',
-                          accent.ring
-                        )}
+                        className="flex h-7 w-8 items-center justify-center border-r-2 border-ink text-ink transition-colors duration-150 ease-out hover:bg-muted active:bg-muted disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ink"
                       >
-                        <RotateCcw className="h-4 w-4" />
+                        <RotateCcw className="h-3.5 w-3.5" />
                       </button>
                       <button
                         type="button"
                         onClick={() => rotatePage(p.pageNumber, 90)}
                         disabled={isProcessing}
                         aria-label={`Girar página ${p.pageNumber} a la derecha`}
-                        className={cn(
-                          'flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-ink disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-1',
-                          accent.ring
-                        )}
+                        className="flex h-7 w-8 items-center justify-center text-ink transition-colors duration-150 ease-out hover:bg-muted active:bg-muted disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ink"
                       >
-                        <RotateCw className="h-4 w-4" />
+                        <RotateCw className="h-3.5 w-3.5" />
                       </button>
                     </div>
                   </div>
@@ -376,10 +396,16 @@ export default function PDFRotator() {
                 ) : (
                   <>
                     <RotateCw className="mr-2 h-5 w-5" />
-                    {anyRotated ? 'Aplicar y guardar PDF' : 'Gira alguna página para continuar'}
+                    Guardar PDF girado
                   </>
                 )}
               </Button>
+              {/* Ayuda breve fuera del botón (antes el texto largo desbordaba). */}
+              {!anyRotated && !isProcessing && (
+                <p className="mt-3 text-sm text-muted-foreground">
+                  Gira al menos una página para guardar.
+                </p>
+              )}
             </div>
           </CardContent>
         </Card>
