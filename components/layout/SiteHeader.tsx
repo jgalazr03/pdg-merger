@@ -50,7 +50,7 @@ export default function SiteHeader() {
   }, [pathname]);
 
   return (
-    <header className="sticky top-0 z-40 w-full border-b-4 border-ink bg-surface">
+    <header className="sticky top-0 z-40 w-full bg-surface">
       <div className="container mx-auto flex h-16 max-w-6xl items-center justify-between pl-[max(20px,env(safe-area-inset-left))] pr-[max(20px,env(safe-area-inset-right))]">
         {/*
          * Lockup nativo al sistema: el isotipo de marca + "Herramientas" como
