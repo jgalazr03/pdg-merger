@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect } from 'react';
 import { usePathname } from 'next/navigation';
 import SiteFooter from './SiteFooter';
 
@@ -14,6 +15,16 @@ const MARKETING_ROUTES = new Set(['/']);
 
 export default function ConditionalFooter() {
   const pathname = usePathname();
-  if (!MARKETING_ROUTES.has(pathname)) return null;
+  const showFooter = MARKETING_ROUTES.has(pathname);
+
+  // Activa el overscroll de dos tonos (papel arriba / navy abajo, ver
+  // globals.css) solo donde hay footer; las herramientas quedan en papel.
+  useEffect(() => {
+    const root = document.documentElement;
+    root.classList.toggle('has-footer', showFooter);
+    return () => root.classList.remove('has-footer');
+  }, [showFooter]);
+
+  if (!showFooter) return null;
   return <SiteFooter />;
 }

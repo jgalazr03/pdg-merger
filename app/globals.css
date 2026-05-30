@@ -93,6 +93,25 @@
   }
 
   /*
+   * Overscroll (rubber-band) de dos tonos SOLO en páginas con footer (home):
+   * al rebasar el tope se ve papel (combina con el header) y al rebasar el
+   * fondo se ve navy (combina con el footer), nunca blanco. El gradiente vive
+   * en el root y el <body> es OPACO, así que solo asoma en la zona de
+   * overscroll; el contenido normal no lo ve. `fixed` lo ancla al viewport
+   * (mitad papel / mitad navy); donde no se respeta `fixed`, cae a la caja del
+   * root y el borde inferior sigue siendo navy. La clase la pone
+   * ConditionalFooter; sin footer (herramientas) el overscroll queda en papel.
+   */
+  html.has-footer {
+    background-image: linear-gradient(
+      to bottom,
+      hsl(var(--surface)) 0 50%,
+      hsl(var(--brand-navy)) 50% 100%
+    );
+    background-attachment: fixed;
+  }
+
+  /*
    * Foco SOLO por teclado, en ink, nunca el azul del navegador (invariante).
    * Cubre cualquier elemento que no use el anillo de shadcn (que ya es ink
    * vía --ring). Doble línea: outline ink + offset.

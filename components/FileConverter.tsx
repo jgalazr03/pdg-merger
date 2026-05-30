@@ -56,7 +56,7 @@ const TARGET_META: Record<Target, { label: string; mime: string; ext: string; hi
 };
 
 const INPUT_OPTIONS: { value: InputFormat; label: string }[] = [
-  { value: 'auto', label: 'Auto detecta' },
+  { value: 'auto', label: '(Auto detecta)' },
   { value: 'pdf', label: 'PDF' },
   { value: 'jpg', label: 'JPG' },
   { value: 'png', label: 'PNG' },
@@ -289,7 +289,7 @@ export default function FileConverter() {
       const label = INPUT_OPTIONS.find((o) => o.value === inputFormat)?.label ?? '';
       toast.error(
         `${mismatched} archivo${mismatched !== 1 ? 's' : ''} no ${mismatched !== 1 ? 'son' : 'es'} ${label}`,
-        { description: 'Cambia el formato de entrada o usa "Auto detecta".' }
+        { description: 'Cambia el formato de entrada o usa "(Auto detecta)".' }
       );
     }
     if (undecodable > 0) {
