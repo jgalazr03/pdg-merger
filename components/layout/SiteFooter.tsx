@@ -53,7 +53,11 @@ export default function SiteFooter() {
           >
             {groups.map((group) => (
               <div key={group.category}>
-                <p className="mb-4 text-xs font-bold uppercase tracking-wider text-white/50">
+                <p className="mb-4 border-b border-white/20 pb-2.5 text-xs font-bold uppercase tracking-[0.18em] text-white">
+                  <span
+                    aria-hidden="true"
+                    className="mr-2 inline-block h-[7px] w-[7px] bg-white align-middle"
+                  />
                   {group.label}
                 </p>
                 <ul className="space-y-3">

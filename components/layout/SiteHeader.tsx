@@ -30,6 +30,30 @@ export default function SiteHeader() {
   const activeTool = TOOLS.find((tool) => isActive(tool.href));
   const groups = toolsByCategory();
 
+  // Distribución del mega-menú en 3 columnas verticales INDEPENDIENTES (no una
+  // rejilla que alinea filas y deja huecos): como la columna "Editar" es larga,
+  // "Optimizar" se acomoda bajo "Organizar" (col 0) y "Seguridad y privacidad"
+  // bajo "Convertir" (col 2). Las categorías nuevas no mapeadas caen en la
+  // columna más corta, así el menú sigue siendo data-driven.
+  const PREFERRED_COLUMN: Record<string, number> = {
+    organizar: 0,
+    optimizar: 0,
+    editar: 1,
+    convertir: 2,
+    seguridad: 2,
+  };
+  const menuColumns: (typeof groups)[] = [[], [], []];
+  for (const group of groups) {
+    let col = PREFERRED_COLUMN[group.category];
+    if (col === undefined) {
+      const counts = menuColumns.map((c) =>
+        c.reduce((n, g) => n + g.tools.length, 0)
+      );
+      col = counts.indexOf(Math.min(...counts));
+    }
+    menuColumns[col].push(group);
+  }
+
   const [megaOpen, setMegaOpen] = useState(false);
   const megaRef = useRef<HTMLDivElement>(null);
 
@@ -115,40 +139,48 @@ export default function SiteHeader() {
               aria-label="Herramientas"
               className="absolute right-0 top-full z-50 mt-2 w-[min(56rem,90vw)] rounded-lg border-4 border-ink bg-surface p-6 motion-safe:animate-slide-up"
             >
-              <div className="grid grid-cols-2 gap-x-8 gap-y-6 lg:grid-cols-3">
-                {groups.map((group) => (
-                  <div key={group.category}>
-                    <p className="mb-3 text-xs font-bold uppercase tracking-wider text-muted-foreground">
-                      {group.label}
-                    </p>
-                    <ul className="space-y-0.5">
-                      {group.tools.map((tool) => {
-                        const active = isActive(tool.href);
-                        return (
-                          <li key={tool.slug}>
-                            <Link
-                              href={tool.href}
-                              role="menuitem"
-                              aria-current={active ? 'page' : undefined}
-                              className={cn(
-                                'flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm font-bold transition-colors',
-                                active
-                                  ? 'bg-card text-ink'
-                                  : 'text-muted-foreground hover:bg-muted hover:text-ink'
-                              )}
-                            >
-                              <tool.Icon
-                                className={cn(
-                                  'h-4 w-4 shrink-0',
-                                  active ? tool.accent.text : 'text-current'
-                                )}
-                              />
-                              {tool.name}
-                            </Link>
-                          </li>
-                        );
-                      })}
-                    </ul>
+              <div className="grid grid-cols-3 gap-x-8">
+                {menuColumns.map((column, i) => (
+                  <div key={i} className="space-y-6">
+                    {column.map((group) => (
+                      <div key={group.category}>
+                        <p className="mb-3 border-b-2 border-ink/15 pb-2 text-xs font-bold uppercase tracking-[0.18em] text-ink">
+                          <span
+                            aria-hidden="true"
+                            className="mr-2 inline-block h-[7px] w-[7px] bg-ink align-middle"
+                          />
+                          {group.label}
+                        </p>
+                        <ul className="space-y-0.5">
+                          {group.tools.map((tool) => {
+                            const active = isActive(tool.href);
+                            return (
+                              <li key={tool.slug}>
+                                <Link
+                                  href={tool.href}
+                                  role="menuitem"
+                                  aria-current={active ? 'page' : undefined}
+                                  className={cn(
+                                    'flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm font-bold transition-colors',
+                                    active
+                                      ? 'bg-card text-ink'
+                                      : 'text-muted-foreground hover:bg-muted hover:text-ink'
+                                  )}
+                                >
+                                  <tool.Icon
+                                    className={cn(
+                                      'h-4 w-4 shrink-0',
+                                      active ? tool.accent.text : 'text-current'
+                                    )}
+                                  />
+                                  {tool.name}
+                                </Link>
+                              </li>
+                            );
+                          })}
+                        </ul>
+                      </div>
+                    ))}
                   </div>
                 ))}
               </div>
@@ -173,7 +205,11 @@ export default function SiteHeader() {
               <nav className="flex flex-col gap-6" aria-label="Herramientas">
                 {groups.map((group) => (
                   <div key={group.category}>
-                    <p className="mb-2 text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                    <p className="mb-2 border-b-2 border-ink/15 pb-2 text-xs font-bold uppercase tracking-[0.18em] text-ink">
+                      <span
+                        aria-hidden="true"
+                        className="mr-2 inline-block h-[7px] w-[7px] bg-ink align-middle"
+                      />
                       {group.label}
                     </p>
                     <div className="flex flex-col gap-1">

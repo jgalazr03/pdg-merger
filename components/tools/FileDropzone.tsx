@@ -95,7 +95,11 @@ export default function FileDropzone({
       onDrop={handleDrop}
       className={cn(
         // Una sola caja: borde navy discontinuo 3px, papel, color plano, sin sombra.
-        'group relative cursor-pointer rounded-lg border-[3px] border-dashed border-ink px-5 py-10 text-center transition-colors duration-150 ease-out sm:px-6 sm:py-12',
+        // Columna flex centrada para que el botón pueda fijarse abajo (mt-auto):
+        // así, en layouts lado a lado (p. ej. dos zonas A/B), los botones quedan
+        // alineados aunque el subtítulo tenga 1 o 2 renglones. En uso individual
+        // no hay altura extra, así que mt-auto = 0 y el layout no cambia.
+        'group relative flex cursor-pointer flex-col items-center rounded-lg border-[3px] border-dashed border-ink px-5 py-10 text-center transition-colors duration-150 ease-out sm:px-6 sm:py-12',
         'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink focus-visible:ring-offset-2',
         isDragOver ? 'bg-highlight-soft' : 'bg-surface hover:bg-muted',
         className
@@ -118,7 +122,7 @@ export default function FileDropzone({
       {!isDragOver && (
         <span
           aria-hidden="true"
-          className={cn(buttonVariants({ size: 'lg' }), accent.solid)}
+          className={cn(buttonVariants({ size: 'lg' }), 'mt-auto', accent.solid)}
         >
           <Upload className="mr-2 h-4 w-4" />
           {buttonLabel}

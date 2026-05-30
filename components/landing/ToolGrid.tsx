@@ -15,8 +15,12 @@ export default function ToolGrid() {
         <section key={group.category} aria-labelledby={`cat-${group.category}`}>
           <h2
             id={`cat-${group.category}`}
-            className="mb-5 text-sm font-bold uppercase tracking-wider text-muted-foreground"
+            className="mb-6 border-b-2 border-ink/15 pb-2.5 text-sm font-bold uppercase tracking-[0.18em] text-ink"
           >
+            <span
+              aria-hidden="true"
+              className="mr-2.5 inline-block h-2 w-2 bg-ink align-middle"
+            />
             {group.label}
           </h2>
           <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
