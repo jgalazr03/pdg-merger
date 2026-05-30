@@ -54,17 +54,13 @@ export default function SiteFooter() {
             {groups.map((group) => (
               <div key={group.category}>
                 <div className="mb-4">
-                  <p className="text-xs font-bold uppercase tracking-[0.2em] text-white">
-                    {group.label}
-                  </p>
-                  {/* Regla con peso: acento blanco grueso (3px) + hairline. */}
-                  <span
-                    aria-hidden="true"
-                    className="mt-2 flex h-[3px] items-end"
-                  >
-                    <span className="h-[3px] w-8 bg-white" />
-                    <span className="h-px flex-1 bg-white/25" />
-                  </span>
+                  {/* Pestaña con borde sobre regla, invertida a blanco sobre navy. */}
+                  <div className="flex">
+                    <p className="rounded-t-lg border-3 border-b-0 border-white px-3 py-1.5 text-xs font-bold uppercase leading-none tracking-[0.2em] text-white">
+                      {group.label}
+                    </p>
+                  </div>
+                  <div aria-hidden="true" className="h-[3px] w-full bg-white" />
                 </div>
                 <ul className="space-y-3">
                   {group.tools.map((tool) => (
