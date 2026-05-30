@@ -95,7 +95,7 @@ export default function FileDropzone({
       onDrop={handleDrop}
       className={cn(
         // Una sola caja: borde navy discontinuo 3px, papel, color plano, sin sombra.
-        'group relative cursor-pointer rounded-lg border-[3px] border-dashed border-ink px-6 py-10 text-center transition-colors duration-150 ease-out sm:py-12',
+        'group relative cursor-pointer rounded-lg border-[3px] border-dashed border-ink px-5 py-10 text-center transition-colors duration-150 ease-out sm:px-6 sm:py-12',
         'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink focus-visible:ring-offset-2',
         isDragOver ? 'bg-highlight-soft' : 'bg-surface hover:bg-muted',
         className

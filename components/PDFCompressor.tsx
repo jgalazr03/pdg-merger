@@ -630,7 +630,7 @@ export default function PDFCompressor() {
 
       {isLoadingFiles && (
         <Card className="mb-8">
-          <CardContent className="p-6">
+          <CardContent className="p-4 sm:p-6">
             <div className="flex items-center gap-4">
               <Skeleton className="h-20 w-16 rounded" />
               <div className="flex-1 space-y-2">
@@ -647,7 +647,7 @@ export default function PDFCompressor() {
 
       {files.length > 0 && (
         <Card className="mb-8" ref={filesListRef}>
-          <CardContent className="p-6">
+          <CardContent className="p-4 sm:p-6">
             <div className="mb-6 flex items-center justify-between">
               <h2 className="font-display text-lg font-bold text-ink">
                 Archivos seleccionados ({files.length})
@@ -696,16 +696,16 @@ export default function PDFCompressor() {
               {files.map((file) => (
                 <div
                   key={file.id}
-                  className="flex items-center gap-4 rounded-lg border-3 border-ink bg-surface p-4"
+                  className="flex items-center gap-3 rounded-lg border-3 border-ink bg-surface p-3 sm:gap-4 sm:p-4"
                 >
-                  <div className="flex h-20 w-16 shrink-0 items-center justify-center rounded border-2 border-ink bg-card">
+                  <div className="flex h-14 w-12 shrink-0 items-center justify-center rounded border-2 border-ink bg-card sm:h-20 sm:w-16">
                     {file.type === 'pdf' ? (
-                      <FileText className="h-8 w-8 text-ink" />
+                      <FileText className="h-7 w-7 text-ink sm:h-8 sm:w-8" />
                     ) : (
-                      <FileSpreadsheet className="h-8 w-8 text-ink" />
+                      <FileSpreadsheet className="h-7 w-7 text-ink sm:h-8 sm:w-8" />
                     )}
                   </div>
-                  
+
                   <div className="flex-1 min-w-0">
                     <p className="font-medium text-ink truncate">
                       {file.name}
@@ -743,7 +743,7 @@ export default function PDFCompressor() {
                     </div>
                   </div>
                   
-                  <div className="flex items-center gap-2">
+                  <div className="flex shrink-0 items-center gap-2">
                     {file.isProcessing && (
                       <Loader2 className={cn('h-5 w-5 animate-spin', accent.text)} />
                     )}
@@ -752,9 +752,11 @@ export default function PDFCompressor() {
                         onClick={() => downloadFile(file)}
                         size="sm"
                         variant="outline"
+                        className="shrink-0"
+                        aria-label={`Descargar ${file.name}`}
                       >
-                        <Download className="w-4 h-4 mr-2" />
-                        Descargar
+                        <Download className="h-4 w-4 sm:mr-2" />
+                        <span className="hidden sm:inline">Descargar</span>
                       </Button>
                     )}
                     <Button
@@ -762,7 +764,7 @@ export default function PDFCompressor() {
                       size="sm"
                       onClick={() => removeFile(file.id)}
                       aria-label={`Quitar ${file.name}`}
-                      className="text-muted-foreground hover:text-ink"
+                      className="shrink-0 text-muted-foreground hover:text-ink"
                     >
                       <X className="w-4 h-4" />
                     </Button>
@@ -807,7 +809,7 @@ export default function PDFCompressor() {
 
       {files.length > 0 && !allCompressed && (
         <Card className="mb-8">
-          <CardContent className="p-6 text-center">
+          <CardContent className="p-4 text-center sm:p-6">
             <h2 className="mb-4 font-display text-lg font-bold text-ink">
               ¿Listo para comprimir?
             </h2>
@@ -847,7 +849,7 @@ export default function PDFCompressor() {
           ref={resultRef}
           className="motion-safe:animate-slide-up"
         >
-          <CardContent className="p-6 text-center">
+          <CardContent className="p-4 text-center sm:p-6">
             <div className="mb-4 inline-flex h-16 w-16 items-center justify-center rounded-full border-3 border-ink bg-success text-white">
               <Download className="h-8 w-8" />
             </div>

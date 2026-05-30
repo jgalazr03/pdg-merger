@@ -19,8 +19,8 @@ export default function ToolShell({
   children: React.ReactNode;
 }) {
   return (
-    <div className="container mx-auto max-w-4xl px-4 py-8 md:py-12">
-      <nav aria-label="Ruta de navegación" className="mb-8">
+    <div className="container mx-auto max-w-4xl py-8 pl-[max(20px,env(safe-area-inset-left))] pr-[max(20px,env(safe-area-inset-right))] md:py-12">
+      <nav aria-label="Ruta de navegación" className="mb-6 sm:mb-8">
         <ol className="flex items-center gap-1.5 text-sm text-muted-foreground">
           <li>
             <Link
@@ -40,18 +40,18 @@ export default function ToolShell({
       </nav>
 
       {/* Hero asimétrico: tile a la izquierda, título a la derecha */}
-      <header className="mb-10 flex items-start gap-5 motion-safe:animate-fade-in">
+      <header className="mb-8 flex items-start gap-4 motion-safe:animate-fade-in sm:mb-10 sm:gap-5">
         <div
           className={cn(
-            'flex h-16 w-16 shrink-0 items-center justify-center rounded-lg border-3 border-ink',
+            'flex h-14 w-14 shrink-0 items-center justify-center rounded-lg border-3 border-ink sm:h-16 sm:w-16',
             tool.accent.iconBg
           )}
         >
-          <tool.Icon className="h-8 w-8 text-white" strokeWidth={2} />
+          <tool.Icon className="h-7 w-7 text-white sm:h-8 sm:w-8" strokeWidth={2} />
         </div>
 
-        <div className="min-w-0 pt-1">
-          <h1 className="text-3xl font-bold tracking-tight text-ink md:text-4xl">
+        <div className="min-w-0 pt-0.5 sm:pt-1">
+          <h1 className="text-[clamp(1.6rem,6vw,2.25rem)] font-bold leading-[1.1] tracking-tight text-ink">
             {tool.title}
           </h1>
           <p className="mt-2 max-w-xl text-base text-muted-foreground md:text-lg">

@@ -321,7 +321,7 @@ export default function PDFMerger() {
 
       {files.length > 0 && (
         <Card className="mb-8 motion-safe:animate-slide-up" ref={filesListRef}>
-          <CardContent className="p-6">
+          <CardContent className="p-4 sm:p-6">
             <div className="mb-6 flex items-center justify-between">
               <h2 className="font-display text-lg font-bold text-ink">
                 Archivos seleccionados ({files.length})
@@ -341,7 +341,9 @@ export default function PDFMerger() {
                   onDragOver={handleDragOver}
                   onDrop={(e) => handleDrop(e, index)}
                   className={cn(
-                    'flex items-center gap-3 rounded-lg border-3 border-ink bg-surface p-4 transition-colors duration-150 ease-out hover:bg-muted',
+                    // flex-wrap: en móvil las acciones de imagen (recortar/quitar)
+                    // bajan a una segunda línea con sitio, en vez de desbordar.
+                    'flex flex-wrap items-center gap-2.5 rounded-lg border-3 border-ink bg-surface p-3 transition-colors duration-150 ease-out hover:bg-muted sm:gap-3 sm:p-4',
                     draggedIndex === index && 'opacity-50 motion-safe:scale-95'
                   )}
                 >
@@ -400,32 +402,42 @@ export default function PDFMerger() {
                         )}
                       </div>
                     </div>
-                    <span className="shrink-0 text-sm text-muted-foreground">
+                    <span className="hidden shrink-0 text-sm text-muted-foreground sm:inline">
                       #{index + 1}
                     </span>
                   </div>
 
-                  {file.type === 'image' && (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setCropFileId(file.id)}
-                      className="shrink-0"
-                      title="Recortar imagen"
-                    >
-                      <Crop className="mr-2 h-4 w-4" />
-                      {file.cropped ? 'Reajustar' : 'Recortar'}
-                    </Button>
-                  )}
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => removeFile(file.id)}
-                    aria-label={`Quitar ${file.name}`}
-                    className="shrink-0 text-muted-foreground hover:text-ink"
+                  {/* Acciones: en móvil ocupan ancho completo (w-full → bajan a
+                      su propia línea con sitio para el texto); en sm+ van en
+                      línea. Para PDFs (sin recortar) la X cabe siempre inline. */}
+                  <div
+                    className={cn(
+                      'flex items-center justify-end gap-2 sm:w-auto',
+                      file.type === 'image' ? 'w-full sm:w-auto' : 'w-auto'
+                    )}
                   >
-                    <X className="h-4 w-4" />
-                  </Button>
+                    {file.type === 'image' && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setCropFileId(file.id)}
+                        className="shrink-0"
+                        title="Recortar imagen"
+                      >
+                        <Crop className="mr-2 h-4 w-4" />
+                        {file.cropped ? 'Reajustar' : 'Recortar'}
+                      </Button>
+                    )}
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => removeFile(file.id)}
+                      aria-label={`Quitar ${file.name}`}
+                      className="shrink-0 text-muted-foreground hover:text-ink"
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                  </div>
                 </li>
               ))}
             </ul>
@@ -443,7 +455,7 @@ export default function PDFMerger() {
 
       {files.length >= 1 && !downloadUrl && (
         <Card className="mb-8">
-          <CardContent className="p-6">
+          <CardContent className="p-4 sm:p-6">
             <div className="mb-6 text-center">
               <h2 className="mb-2 font-display text-lg font-bold text-ink">
                 {files.length > 1 ? '¿Listo para unir?' : '¿Listo para generar el PDF?'}
@@ -522,7 +534,7 @@ export default function PDFMerger() {
           ref={resultRef}
           className="motion-safe:animate-slide-up"
         >
-          <CardContent className="p-6 text-center">
+          <CardContent className="p-4 text-center sm:p-6">
             <div className="mb-4 inline-flex h-16 w-16 items-center justify-center rounded-full border-3 border-ink bg-success text-white">
               <Download className="h-8 w-8" />
             </div>

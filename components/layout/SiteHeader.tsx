@@ -51,7 +51,7 @@ export default function SiteHeader() {
 
   return (
     <header className="sticky top-0 z-40 w-full border-b-4 border-ink bg-surface">
-      <div className="container mx-auto flex h-16 max-w-6xl items-center justify-between px-4">
+      <div className="container mx-auto flex h-16 max-w-6xl items-center justify-between pl-[max(20px,env(safe-area-inset-left))] pr-[max(20px,env(safe-area-inset-right))]">
         {/*
          * Lockup nativo al sistema: el isotipo de marca + "Herramientas" como
          * nombre de producto en la tipografía mono. Sin divisor ni etiqueta
@@ -132,7 +132,7 @@ export default function SiteHeader() {
             >
               <Menu className="h-5 w-5" />
             </SheetTrigger>
-            <SheetContent side="right" className="w-72">
+            <SheetContent side="right" className="w-[min(20rem,86vw)]">
               <SheetTitle className="mb-4">Herramientas</SheetTitle>
               <nav className="flex flex-col gap-1" aria-label="Herramientas">
                 {TOOLS.map((tool) => {

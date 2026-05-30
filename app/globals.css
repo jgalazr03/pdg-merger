@@ -78,6 +78,12 @@
   html {
     /* Tabular y monoespaciado real para cifras de tamaños/páginas */
     font-feature-settings: 'tnum' 1;
+    /* Móvil: no inflar el texto en rotación (iOS) y quitar el "flash" gris del
+     * tap táctil —ya damos feedback con :active scale + hover bg, así que el
+     * resaltado por defecto solo ensucia. */
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+    -webkit-tap-highlight-color: transparent;
   }
   body {
     @apply bg-surface text-ink;

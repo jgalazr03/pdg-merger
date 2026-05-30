@@ -10,7 +10,7 @@ export default function ToolCard({ tool }: { tool: ToolDef }) {
         // Panel del sistema: arena + borde navy 4px, color plano, sin sombra.
         // La tarjeta entera es el enlace; el hover desplaza el fondo y subraya
         // el título. Sin flechas ni acentos decorativos.
-        'group flex flex-col rounded-lg border-4 border-ink bg-card p-6 text-left transition-[transform,background-color] duration-150 ease-out active:scale-[0.99]',
+        'group flex flex-col rounded-lg border-4 border-ink bg-card p-5 text-left transition-[transform,background-color] duration-150 ease-out active:scale-[0.99] sm:p-6',
         'hover:bg-muted',
         'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink focus-visible:ring-offset-2'
       )}

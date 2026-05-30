@@ -182,7 +182,7 @@ export default function ImageCropModal({ file, onCancel, onConfirm }: ImageCropM
 
   return (
     <Dialog open onOpenChange={(open) => !open && onCancel()}>
-      <DialogContent className="max-w-2xl">
+      <DialogContent className="max-h-[90dvh] max-w-2xl overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Recortar imagen</DialogTitle>
           <DialogDescription>
@@ -194,7 +194,7 @@ export default function ImageCropModal({ file, onCancel, onConfirm }: ImageCropM
         <div className="flex justify-center">
           <div
             ref={containerRef}
-            className="relative select-none inline-block max-h-[60vh] overflow-hidden"
+            className="relative inline-block max-h-[55dvh] select-none overflow-hidden sm:max-h-[60vh]"
             style={{ touchAction: 'none' }}
           >
             {imageUrl && (
@@ -202,7 +202,7 @@ export default function ImageCropModal({ file, onCancel, onConfirm }: ImageCropM
               <img
                 src={imageUrl}
                 alt="Imagen a recortar"
-                className="block max-h-[60vh] w-auto pointer-events-none"
+                className="block max-h-[55dvh] w-auto pointer-events-none sm:max-h-[60vh]"
                 draggable={false}
               />
             )}
@@ -220,7 +220,9 @@ export default function ImageCropModal({ file, onCancel, onConfirm }: ImageCropM
                 <div
                   key={corner.mode}
                   onPointerDown={(e) => startDrag(e, corner.mode)}
-                  className={`absolute w-3 h-3 bg-white border-2 border-ink rounded-sm ${corner.className}`}
+                  // Visual compacto, pero el ::before extiende el área táctil
+                  // ~10px por lado (objetivo cómodo con el dedo en móvil).
+                  className={`absolute h-5 w-5 rounded-sm border-2 border-ink bg-white before:absolute before:-inset-2 before:content-[''] sm:h-3 sm:w-3 ${corner.className}`}
                 />
               ))}
             </div>

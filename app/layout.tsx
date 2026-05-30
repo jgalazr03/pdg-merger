@@ -28,6 +28,18 @@ export const metadata: Metadata = {
   icons: {
     icon: { url: '/favicon.svg', type: 'image/svg+xml' },
   },
+  // Viewport móvil: ocupa el área completa (incluye notch/safe-areas vía
+  // `viewport-fit=cover`) y PERMITE el zoom del usuario (a11y: nunca
+  // `maximum-scale` ni `user-scalable=no`). El zoom indeseado al enfocar inputs
+  // se evita con font ≥16px, no deshabilitando el gesto. En Next 13.5.1 el
+  // viewport/themeColor viven dentro de `metadata` (el export `viewport`
+  // separado llegó en Next 14).
+  viewport: {
+    width: 'device-width',
+    initialScale: 1,
+    viewportFit: 'cover',
+  },
+  themeColor: '#fcfaf7',
 };
 
 export default function RootLayout({
@@ -37,7 +49,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="es" className={robotoMono.variable}>
-      <body className="flex min-h-screen flex-col bg-surface font-mono text-ink antialiased">
+      <body className="flex min-h-screen flex-col bg-surface font-mono text-ink antialiased supports-[min-height:100dvh]:min-h-[100dvh]">
         <SiteHeader />
         <main className="flex-1">{children}</main>
         <ConditionalFooter />

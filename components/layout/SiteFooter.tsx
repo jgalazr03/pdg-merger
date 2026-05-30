@@ -16,8 +16,8 @@ export default function SiteFooter() {
   const year = new Date().getFullYear();
 
   return (
-    <footer className="mt-20 border-t-4 border-white bg-brand-navy text-white/80">
-      <div className="container mx-auto max-w-6xl px-4 py-14">
+    <footer className="mt-20 border-t-4 border-white bg-brand-navy pb-[env(safe-area-inset-bottom)] text-white/80">
+      <div className="container mx-auto max-w-6xl py-14 pl-[max(20px,env(safe-area-inset-left))] pr-[max(20px,env(safe-area-inset-right))]">
         <div className="grid gap-10 md:grid-cols-[1fr_auto] md:gap-16">
           {/* Marca + propuesta + privacidad */}
           <div className="max-w-md">

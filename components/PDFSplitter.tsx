@@ -269,7 +269,7 @@ export default function PDFSplitter() {
 
       {selectedFile && (
         <Card className="mb-8 motion-safe:animate-slide-up" ref={fileInfoRef}>
-          <CardContent className="p-6">
+          <CardContent className="p-4 sm:p-6">
             <div className="mb-6 flex items-center justify-between">
               <h2 className="font-display text-lg font-bold text-ink">
                 Archivo seleccionado
@@ -340,7 +340,7 @@ export default function PDFSplitter() {
 
       {selectedFile && splitRanges && !rangeError && splitPDFs.length === 0 && (
         <Card className="mb-8">
-          <CardContent className="p-6 text-center">
+          <CardContent className="p-4 text-center sm:p-6">
             <h2 className="mb-4 font-display text-lg font-bold text-ink">
               ¿Listo para dividir?
             </h2>
@@ -376,7 +376,7 @@ export default function PDFSplitter() {
           ref={resultRef}
           className="motion-safe:animate-slide-up"
         >
-          <CardContent className="p-6">
+          <CardContent className="p-4 sm:p-6">
             <div className="mb-6 text-center">
               <div className="mb-4 inline-flex h-16 w-16 items-center justify-center rounded-full border-3 border-ink bg-success text-white">
                 <Download className="h-8 w-8" />
@@ -398,7 +398,7 @@ export default function PDFSplitter() {
               {splitPDFs.map((pdf) => (
                 <div
                   key={pdf.id}
-                  className="flex items-center justify-between gap-3 rounded-lg border-3 border-ink bg-surface p-4"
+                  className="flex items-center justify-between gap-3 rounded-lg border-3 border-ink bg-surface p-3 sm:p-4"
                 >
                   <div className="flex min-w-0 items-center gap-3">
                     <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded border-2 border-ink bg-success text-white">
@@ -416,9 +416,10 @@ export default function PDFSplitter() {
                     size="sm"
                     variant="outline"
                     className="shrink-0"
+                    aria-label={`Descargar ${pdf.name}`}
                   >
-                    <Download className="mr-2 h-4 w-4" />
-                    Descargar
+                    <Download className="h-4 w-4 sm:mr-2" />
+                    <span className="hidden sm:inline">Descargar</span>
                   </Button>
                 </div>
               ))}
