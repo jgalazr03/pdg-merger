@@ -144,13 +144,19 @@ export default function SiteHeader() {
                   <div key={i} className="space-y-6">
                     {column.map((group) => (
                       <div key={group.category}>
-                        <p className="mb-3 border-b-2 border-ink/15 pb-2 text-xs font-bold uppercase tracking-[0.18em] text-ink">
+                        <div className="mb-3">
+                          <p className="text-xs font-bold uppercase tracking-[0.2em] text-ink">
+                            {group.label}
+                          </p>
+                          {/* Regla con peso: acento navy grueso (3px) + hairline. */}
                           <span
                             aria-hidden="true"
-                            className="mr-2 inline-block h-[7px] w-[7px] bg-ink align-middle"
-                          />
-                          {group.label}
-                        </p>
+                            className="mt-2 flex h-[3px] items-end"
+                          >
+                            <span className="h-[3px] w-8 bg-ink" />
+                            <span className="h-px flex-1 bg-ink/20" />
+                          </span>
+                        </div>
                         <ul className="space-y-0.5">
                           {group.tools.map((tool) => {
                             const active = isActive(tool.href);
@@ -205,13 +211,18 @@ export default function SiteHeader() {
               <nav className="flex flex-col gap-6" aria-label="Herramientas">
                 {groups.map((group) => (
                   <div key={group.category}>
-                    <p className="mb-2 border-b-2 border-ink/15 pb-2 text-xs font-bold uppercase tracking-[0.18em] text-ink">
+                    <div className="mb-2">
+                      <p className="text-xs font-bold uppercase tracking-[0.2em] text-ink">
+                        {group.label}
+                      </p>
                       <span
                         aria-hidden="true"
-                        className="mr-2 inline-block h-[7px] w-[7px] bg-ink align-middle"
-                      />
-                      {group.label}
-                    </p>
+                        className="mt-2 flex h-[3px] items-end"
+                      >
+                        <span className="h-[3px] w-8 bg-ink" />
+                        <span className="h-px flex-1 bg-ink/20" />
+                      </span>
+                    </div>
                     <div className="flex flex-col gap-1">
                       {group.tools.map((tool) => {
                         const active = isActive(tool.href);

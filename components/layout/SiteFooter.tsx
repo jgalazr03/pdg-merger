@@ -53,13 +53,19 @@ export default function SiteFooter() {
           >
             {groups.map((group) => (
               <div key={group.category}>
-                <p className="mb-4 border-b border-white/20 pb-2.5 text-xs font-bold uppercase tracking-[0.18em] text-white">
+                <div className="mb-4">
+                  <p className="text-xs font-bold uppercase tracking-[0.2em] text-white">
+                    {group.label}
+                  </p>
+                  {/* Regla con peso: acento blanco grueso (3px) + hairline. */}
                   <span
                     aria-hidden="true"
-                    className="mr-2 inline-block h-[7px] w-[7px] bg-white align-middle"
-                  />
-                  {group.label}
-                </p>
+                    className="mt-2 flex h-[3px] items-end"
+                  >
+                    <span className="h-[3px] w-8 bg-white" />
+                    <span className="h-px flex-1 bg-white/25" />
+                  </span>
+                </div>
                 <ul className="space-y-3">
                   {group.tools.map((tool) => (
                     <li key={tool.slug}>
