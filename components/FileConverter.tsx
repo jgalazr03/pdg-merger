@@ -625,9 +625,12 @@ export default function FileConverter() {
               </div>
             )}
 
-            <div className={cn('mt-6 rounded-lg border-3 border-ink p-4', accent.soft)}>
-              <p className={cn('text-sm', accent.softText)}>
-                <strong>Tip:</strong>{' '}
+            {/* Nota informativa NEUTRA (arena + ícono), no el tinte de la
+                herramienta: el índigo ya marca la opción seleccionada y usarlo
+                aquí también se confundía con una selección. */}
+            <div className="mt-6 flex items-start gap-2.5 rounded-lg border-3 border-ink bg-muted p-4">
+              <Info className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+              <p className="text-sm text-ink">
                 {target === 'pdf'
                   ? 'Cada imagen se convierte en su propio PDF. Para combinar varias en un solo documento, usa Unir.'
                   : hasPdf

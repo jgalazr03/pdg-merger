@@ -7,16 +7,19 @@ import { cn } from '@/lib/utils';
 /**
  * Footer sobre navy de marca. En el footer el COLOR = identidad de herramienta:
  * cada enlace lleva su ícono en el tono claro de su herramienta (accent.onDark,
- * legible sobre navy). Todo lo demás (chrome) va neutro en blanco —escudo,
- * eyebrow y la costura superior (que espeja el border-b-4 del header)— para no
- * competir con los colores de herramienta. La privacidad se afirma como
- * propuesta de valor, no como "badge".
+ * legible sobre navy). Todo lo demás (chrome) va neutro en blanco —escudo y
+ * eyebrow— para no competir con los colores de herramienta. La privacidad se
+ * afirma como propuesta de valor, no como "badge".
+ *
+ * El footer va PEGADO al contenido (sin margen superior ni costura blanca): el
+ * cambio papel → navy ya lo separa, y un margen transparente dejaría ver el
+ * body navy del overscroll como una franja extra (ver globals.css).
  */
 export default function SiteFooter() {
   const year = new Date().getFullYear();
 
   return (
-    <footer className="mt-20 border-t-4 border-white bg-brand-navy pb-[env(safe-area-inset-bottom)] text-white/80">
+    <footer className="bg-brand-navy pb-[env(safe-area-inset-bottom)] text-white/80">
       <div className="container mx-auto max-w-6xl py-14 pl-[max(20px,env(safe-area-inset-left))] pr-[max(20px,env(safe-area-inset-right))]">
         <div className="grid gap-10 md:grid-cols-[1fr_auto] md:gap-16">
           {/* Marca + propuesta + privacidad */}

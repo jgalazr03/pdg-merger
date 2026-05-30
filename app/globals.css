@@ -94,17 +94,20 @@
   }
 
   /*
-   * Overscroll (rubber-band) de dos tonos, nunca blanco. Técnica del split
-   * html/body (la fiable en iOS, donde background-attachment:fixed se ignora en
-   * la zona de rebote): iOS pinta el rebote SUPERIOR con el fondo de <html> y
-   * el INFERIOR con el de <body>.
-   *  - <html> = papel SIEMPRE → el rebote superior (junto al header) nunca es
-   *    blanco, en todas las rutas.
-   *  - <body> = papel por defecto (herramientas: rebote inferior en papel);
-   *    navy SOLO en páginas con footer (home), para que el rebote inferior
-   *    combine con el footer. La clase `has-footer` la pone ConditionalFooter.
-   * El contenido visible lo mantiene en papel <main> (bg-surface en layout),
-   * así el navy del body solo asoma al rebasar el fondo.
+   * Overscroll (rubber-band), nunca blanco. Dos mecanismos según la plataforma:
+   *
+   * MÓVIL (iOS): split html/body — iOS pinta el rebote SUPERIOR con el fondo de
+   * <html> y el INFERIOR con el de <body>. Así:
+   *  - <html> = papel siempre → rebote superior nunca blanco, en toda ruta.
+   *  - <body> = papel por defecto; navy solo en home (clase `has-footer`) →
+   *    rebote inferior combina con el footer. El navy NO asoma en el flujo
+   *    normal porque el footer va pegado (sin margen) y <main> es papel.
+   *
+   * ESCRITORIO (macOS Chrome/Safari): el rebote muestra SIEMPRE el fondo de
+   * <html> en ambos extremos (no respeta el split), así que el truco de arriba
+   * dejaría el fondo blanco. Como no se puede dar dos colores al canvas, se
+   * DESACTIVA el rebote en punteros finos (mouse) → no hay zona blanca. El
+   * `pointer: fine` no toca el táctil, que conserva su rebote navy.
    */
   html {
     background-color: hsl(var(--surface));
@@ -114,6 +117,12 @@
   }
   html.has-footer body {
     background-color: hsl(var(--brand-navy));
+  }
+  @media (pointer: fine) {
+    html,
+    body {
+      overscroll-behavior-y: none;
+    }
   }
 
   /*

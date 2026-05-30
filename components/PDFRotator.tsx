@@ -313,16 +313,24 @@ export default function PDFRotator() {
                       Derecha
                     </button>
                   </div>
-                  {anyRotated && (
-                    <button
-                      type="button"
-                      onClick={resetRotations}
-                      disabled={isProcessing}
-                      className="shrink-0 text-sm font-bold text-muted-foreground underline-offset-4 transition-colors hover:text-ink hover:underline disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink focus-visible:ring-offset-2"
-                    >
-                      Restablecer
-                    </button>
-                  )}
+                  {/* Siempre ocupa su lugar (invisible cuando no hay rotación)
+                      para que el control segmentado NO se reposicione al
+                      aparecer/desaparecer. */}
+                  <button
+                    type="button"
+                    onClick={resetRotations}
+                    disabled={isProcessing || !anyRotated}
+                    aria-hidden={!anyRotated}
+                    tabIndex={anyRotated ? 0 : -1}
+                    className={cn(
+                      'shrink-0 text-sm font-bold underline-offset-4 transition-colors hover:text-ink hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink focus-visible:ring-offset-2',
+                      anyRotated
+                        ? 'text-muted-foreground'
+                        : 'invisible pointer-events-none'
+                    )}
+                  >
+                    Restablecer
+                  </button>
                 </div>
               </div>
             </div>
