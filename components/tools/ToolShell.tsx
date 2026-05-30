@@ -19,7 +19,7 @@ export default function ToolShell({
   children: React.ReactNode;
 }) {
   return (
-    <div className="container mx-auto max-w-4xl py-8 pl-[max(20px,env(safe-area-inset-left))] pr-[max(20px,env(safe-area-inset-right))] md:py-12">
+    <div className="container mx-auto max-w-4xl py-8 pl-[max(20px,env(safe-area-inset-left))] pr-[max(20px,env(safe-area-inset-right))] md:py-16">
       <nav aria-label="Ruta de navegación" className="mb-6 sm:mb-8">
         <ol className="flex items-center gap-1.5 text-sm text-muted-foreground">
           <li>

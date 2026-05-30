@@ -351,19 +351,21 @@ export default function PDFRotator() {
                       loading="lazy"
                     />
                   </div>
-                  <div className="flex items-center justify-between gap-2 px-3 py-2.5">
+                  {/* Pie: etiqueta arriba + par de botones a ancho completo en
+                      su PROPIA fila (grid de 2 columnas iguales → minmax(0,1fr),
+                      nunca recorta). En la misma fila con la etiqueta se salía de
+                      la tarjeta angosta (2 cols en móvil). */}
+                  <div className="flex flex-col gap-2 p-2">
                     <span className="text-xs font-bold text-ink">
                       Pág. {p.pageNumber}
                     </span>
-                    {/* Par segmentado simétrico (divisor navy al centro), mismo
-                        lenguaje que los controles globales pero a menor escala. */}
-                    <div className="flex shrink-0 overflow-hidden rounded-md border-2 border-ink">
+                    <div className="grid grid-cols-2 overflow-hidden rounded-md border-2 border-ink">
                       <button
                         type="button"
                         onClick={() => rotatePage(p.pageNumber, -90)}
                         disabled={isProcessing}
                         aria-label={`Girar página ${p.pageNumber} a la izquierda`}
-                        className="flex h-8 w-9 items-center justify-center border-r-2 border-ink text-ink transition-colors duration-150 ease-out hover:bg-muted active:bg-muted disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ink"
+                        className="flex h-8 items-center justify-center border-r-2 border-ink text-ink transition-colors duration-150 ease-out hover:bg-muted active:bg-muted disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ink"
                       >
                         <RotateCcw className="h-4 w-4" />
                       </button>
@@ -372,7 +374,7 @@ export default function PDFRotator() {
                         onClick={() => rotatePage(p.pageNumber, 90)}
                         disabled={isProcessing}
                         aria-label={`Girar página ${p.pageNumber} a la derecha`}
-                        className="flex h-8 w-9 items-center justify-center text-ink transition-colors duration-150 ease-out hover:bg-muted active:bg-muted disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ink"
+                        className="flex h-8 items-center justify-center text-ink transition-colors duration-150 ease-out hover:bg-muted active:bg-muted disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ink"
                       >
                         <RotateCw className="h-4 w-4" />
                       </button>
