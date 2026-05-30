@@ -87,28 +87,32 @@
     -webkit-tap-highlight-color: transparent;
   }
   body {
-    @apply bg-surface text-ink;
+    @apply text-ink;
     position: relative;
     /* Color plano: sin halos ni degradados decorativos (invariante). */
   }
 
   /*
-   * Overscroll (rubber-band) de dos tonos SOLO en páginas con footer (home):
-   * al rebasar el tope se ve papel (combina con el header) y al rebasar el
-   * fondo se ve navy (combina con el footer), nunca blanco. El gradiente vive
-   * en el root y el <body> es OPACO, así que solo asoma en la zona de
-   * overscroll; el contenido normal no lo ve. `fixed` lo ancla al viewport
-   * (mitad papel / mitad navy); donde no se respeta `fixed`, cae a la caja del
-   * root y el borde inferior sigue siendo navy. La clase la pone
-   * ConditionalFooter; sin footer (herramientas) el overscroll queda en papel.
+   * Overscroll (rubber-band) de dos tonos, nunca blanco. Técnica del split
+   * html/body (la fiable en iOS, donde background-attachment:fixed se ignora en
+   * la zona de rebote): iOS pinta el rebote SUPERIOR con el fondo de <html> y
+   * el INFERIOR con el de <body>.
+   *  - <html> = papel SIEMPRE → el rebote superior (junto al header) nunca es
+   *    blanco, en todas las rutas.
+   *  - <body> = papel por defecto (herramientas: rebote inferior en papel);
+   *    navy SOLO en páginas con footer (home), para que el rebote inferior
+   *    combine con el footer. La clase `has-footer` la pone ConditionalFooter.
+   * El contenido visible lo mantiene en papel <main> (bg-surface en layout),
+   * así el navy del body solo asoma al rebasar el fondo.
    */
-  html.has-footer {
-    background-image: linear-gradient(
-      to bottom,
-      hsl(var(--surface)) 0 50%,
-      hsl(var(--brand-navy)) 50% 100%
-    );
-    background-attachment: fixed;
+  html {
+    background-color: hsl(var(--surface));
+  }
+  body {
+    background-color: hsl(var(--surface));
+  }
+  html.has-footer body {
+    background-color: hsl(var(--brand-navy));
   }
 
   /*

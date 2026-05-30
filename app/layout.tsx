@@ -49,9 +49,12 @@ export default function RootLayout({
 }) {
   return (
     <html lang="es" className={robotoMono.variable}>
-      <body className="flex min-h-screen flex-col bg-surface font-mono text-ink antialiased supports-[min-height:100dvh]:min-h-[100dvh]">
+      {/* El bg del body lo controla globals.css (split html/body para el
+          overscroll de dos tonos); por eso NO va `bg-surface` aquí. El
+          contenido visible se mantiene en papel con bg-surface en <main>. */}
+      <body className="flex min-h-screen flex-col font-mono text-ink antialiased supports-[min-height:100dvh]:min-h-[100dvh]">
         <SiteHeader />
-        <main className="flex-1">{children}</main>
+        <main className="flex-1 bg-surface">{children}</main>
         <ConditionalFooter />
         <Toaster position="top-right" />
         <Analytics />

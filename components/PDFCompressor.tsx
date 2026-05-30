@@ -1,10 +1,9 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
-import { PDFDocument } from 'pdf-lib';
-import * as pdfjsLib from 'pdfjs-dist';
-import JSZip from 'jszip';
-import ExcelJS from 'exceljs';
+// Las librerías pesadas (ExcelJS ~900 KB, pdfjs-dist, pdf-lib, JSZip) se cargan
+// con import() dinámico SOLO al comprimir/descargar, no al abrir la herramienta,
+// para que la pantalla aparezca al instante (ver loaders más abajo).
 import { FileText, Download, Loader2, X, Minimize2 as Compress, FileSpreadsheet, Clock } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
@@ -20,9 +19,17 @@ import ToolShell from '@/components/tools/ToolShell';
 import FileDropzone from '@/components/tools/FileDropzone';
 import ToolConstraints from '@/components/tools/ToolConstraints';
 
-if (typeof window !== 'undefined') {
-  pdfjsLib.GlobalWorkerOptions.workerSrc = '/pdf.worker.min.js';
-}
+// Carga perezosa y memoizada de pdfjs-dist; configura el worker una sola vez.
+let pdfjsPromise: Promise<typeof import('pdfjs-dist')> | null = null;
+const loadPdfjs = async () => {
+  if (!pdfjsPromise) {
+    pdfjsPromise = import('pdfjs-dist').then((mod) => {
+      mod.GlobalWorkerOptions.workerSrc = '/pdf.worker.min.js';
+      return mod;
+    });
+  }
+  return pdfjsPromise;
+};
 
 interface ProcessableFile {
   id: string;
@@ -178,7 +185,11 @@ export default function PDFCompressor() {
   const compressPDF = async (pdfFile: ProcessableFile): Promise<Blob> => {
     const { scale, quality } = compressionSettings[compressionLevel];
     
-    // Load PDF with PDF.js
+    // Carga perezosa de pdfjs-dist + pdf-lib (solo al comprimir un PDF).
+    const [pdfjsLib, { PDFDocument }] = await Promise.all([
+      loadPdfjs(),
+      import('pdf-lib'),
+    ]);
     const arrayBuffer = await pdfFile.file.arrayBuffer();
     const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
     
@@ -231,6 +242,7 @@ export default function PDFCompressor() {
     
     try {
       // Load the Excel file
+      const ExcelJS = (await import('exceljs')).default;
       const arrayBuffer = await excelFile.file.arrayBuffer();
       const workbook = new ExcelJS.Workbook();
       await workbook.xlsx.load(arrayBuffer);
@@ -562,6 +574,7 @@ export default function PDFCompressor() {
     }
 
     // Create ZIP file
+    const { default: JSZip } = await import('jszip');
     const zip = new JSZip();
     
     compressedFiles.forEach(file => {
