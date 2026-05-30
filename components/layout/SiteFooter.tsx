@@ -1,15 +1,15 @@
 import Link from 'next/link';
 import Image from 'next/image';
 import { ShieldCheck } from 'lucide-react';
-import { TOOLS } from '@/lib/tools';
+import { toolsByCategory } from '@/lib/tools';
 import { cn } from '@/lib/utils';
 
 /**
  * Footer sobre navy de marca. En el footer el COLOR = identidad de herramienta:
  * cada enlace lleva su ícono en el tono claro de su herramienta (accent.onDark,
- * legible sobre navy). Todo lo demás (chrome) va neutro en blanco —escudo y
- * eyebrow— para no competir con los colores de herramienta. La privacidad se
- * afirma como propuesta de valor, no como "badge".
+ * legible sobre navy). Con el catálogo ampliado las herramientas se reparten en
+ * columnas por categoría. El resto del cromo (escudo, eyebrow) va neutro en
+ * blanco para no competir con los colores de herramienta.
  *
  * El footer va PEGADO al contenido (sin margen superior ni costura blanca): el
  * cambio papel → navy ya lo separa, y un margen transparente dejaría ver el
@@ -17,11 +17,12 @@ import { cn } from '@/lib/utils';
  */
 export default function SiteFooter() {
   const year = new Date().getFullYear();
+  const groups = toolsByCategory();
 
   return (
     <footer className="bg-brand-navy pb-[env(safe-area-inset-bottom)] text-white/80">
       <div className="container mx-auto max-w-6xl py-14 pl-[max(20px,env(safe-area-inset-left))] pr-[max(20px,env(safe-area-inset-right))]">
-        <div className="grid gap-10 md:grid-cols-[1fr_auto] md:gap-16">
+        <div className="grid gap-10 lg:grid-cols-[minmax(0,18rem)_1fr] lg:gap-16">
           {/* Marca + propuesta + privacidad */}
           <div className="max-w-md">
             <Image
@@ -32,7 +33,7 @@ export default function SiteFooter() {
               className="h-8 w-auto"
             />
             <p className="mt-5 text-sm leading-relaxed text-white/70">
-              Une, divide, comprime y convierte archivos PDF y Excel, directo
+              Une, divide, comprime, convierte y edita archivos PDF, directo
               desde tu navegador.
             </p>
             <p className="mt-6 flex items-center gap-2.5 text-sm font-bold text-white">
@@ -45,30 +46,37 @@ export default function SiteFooter() {
             </p>
           </div>
 
-          {/* Herramientas */}
-          <nav aria-label="Herramientas" className="md:min-w-[180px]">
-            <p className="mb-5 text-xs font-bold uppercase tracking-wider text-white/50">
-              Herramientas
-            </p>
-            <ul className="space-y-3.5">
-              {TOOLS.map((tool) => (
-                <li key={tool.slug}>
-                  <Link
-                    href={tool.href}
-                    className="group inline-flex items-center gap-2.5 text-sm font-bold text-white/75 transition-colors hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-brand-navy"
-                  >
-                    <tool.Icon
-                      className={cn('h-4 w-4 shrink-0', tool.accent.onDark)}
-                      strokeWidth={2}
-                      aria-hidden="true"
-                    />
-                    <span className="decoration-2 underline-offset-4 group-hover:underline">
-                      {tool.name}
-                    </span>
-                  </Link>
-                </li>
-              ))}
-            </ul>
+          {/* Herramientas por categoría */}
+          <nav
+            aria-label="Herramientas"
+            className="grid grid-cols-2 gap-x-6 gap-y-9 sm:grid-cols-3 lg:grid-cols-5"
+          >
+            {groups.map((group) => (
+              <div key={group.category}>
+                <p className="mb-4 text-xs font-bold uppercase tracking-wider text-white/50">
+                  {group.label}
+                </p>
+                <ul className="space-y-3">
+                  {group.tools.map((tool) => (
+                    <li key={tool.slug}>
+                      <Link
+                        href={tool.href}
+                        className="group inline-flex items-center gap-2.5 text-sm font-bold text-white/75 transition-colors hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-brand-navy"
+                      >
+                        <tool.Icon
+                          className={cn('h-4 w-4 shrink-0', tool.accent.onDark)}
+                          strokeWidth={2}
+                          aria-hidden="true"
+                        />
+                        <span className="decoration-2 underline-offset-4 group-hover:underline">
+                          {tool.name}
+                        </span>
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ))}
           </nav>
         </div>
 

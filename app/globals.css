@@ -39,6 +39,20 @@
     --amber-soft: 34 55% 83%;     /* ~#ebd8be ámbar pastel: cajas de ayuda (dividir) */
     --indigo-soft: 239 44% 86%;   /* ~#cdd0ef índigo pastel: cajas de ayuda (convertir) */
     --fuchsia-soft: 322 42% 87%;  /* ~#e9c9e2 fucsia pastel: cajas de ayuda (girar) */
+    --violet-soft: 262 45% 86%;   /* violeta pastel: cajas de ayuda (organizar) */
+    /* Matices adicionales para el catálogo ampliado de herramientas — mismo
+     * registro apagado (S~45%, L~84%) para que todas las cajas de ayuda
+     * convivan con texto ink y los bordes navy. */
+    --sky-soft: 199 48% 84%;      /* cielo pastel */
+    --cyan-soft: 189 45% 83%;     /* cian pastel */
+    --blue-soft: 217 52% 86%;     /* azul pastel */
+    --emerald-soft: 160 40% 82%;  /* esmeralda pastel */
+    --green-soft: 142 42% 83%;    /* verde pastel */
+    --orange-soft: 27 70% 85%;    /* naranja pastel */
+    --rose-soft: 350 60% 88%;     /* rosa pastel */
+    --purple-soft: 271 45% 87%;   /* púrpura pastel */
+    --pink-soft: 330 60% 89%;     /* magenta pastel */
+    --slate-soft: 215 28% 85%;    /* pizarra pastel */
 
     /* ---- Semánticos GAINCO (un tono, se modula con opacidad) ---- */
     --success: 142 72% 26%;
