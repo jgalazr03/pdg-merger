@@ -12,6 +12,9 @@ import {
   Repeat,
   ImageIcon,
   Settings2,
+  ArrowRight,
+  ArrowDown,
+  ChevronDown,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
@@ -41,12 +44,53 @@ const accent = tool.accent;
 type ImageTarget = 'jpg' | 'png' | 'webp';
 type Target = ImageTarget | 'pdf';
 type Kind = 'image' | 'pdf';
+// Formato de entrada que el usuario fija a mano, o 'auto' para detectar.
+type InputFormat = 'auto' | 'pdf' | 'jpg' | 'png' | 'webp' | 'gif' | 'bmp' | 'svg' | 'avif';
+type SpecificInput = Exclude<InputFormat, 'auto'>;
 
 const TARGET_META: Record<Target, { label: string; mime: string; ext: string; hint: string }> = {
   jpg: { label: 'JPG', mime: 'image/jpeg', ext: 'jpg', hint: 'Fotos, menor peso' },
   png: { label: 'PNG', mime: 'image/png', ext: 'png', hint: 'Sin pérdida, transparencia' },
   webp: { label: 'WebP', mime: 'image/webp', ext: 'webp', hint: 'Peso mínimo, moderno' },
   pdf: { label: 'PDF', mime: 'application/pdf', ext: 'pdf', hint: 'Un documento por imagen' },
+};
+
+const INPUT_OPTIONS: { value: InputFormat; label: string }[] = [
+  { value: 'auto', label: 'Detectar automáticamente' },
+  { value: 'pdf', label: 'PDF' },
+  { value: 'jpg', label: 'JPG' },
+  { value: 'png', label: 'PNG' },
+  { value: 'webp', label: 'WebP' },
+  { value: 'gif', label: 'GIF' },
+  { value: 'bmp', label: 'BMP' },
+  { value: 'svg', label: 'SVG' },
+  { value: 'avif', label: 'AVIF' },
+];
+
+// Patrón de coincidencia por formato específico (extensión o MIME).
+const INPUT_MATCH: Record<SpecificInput, { re: RegExp; mime: string }> = {
+  pdf: { re: /\.pdf$/i, mime: 'application/pdf' },
+  jpg: { re: /\.jpe?g$/i, mime: 'image/jpeg' },
+  png: { re: /\.png$/i, mime: 'image/png' },
+  webp: { re: /\.webp$/i, mime: 'image/webp' },
+  gif: { re: /\.gif$/i, mime: 'image/gif' },
+  bmp: { re: /\.bmp$/i, mime: 'image/bmp' },
+  svg: { re: /\.svg$/i, mime: 'image/svg+xml' },
+  avif: { re: /\.avif$/i, mime: 'image/avif' },
+};
+
+// `accept` del input según el formato de entrada elegido.
+const ALL_ACCEPT =
+  '.pdf,.jpg,.jpeg,.png,.webp,.gif,.bmp,.svg,.avif,application/pdf,image/*';
+const INPUT_ACCEPT: Record<SpecificInput, string> = {
+  pdf: '.pdf,application/pdf',
+  jpg: '.jpg,.jpeg,image/jpeg',
+  png: '.png,image/png',
+  webp: '.webp,image/webp',
+  gif: '.gif,image/gif',
+  bmp: '.bmp,image/bmp',
+  svg: '.svg,image/svg+xml',
+  avif: '.avif,image/avif',
 };
 
 // Nivel único que modula resolución (escala de render del PDF) y calidad JPEG/WebP.
@@ -72,13 +116,12 @@ interface ResultFile {
   previewUrl?: string; // solo para resultados de imagen
 }
 
-const IMAGE_EXT = /\.(jpe?g|png|webp|gif|bmp|svg|avif)$/i;
 const stripExt = (name: string) => name.replace(/\.[^./\\]+$/, '');
 
 const isPdf = (file: File) =>
   file.type === 'application/pdf' || /\.pdf$/i.test(file.name);
-const looksLikeImage = (file: File) =>
-  file.type.startsWith('image/') || IMAGE_EXT.test(file.name);
+const matchesInput = (file: File, fmt: SpecificInput) =>
+  INPUT_MATCH[fmt].re.test(file.name) || file.type === INPUT_MATCH[fmt].mime;
 
 /** Carga la imagen en un <img> decodificado; rechaza si el navegador no puede. */
 function loadImageElement(file: File): Promise<HTMLImageElement> {
@@ -104,8 +147,56 @@ function canvasToBlob(canvas: HTMLCanvasElement, mime: string, quality: number):
   });
 }
 
+/** Selector de formato nativo (mejor UX móvil) estilizado al sistema. */
+function FormatSelect({
+  id,
+  label,
+  value,
+  onChange,
+  options,
+  disabled,
+}: {
+  id: string;
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  options: { value: string; label: string }[];
+  disabled?: boolean;
+}) {
+  return (
+    <div className="min-w-0">
+      <label
+        htmlFor={id}
+        className="mb-1.5 block text-xs font-bold uppercase tracking-wide text-muted-foreground"
+      >
+        {label}
+      </label>
+      <div className="relative">
+        <select
+          id={id}
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          disabled={disabled}
+          className="w-full appearance-none rounded-lg border-3 border-ink bg-surface px-3 py-2.5 pr-10 text-base font-bold text-ink transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 md:text-sm"
+        >
+          {options.map((o) => (
+            <option key={o.value} value={o.value}>
+              {o.label}
+            </option>
+          ))}
+        </select>
+        <ChevronDown
+          aria-hidden="true"
+          className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink"
+        />
+      </div>
+    </div>
+  );
+}
+
 export default function FileConverter() {
   const [files, setFiles] = useState<SourceFile[]>([]);
+  const [inputFormat, setInputFormat] = useState<InputFormat>('auto');
   const [target, setTarget] = useState<Target>('jpg');
   const [level, setLevel] = useState<Level>('alta');
   const [isProcessing, setIsProcessing] = useState(false);
@@ -136,15 +227,21 @@ export default function FileConverter() {
   const hasPdf = files.some((f) => f.kind === 'pdf');
   const hasImage = files.some((f) => f.kind === 'image');
 
-  // Destinos disponibles según el origen: PDF como destino solo si TODO son
-  // imágenes (no hay "PDF a PDF"; para combinar imágenes en uno está Unir).
+  // Destinos disponibles según la ENTRADA elegida (y, en auto, según lo subido):
+  // PDF como salida solo cuando el origen es imagen (no hay "PDF a PDF"; para
+  // combinar imágenes en un solo PDF está la herramienta Unir).
   const availableTargets = useMemo<Target[]>(() => {
-    if (files.length === 0) return ['jpg', 'png', 'webp', 'pdf'];
-    const imgTargets: Target[] = ['jpg', 'png', 'webp'];
-    return hasImage && !hasPdf ? [...imgTargets, 'pdf'] : imgTargets;
-  }, [files.length, hasImage, hasPdf]);
+    const img: Target[] = ['jpg', 'png', 'webp'];
+    if (inputFormat === 'pdf') return img;
+    if (inputFormat !== 'auto') return [...img, 'pdf']; // imagen específica
+    // auto: depende de lo que haya en la lista
+    if (files.length === 0) return [...img, 'pdf'];
+    if (hasPdf && !hasImage) return img;
+    if (hasImage && !hasPdf) return [...img, 'pdf'];
+    return img; // mezcla pdf + imagen → común denominador (imagen)
+  }, [inputFormat, files.length, hasPdf, hasImage]);
 
-  // Si el destino actual deja de ser válido al cambiar los archivos, reencaja.
+  // Si el destino actual deja de ser válido al cambiar entrada/archivos, reencaja.
   useEffect(() => {
     if (!availableTargets.includes(target)) setTarget(availableTargets[0]);
   }, [availableTargets, target]);
@@ -163,9 +260,16 @@ export default function FileConverter() {
   const handleFileSelect = async (selected: FileList) => {
     const incoming = Array.from(selected);
     const accepted: SourceFile[] = [];
-    const rejected: string[] = [];
+    let mismatched = 0; // no coinciden con el formato de entrada fijado
+    let undecodable = 0; // el navegador no los puede abrir
 
     for (const file of incoming) {
+      // 1) Si hay un formato de entrada específico, descarta lo que no coincida.
+      if (inputFormat !== 'auto' && !matchesInput(file, inputFormat)) {
+        mismatched += 1;
+        continue;
+      }
+      // 2) Clasifica y valida que el navegador realmente pueda procesarlo.
       if (isPdf(file)) {
         accepted.push({
           id: Math.random().toString(36).substring(2, 11),
@@ -175,26 +279,28 @@ export default function FileConverter() {
         });
         continue;
       }
-      if (looksLikeImage(file)) {
-        // Verifica que el navegador realmente pueda decodificarla (descarta
-        // HEIC/TIFF y archivos corruptos antes de prometer la conversión).
-        try {
-          await loadImageElement(file);
-          accepted.push({
-            id: Math.random().toString(36).substring(2, 11),
-            file,
-            name: stripExt(file.name),
-            kind: 'image',
-          });
-        } catch {
-          rejected.push(file.name);
-        }
-        continue;
+      try {
+        const img = await loadImageElement(file);
+        URL.revokeObjectURL(img.src);
+        accepted.push({
+          id: Math.random().toString(36).substring(2, 11),
+          file,
+          name: stripExt(file.name),
+          kind: 'image',
+        });
+      } catch {
+        undecodable += 1;
       }
-      rejected.push(file.name);
     }
 
-    if (rejected.length > 0) {
+    if (mismatched > 0) {
+      const label = INPUT_OPTIONS.find((o) => o.value === inputFormat)?.label ?? '';
+      toast.error(
+        `${mismatched} archivo${mismatched !== 1 ? 's' : ''} no ${mismatched !== 1 ? 'son' : 'es'} ${label}`,
+        { description: 'Cambia el formato de entrada o usa "Detectar automáticamente".' }
+      );
+    }
+    if (undecodable > 0) {
       toast.error('Algunos archivos no se pueden convertir', {
         description:
           'Solo PDF e imágenes que el navegador pueda abrir (JPG, PNG, WebP, GIF, BMP, SVG, AVIF).',
@@ -206,6 +312,24 @@ export default function FileConverter() {
       toast.success(
         `${accepted.length} archivo${accepted.length !== 1 ? 's' : ''} agregado${accepted.length !== 1 ? 's' : ''}`
       );
+    }
+  };
+
+  const handleInputFormatChange = (value: string) => {
+    const fmt = value as InputFormat;
+    setInputFormat(fmt);
+    setResults([]);
+    // Mantén la lista coherente con el nuevo formato: quita lo que ya no encaje.
+    if (fmt !== 'auto') {
+      setFiles((prev) => {
+        const kept = prev.filter((f) => matchesInput(f.file, fmt));
+        if (kept.length !== prev.length) {
+          toast('Se ajustó la lista', {
+            description: 'Quitamos los archivos que no coinciden con el formato de entrada.',
+          });
+        }
+        return kept;
+      });
     }
   };
 
@@ -384,16 +508,47 @@ export default function FileConverter() {
 
   return (
     <ToolShell tool={tool} step={step}>
+      {/* Barra de conversión "De → A": el usuario fija formato de entrada
+          (o lo deja en automático) y el de salida ANTES de subir. */}
+      <div className="mb-4 rounded-lg border-3 border-ink bg-card p-4">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-[1fr_auto_1fr] sm:items-end sm:gap-4">
+          <FormatSelect
+            id="conv-from"
+            label="De"
+            value={inputFormat}
+            onChange={handleInputFormatChange}
+            options={INPUT_OPTIONS}
+            disabled={isProcessing}
+          />
+          <div className="flex justify-center sm:h-[46px] sm:items-center" aria-hidden="true">
+            <ArrowRight className="hidden h-5 w-5 shrink-0 text-ink sm:block" />
+            <ArrowDown className="h-5 w-5 shrink-0 text-ink sm:hidden" />
+          </div>
+          <FormatSelect
+            id="conv-to"
+            label="A"
+            value={target}
+            onChange={(v) => setTarget(v as Target)}
+            options={availableTargets.map((t) => ({ value: t, label: TARGET_META[t].label }))}
+            disabled={isProcessing}
+          />
+        </div>
+      </div>
+
       <FileDropzone
         className="mb-4"
         accent={accent}
         multiple
-        accept=".pdf,.jpg,.jpeg,.png,.webp,.gif,.bmp,.svg,.avif,application/pdf,image/*"
-        idleTitle="Selecciona PDF o imágenes"
-        idleSubtitle="Haz clic aquí o arrastra y suelta tus archivos PDF o imágenes"
+        accept={inputFormat === 'auto' ? ALL_ACCEPT : INPUT_ACCEPT[inputFormat]}
+        idleTitle={
+          inputFormat === 'auto'
+            ? 'Selecciona PDF o imágenes'
+            : `Selecciona archivos ${INPUT_OPTIONS.find((o) => o.value === inputFormat)?.label}`
+        }
+        idleSubtitle="Haz clic aquí o arrastra y suelta tus archivos"
         dragTitle="Suelta los archivos aquí"
         buttonLabel="Seleccionar archivos"
-        ariaLabel="Seleccionar o arrastrar archivos PDF o imágenes"
+        ariaLabel="Seleccionar o arrastrar archivos para convertir"
         onFiles={handleFileSelect}
       />
 
@@ -453,38 +608,11 @@ export default function FileConverter() {
               ))}
             </ul>
 
-            {/* Destino */}
-            <div className="mt-6">
-              <Label className="mb-3 block text-sm font-medium text-ink">
-                <Repeat className="mr-2 inline h-4 w-4" />
-                Convertir a
-              </Label>
-              <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-                {availableTargets.map((t) => (
-                  <button
-                    key={t}
-                    type="button"
-                    onClick={() => setTarget(t)}
-                    aria-pressed={target === t}
-                    className={cn(
-                      'rounded-lg border-3 border-ink p-4 text-left transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink focus-visible:ring-offset-2',
-                      target === t ? 'bg-indigo-soft' : 'bg-surface hover:bg-muted'
-                    )}
-                  >
-                    <div className="mb-1 font-bold text-ink">{TARGET_META[t].label}</div>
-                    <div className="text-xs text-muted-foreground">{TARGET_META[t].hint}</div>
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Nivel (calidad / resolución) cuando influye */}
+            {/* Nivel (calidad / resolución) cuando influye en el resultado */}
             {showLevel && (
               <div className="mt-6">
                 <Label className="mb-3 block text-sm font-medium text-ink">
                   <Settings2 className="mr-2 inline h-4 w-4" />
-                  {/* Dentro de showLevel, target ya está acotado a imagen (TS
-                      reduce por la condición aliased), por eso basta `hasPdf`. */}
                   {hasPdf ? 'Resolución y calidad' : 'Calidad'}
                 </Label>
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
@@ -494,8 +622,9 @@ export default function FileConverter() {
                       type="button"
                       onClick={() => setLevel(lv)}
                       aria-pressed={level === lv}
+                      disabled={isProcessing}
                       className={cn(
-                        'rounded-lg border-3 border-ink p-4 text-left transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink focus-visible:ring-offset-2',
+                        'rounded-lg border-3 border-ink p-4 text-left transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink focus-visible:ring-offset-2 disabled:opacity-50',
                         level === lv ? 'bg-indigo-soft' : 'bg-surface hover:bg-muted'
                       )}
                     >
