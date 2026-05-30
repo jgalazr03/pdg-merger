@@ -1,6 +1,6 @@
-import { Combine, Scissors, Minimize2, Repeat, type LucideIcon } from 'lucide-react';
+import { Combine, Scissors, Minimize2, Repeat, RotateCw, type LucideIcon } from 'lucide-react';
 
-export type ToolSlug = 'unir' | 'dividir' | 'comprimir' | 'convertir';
+export type ToolSlug = 'unir' | 'dividir' | 'comprimir' | 'convertir' | 'girar';
 
 /**
  * Sistema de acento.
@@ -167,6 +167,32 @@ export const TOOLS: ToolDef[] = [
       line: 'bg-indigo-700',
       onDark: 'text-indigo-400',
       soft: 'bg-indigo-soft',
+      softText: 'text-ink',
+    },
+  },
+  {
+    slug: 'girar',
+    href: '/girar',
+    name: 'Girar PDF',
+    title: 'Girar PDF',
+    tagline: 'Rota las páginas de un PDF y guárdalo sin perder calidad.',
+    description:
+      'Gira las páginas de un PDF 90° o 180°, todas a la vez o una por una, y descárgalo sin perder calidad. Todo ocurre en tu navegador.',
+    Icon: RotateCw,
+    constraints: [
+      'Formato: PDF (un archivo a la vez)',
+      'Gira todas las páginas o cada una por separado',
+      'Sin pérdida de calidad: no se rasteriza el contenido',
+      'Vista previa de cada página para girar con precisión',
+    ],
+    accent: {
+      ...BRAND,
+      solid: 'bg-fuchsia-700 text-white hover:opacity-85',
+      iconBg: 'bg-fuchsia-700',
+      text: 'text-fuchsia-700',
+      line: 'bg-fuchsia-700',
+      onDark: 'text-fuchsia-400',
+      soft: 'bg-fuchsia-soft',
       softText: 'text-ink',
     },
   },
