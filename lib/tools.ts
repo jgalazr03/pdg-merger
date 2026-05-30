@@ -1,6 +1,20 @@
-import { Combine, Scissors, Minimize2, Repeat, RotateCw, type LucideIcon } from 'lucide-react';
+import {
+  Combine,
+  Scissors,
+  Minimize2,
+  Repeat,
+  RotateCw,
+  LayoutGrid,
+  type LucideIcon,
+} from 'lucide-react';
 
-export type ToolSlug = 'unir' | 'dividir' | 'comprimir' | 'convertir' | 'girar';
+export type ToolSlug =
+  | 'unir'
+  | 'dividir'
+  | 'comprimir'
+  | 'convertir'
+  | 'girar'
+  | 'organizar';
 
 /**
  * Sistema de acento.
@@ -193,6 +207,32 @@ export const TOOLS: ToolDef[] = [
       line: 'bg-fuchsia-700',
       onDark: 'text-fuchsia-400',
       soft: 'bg-fuchsia-soft',
+      softText: 'text-ink',
+    },
+  },
+  {
+    slug: 'organizar',
+    href: '/organizar',
+    name: 'Organizar PDF',
+    title: 'Organizar PDF',
+    tagline: 'Reordena, gira y elimina páginas de un PDF, y guárdalo.',
+    description:
+      'Reordena las páginas de un PDF arrastrándolas, gíralas o elimínalas, y descarga el documento reorganizado sin perder calidad. Todo ocurre en tu navegador.',
+    Icon: LayoutGrid,
+    constraints: [
+      'Formato: PDF (un archivo a la vez)',
+      'Reordena arrastrando o con los botones de mover',
+      'Gira o elimina páginas una por una',
+      'Sin pérdida de calidad: no se rasteriza el contenido',
+    ],
+    accent: {
+      ...BRAND,
+      solid: 'bg-violet-700 text-white hover:opacity-85',
+      iconBg: 'bg-violet-700',
+      text: 'text-violet-700',
+      line: 'bg-violet-700',
+      onDark: 'text-violet-400',
+      soft: 'bg-violet-soft',
       softText: 'text-ink',
     },
   },

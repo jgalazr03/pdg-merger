@@ -76,11 +76,11 @@ export default function SiteHeader() {
         </Link>
 
         {/* Navegación de escritorio: una sola línea que se DESLIZA entre tabs.
-            En lg+ (no md): con 4 herramientas, en tablet los tabs se apretaban,
-            así que el menú móvil cubre hasta lg. */}
+            En xl+: con 6 herramientas, antes de xl los tabs se apretaban y
+            llegaban a envolverse, así que el menú móvil cubre hasta xl. */}
         <nav
           ref={navRef}
-          className="relative hidden items-center gap-1 lg:flex"
+          className="relative hidden items-center gap-1 xl:flex"
           aria-label="Herramientas"
         >
           {TOOLS.map((tool) => {
@@ -125,8 +125,8 @@ export default function SiteHeader() {
           )}
         </nav>
 
-        {/* Navegación móvil / tablet (hasta lg) */}
-        <div className="lg:hidden">
+        {/* Navegación móvil / tablet (hasta xl) */}
+        <div className="xl:hidden">
           <Sheet>
             <SheetTrigger
               className="inline-flex h-11 w-11 items-center justify-center rounded-lg border-3 border-ink bg-surface text-ink transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink focus-visible:ring-offset-2"

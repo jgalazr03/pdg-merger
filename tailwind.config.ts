@@ -100,6 +100,7 @@ const config: Config = {
         'amber-soft': 'hsl(var(--amber-soft) / <alpha-value>)',
         'indigo-soft': 'hsl(var(--indigo-soft) / <alpha-value>)',
         'fuchsia-soft': 'hsl(var(--fuchsia-soft) / <alpha-value>)',
+        'violet-soft': 'hsl(var(--violet-soft) / <alpha-value>)',
         background: 'hsl(var(--background))',
         foreground: 'hsl(var(--foreground))',
         card: {
