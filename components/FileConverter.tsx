@@ -56,7 +56,7 @@ const TARGET_META: Record<Target, { label: string; mime: string; ext: string; hi
 };
 
 const INPUT_OPTIONS: { value: InputFormat; label: string }[] = [
-  { value: 'auto', label: 'Detectar automáticamente' },
+  { value: 'auto', label: 'Auto detecta' },
   { value: 'pdf', label: 'PDF' },
   { value: 'jpg', label: 'JPG' },
   { value: 'png', label: 'PNG' },
@@ -113,7 +113,6 @@ interface ResultFile {
   name: string; // con extensión
   blob: Blob;
   kind: Kind;
-  previewUrl?: string; // solo para resultados de imagen
 }
 
 const stripExt = (name: string) => name.replace(/\.[^./\\]+$/, '');
@@ -217,13 +216,6 @@ export default function FileConverter() {
     }
   }, [results.length]);
 
-  // Limpia las URLs de preview al desmontar / regenerar resultados.
-  useEffect(() => {
-    return () => {
-      results.forEach((r) => r.previewUrl && URL.revokeObjectURL(r.previewUrl));
-    };
-  }, [results]);
-
   const hasPdf = files.some((f) => f.kind === 'pdf');
   const hasImage = files.some((f) => f.kind === 'image');
 
@@ -297,7 +289,7 @@ export default function FileConverter() {
       const label = INPUT_OPTIONS.find((o) => o.value === inputFormat)?.label ?? '';
       toast.error(
         `${mismatched} archivo${mismatched !== 1 ? 's' : ''} no ${mismatched !== 1 ? 'son' : 'es'} ${label}`,
-        { description: 'Cambia el formato de entrada o usa "Detectar automáticamente".' }
+        { description: 'Cambia el formato de entrada o usa "Auto detecta".' }
       );
     }
     if (undecodable > 0) {
@@ -374,7 +366,6 @@ export default function FileConverter() {
       name: `${src.name}.${TARGET_META[t].ext}`,
       blob,
       kind: 'image',
-      previewUrl: URL.createObjectURL(blob),
     };
   };
 
@@ -424,7 +415,6 @@ export default function FileConverter() {
         name: `${src.name}_pagina_${pageNum}.${TARGET_META[t].ext}`,
         blob,
         kind: 'image',
-        previewUrl: URL.createObjectURL(blob),
       });
       // Cede el hilo para que la barra de progreso respire.
       await new Promise((r) => setTimeout(r, 0));
@@ -459,7 +449,6 @@ export default function FileConverter() {
       );
     } catch (error) {
       console.error('Error converting files:', error);
-      out.forEach((r) => r.previewUrl && URL.revokeObjectURL(r.previewUrl));
       toast.error('No se pudo completar la conversión', {
         description: 'Revisa los archivos e inténtalo de nuevo.',
       });
@@ -714,43 +703,48 @@ export default function FileConverter() {
               </Button>
             </div>
 
-            {/* Rejilla responsive: 2 columnas en móvil → 4 en escritorio. */}
-            <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4 lg:grid-cols-4">
+            {/* Lista de resultados: mismo patrón que Dividir/Comprimir (ícono +
+                nombre + descargar), sin preview, para ser consistente con el
+                resto del sistema. */}
+            <div className="space-y-3">
+              <h3 className="mb-3 font-display font-bold text-ink">
+                Archivos generados:
+              </h3>
               {results.map((r) => (
-                <li
+                <div
                   key={r.id}
-                  className="flex flex-col overflow-hidden rounded-lg border-3 border-ink bg-surface"
+                  className="flex items-center justify-between gap-3 rounded-lg border-3 border-ink bg-surface p-3 sm:p-4"
                 >
-                  <div className="flex aspect-[4/3] items-center justify-center border-b-3 border-ink bg-card p-2">
-                    {r.previewUrl ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img
-                        src={r.previewUrl}
-                        alt={r.name}
-                        className="max-h-full w-auto max-w-full object-contain"
-                        loading="lazy"
-                      />
-                    ) : (
-                      <FileText className="h-12 w-12 text-ink" aria-hidden="true" />
-                    )}
+                  <div className="flex min-w-0 items-center gap-3">
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded border-2 border-ink bg-card">
+                      {r.kind === 'pdf' ? (
+                        <FileText className="h-5 w-5 text-ink" />
+                      ) : (
+                        <ImageIcon className="h-5 w-5 text-ink" />
+                      )}
+                    </div>
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-medium text-ink" title={r.name}>
+                        {r.name}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        {formatFileSize(r.blob.size)}
+                      </p>
+                    </div>
                   </div>
-                  <div className="flex items-center justify-between gap-2 p-2.5">
-                    <span className="min-w-0 flex-1 truncate text-xs font-bold text-ink" title={r.name}>
-                      {r.name}
-                    </span>
-                    <Button
-                      onClick={() => downloadResult(r)}
-                      size="sm"
-                      variant="outline"
-                      className="shrink-0"
-                      aria-label={`Descargar ${r.name}`}
-                    >
-                      <Download className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </li>
+                  <Button
+                    onClick={() => downloadResult(r)}
+                    size="sm"
+                    variant="outline"
+                    className="shrink-0"
+                    aria-label={`Descargar ${r.name}`}
+                  >
+                    <Download className="h-4 w-4 sm:mr-2" />
+                    <span className="hidden sm:inline">Descargar</span>
+                  </Button>
+                </div>
               ))}
-            </ul>
+            </div>
 
             <div className="mt-6 text-center">
               <Button variant="outline" onClick={resetAll} size="lg">
