@@ -301,19 +301,22 @@ export default function PDFRotator() {
                   <span className="text-sm font-bold text-ink">
                     Girar todas las páginas
                   </span>
-                  {/* Restablecer — MÓVIL (texto, alineado al borde derecho) */}
+                  {/* Restablecer — MÓVIL (mismo ícono que escritorio, alineado
+                      al borde derecho de la cabecera). */}
                   <button
                     type="button"
                     onClick={resetRotations}
                     disabled={isProcessing || !anyRotated}
                     aria-hidden={!anyRotated}
                     tabIndex={anyRotated ? 0 : -1}
+                    aria-label="Restablecer rotación"
+                    title="Restablecer rotación"
                     className={cn(
-                      'shrink-0 whitespace-nowrap text-sm font-bold underline-offset-4 transition-colors hover:text-ink hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink focus-visible:ring-offset-2 sm:hidden',
-                      anyRotated ? 'text-muted-foreground' : 'invisible pointer-events-none'
+                      'flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-muted-foreground transition-colors duration-150 ease-out hover:bg-muted hover:text-ink active:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink focus-visible:ring-offset-2 sm:hidden',
+                      anyRotated ? '' : 'invisible pointer-events-none'
                     )}
                   >
-                    Restablecer
+                    <Undo2 className="h-4 w-4" />
                   </button>
                 </div>
 
