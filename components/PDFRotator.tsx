@@ -286,14 +286,30 @@ export default function PDFRotator() {
             </div>
 
             {/* Controles globales: segmentado simétrico en GRID de 2 columnas
-                (Tailwind usa minmax(0,1fr) → nunca recorta un botón). Ocupa todo
-                el ancho en móvil y un ancho fijo en escritorio. "Restablecer" va
-                en su PROPIA fila: aparece/desaparece sin desplazar los botones. */}
+                (minmax(0,1fr) → nunca recorta un botón). "Restablecer" vive en
+                la MISMA fila del label (lado opuesto a los botones) y RESERVA su
+                lugar siempre (invisible cuando no aplica): así no añade alto ni
+                desplaza el contenido al aparecer, y no roba ancho a los botones. */}
             <div className="mb-6 rounded-lg border-3 border-ink bg-surface p-3">
               <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                <span className="text-sm font-bold text-ink">
-                  Girar todas las páginas
-                </span>
+                <div className="flex items-center gap-3">
+                  <span className="text-sm font-bold text-ink">
+                    Girar todas las páginas
+                  </span>
+                  <button
+                    type="button"
+                    onClick={resetRotations}
+                    disabled={isProcessing || !anyRotated}
+                    aria-hidden={!anyRotated}
+                    tabIndex={anyRotated ? 0 : -1}
+                    className={cn(
+                      'shrink-0 whitespace-nowrap text-sm font-bold underline-offset-4 transition-colors hover:text-ink hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink focus-visible:ring-offset-2',
+                      anyRotated ? 'text-muted-foreground' : 'invisible pointer-events-none'
+                    )}
+                  >
+                    Restablecer
+                  </button>
+                </div>
                 <div className="grid grid-cols-2 overflow-hidden rounded-lg border-3 border-ink sm:w-72">
                   <button
                     type="button"
@@ -315,18 +331,6 @@ export default function PDFRotator() {
                   </button>
                 </div>
               </div>
-              {anyRotated && (
-                <div className="mt-3 text-right">
-                  <button
-                    type="button"
-                    onClick={resetRotations}
-                    disabled={isProcessing}
-                    className="text-sm font-bold text-muted-foreground underline-offset-4 transition-colors hover:text-ink hover:underline disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink focus-visible:ring-offset-2"
-                  >
-                    Restablecer
-                  </button>
-                </div>
-              )}
             </div>
 
             {/* Rejilla de páginas: 2 cols móvil → 4 escritorio. Cada miniatura es
