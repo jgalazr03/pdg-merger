@@ -1,6 +1,6 @@
-import { Combine, Scissors, Minimize2, FileImage, type LucideIcon } from 'lucide-react';
+import { Combine, Scissors, Minimize2, Repeat, type LucideIcon } from 'lucide-react';
 
-export type ToolSlug = 'unir' | 'dividir' | 'comprimir' | 'pdf-a-jpg';
+export type ToolSlug = 'unir' | 'dividir' | 'comprimir' | 'convertir';
 
 /**
  * Sistema de acento.
@@ -13,7 +13,7 @@ export type ToolSlug = 'unir' | 'dividir' | 'comprimir' | 'pdf-a-jpg';
  *
  * Paleta de herramientas (peso -700 para pasar contraste AA con glifo blanco):
  *   unir → océano #004b7d · dividir → ámbar #b45309 · comprimir → teal #0f766e
- *   · PDF a JPG → índigo #4338ca
+ *   · convertir → índigo #4338ca
  * Las cajas de ayuda usan el tinte suave del MISMO matiz (ocean/amber/highlight
  * /indigo-soft, todos en el registro apagado S~45%/L~82%) con texto ink.
  *
@@ -144,19 +144,20 @@ export const TOOLS: ToolDef[] = [
     },
   },
   {
-    slug: 'pdf-a-jpg',
-    href: '/pdf-a-jpg',
-    name: 'PDF a JPG',
-    title: 'Convertir PDF a JPG',
-    tagline: 'Convierte cada página de un PDF en una imagen JPG.',
+    slug: 'convertir',
+    href: '/convertir',
+    name: 'Convertir',
+    title: 'Convertir archivos',
+    tagline: 'Convierte entre PDF e imágenes (JPG, PNG, WebP) en tu navegador.',
     description:
-      'Transforma las páginas de un PDF en imágenes JPG de alta calidad y descárgalas una a una o todas en un ZIP. Todo ocurre en tu navegador.',
-    Icon: FileImage,
+      'Convierte archivos entre PDF e imágenes: pasa un PDF a imágenes (una por página), una imagen a PDF, o entre formatos de imagen (JPG, PNG, WebP). Todo ocurre en tu navegador.',
+    Icon: Repeat,
     constraints: [
-      'Formato: PDF (un archivo a la vez)',
-      'Genera una imagen JPG por página',
-      'Elige la resolución antes de convertir',
-      'Descarga individual o todas en un ZIP',
+      'Entrada: PDF, JPG, PNG, WebP, GIF, BMP, SVG y AVIF',
+      'Salida: JPG, PNG, WebP y PDF',
+      'PDF → imágenes: una imagen por página',
+      'Imágenes → PDF: un PDF por imagen (para combinar varias, usa Unir)',
+      'No soporta Office (Word/Excel), TIFF ni HEIC: no se pueden procesar en el navegador',
     ],
     accent: {
       ...BRAND,

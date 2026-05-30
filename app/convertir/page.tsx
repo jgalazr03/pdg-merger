@@ -1,14 +1,14 @@
 import type { Metadata } from 'next';
-import PDFToJPGLoader from '@/components/tools/PDFToJPGLoader';
+import ConverterLoader from '@/components/tools/ConverterLoader';
 import { getTool } from '@/lib/tools';
 
-const tool = getTool('pdf-a-jpg');
+const tool = getTool('convertir');
 
 export const metadata: Metadata = {
   title: tool.title,
   description: tool.description,
 };
 
-export default function PdfAJpgPage() {
-  return <PDFToJPGLoader />;
+export default function ConvertirPage() {
+  return <ConverterLoader />;
 }
