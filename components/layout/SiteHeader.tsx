@@ -251,19 +251,25 @@ export default function SiteHeader() {
                                   role="menuitem"
                                   aria-current={active ? 'page' : undefined}
                                   className={cn(
-                                    'flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm font-bold transition-colors',
+                                    'group flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm font-bold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink focus-visible:ring-offset-2',
                                     active
                                       ? 'bg-card text-ink'
-                                      : 'text-muted-foreground hover:bg-muted hover:text-ink'
+                                      : 'text-muted-foreground hover:text-ink'
                                   )}
                                 >
+                                  {/* Hover estilo footer: el ícono toma su color
+                                      y la frase se subraya (sin relleno de fondo). */}
                                   <tool.Icon
                                     className={cn(
-                                      'h-4 w-4 shrink-0',
-                                      active ? tool.accent.text : 'text-current'
+                                      'h-4 w-4 shrink-0 transition-colors',
+                                      active
+                                        ? tool.accent.text
+                                        : cn('text-current', tool.accent.iconHover)
                                     )}
                                   />
-                                  {tool.name}
+                                  <span className="decoration-2 underline-offset-4 group-hover:underline">
+                                    {tool.name}
+                                  </span>
                                 </Link>
                               </li>
                             );
