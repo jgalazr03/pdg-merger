@@ -18,7 +18,7 @@ export default function Home() {
         </p>
       </section>
 
-      <section className="motion-safe:animate-slide-up">
+      <section>
         <ToolGrid />
       </section>
 
