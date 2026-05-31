@@ -46,22 +46,21 @@ export default function SiteFooter() {
             </p>
           </div>
 
-          {/* Herramientas por categoría */}
+          {/* Herramientas por categoría. Multi-columna (CSS columns) que reparte
+              las categorías sin acoplar alturas por fila: evita el hueco que en
+              una rejilla dejaba una categoría corta (Organizar) junto a una larga
+              (Editar). Cada categoría se mantiene íntegra (break-inside-avoid). */}
           <nav
             aria-label="Herramientas"
-            className="grid grid-cols-2 gap-x-6 gap-y-9 sm:grid-cols-3 lg:grid-cols-5"
+            className="columns-2 gap-x-6 sm:columns-3 sm:gap-x-8"
           >
             {groups.map((group) => (
-              <div key={group.category}>
-                <div className="mb-4">
-                  {/* Pestaña con borde sobre regla, invertida a blanco sobre navy. */}
-                  <div className="flex">
-                    <p className="rounded-t-lg border-3 border-b-0 border-white px-3 py-1.5 text-xs font-bold uppercase leading-none tracking-[0.2em] text-white">
-                      {group.label}
-                    </p>
-                  </div>
-                  <div aria-hidden="true" className="h-[3px] w-full bg-white" />
-                </div>
+              <div key={group.category} className="mb-9 break-inside-avoid">
+                {/* Encabezado limpio: etiqueta sobre regla blanca (sin pestaña de
+                    ancho variable), coherente con el menú móvil. */}
+                <p className="mb-4 border-b-[3px] border-white pb-2 text-xs font-bold uppercase tracking-[0.15em] text-white">
+                  {group.label}
+                </p>
                 <ul className="space-y-3">
                   {group.tools.map((tool) => (
                     <li key={tool.slug}>
