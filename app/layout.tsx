@@ -4,6 +4,8 @@ import { Roboto_Mono } from 'next/font/google';
 import { Analytics } from "@vercel/analytics/next"
 import SiteHeader from '@/components/layout/SiteHeader';
 import ConditionalFooter from '@/components/layout/ConditionalFooter';
+import CommandPalette from '@/components/CommandPalette';
+import ToolVisitTracker from '@/components/ToolVisitTracker';
 import { Toaster } from '@/components/ui/sonner';
 
 // Tipografía única del sistema (invariante): monoespaciada. Jerarquía solo por
@@ -56,6 +58,8 @@ export default function RootLayout({
         <SiteHeader />
         <main className="flex-1 bg-surface">{children}</main>
         <ConditionalFooter />
+        <CommandPalette />
+        <ToolVisitTracker />
         <Toaster position="top-right" />
         <Analytics />
       </body>

@@ -1,12 +1,14 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import Link from 'next/link';
 import { Search, X } from 'lucide-react';
 import {
   TOOLS,
   toolsByCategory,
   type ToolCategory,
 } from '@/lib/tools';
+import { useRecentTools } from '@/lib/recent-tools';
 import { cn } from '@/lib/utils';
 import ToolCard from './ToolCard';
 
@@ -38,6 +40,7 @@ const norm = (s: string) =>
 
 export default function ToolCatalog() {
   const groups = toolsByCategory();
+  const recents = useRecentTools(5);
   const [query, setQuery] = useState('');
   const [cat, setCat] = useState<ToolCategory | 'all'>('all');
   const [animateInitial, setAnimateInitial] = useState(true);
@@ -159,6 +162,32 @@ export default function ToolCatalog() {
           })}
         </div>
       </div>
+
+      {/* Recientes (solo en navegación, no al buscar/filtrar): atajo de un toque
+          a lo último usado. Guardado solo en el equipo; vacío hasta montar. */}
+      {!isSearching && cat === 'all' && recents.length > 0 && (
+        <div className="mb-10 sm:mb-12">
+          <p className="mb-3 text-xs font-bold uppercase tracking-[0.15em] text-muted-foreground">
+            Recientes
+          </p>
+          <div className="flex flex-wrap gap-2.5">
+            {recents.map((tool) => (
+              <Link
+                key={tool.slug}
+                href={tool.href}
+                className="group inline-flex items-center gap-2 rounded-lg border-3 border-ink bg-card px-3 py-2 text-sm font-bold text-ink transition-[background-color,transform] duration-150 ease-out hover:bg-muted active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink focus-visible:ring-offset-2"
+              >
+                <tool.Icon
+                  className={cn('h-4 w-4 shrink-0', tool.accent.text)}
+                  strokeWidth={2}
+                  aria-hidden="true"
+                />
+                {tool.name}
+              </Link>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* --- Resultados --- */}
       {isSearching ? (

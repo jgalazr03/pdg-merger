@@ -83,6 +83,16 @@ export default function SiteHeader() {
   // teclado solo debe salir cuando el usuario toca el buscador.
   const menuTitleRef = useRef<HTMLHeadingElement>(null);
 
+  // Etiqueta del atajo del command palette según plataforma (⌘ en Mac, Ctrl en
+  // el resto). Inicia en '⌘' y se corrige tras montar para no romper hidratación.
+  const [modKey, setModKey] = useState('⌘');
+  useEffect(() => {
+    const isMac = /mac|iphone|ipad/i.test(
+      navigator.platform || navigator.userAgent || ''
+    );
+    if (!isMac) setModKey('Ctrl');
+  }, []);
+
   // Al navegar, deja expandida SOLO la categoría de la herramienta activa (el
   // resto colapsado) para abrir el menú con el mínimo scroll.
   useEffect(() => {
@@ -190,9 +200,25 @@ export default function SiteHeader() {
           </span>
         </Link>
 
-        {/* Escritorio (lg+): mega-menú propio. La herramienta activa se indica en
-            el breadcrumb de la página (ToolShell), no aquí. */}
+        {/* Escritorio (lg+): buscar (⌘K) + mega-menú propio. La herramienta activa
+            se indica en el breadcrumb de la página (ToolShell), no aquí. */}
         <div ref={megaRef} className="relative hidden items-center gap-3 lg:flex">
+          {/* Acceso al command palette global (descubre el atajo ⌘K/Ctrl+K). */}
+          <button
+            type="button"
+            onClick={() =>
+              window.dispatchEvent(new Event('gainco:open-command-palette'))
+            }
+            aria-label="Buscar herramienta"
+            className="inline-flex items-center gap-2 rounded-lg border-3 border-ink bg-surface px-3 py-2 text-sm font-bold text-ink transition-[background-color,transform] duration-150 ease-out hover:bg-muted active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink focus-visible:ring-offset-2"
+          >
+            <Search className="h-4 w-4" />
+            Buscar
+            <kbd className="ml-1 select-none rounded border-2 border-ink/25 px-1.5 py-0.5 text-[0.7rem] font-bold leading-none text-muted-foreground">
+              {modKey === '⌘' ? '⌘K' : 'Ctrl K'}
+            </kbd>
+          </button>
+
           <button
             type="button"
             aria-expanded={megaOpen}
