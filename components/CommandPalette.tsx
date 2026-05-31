@@ -10,19 +10,28 @@ import { cn } from '@/lib/utils';
 
 /**
  * Command palette global (⌘K / Ctrl+K), el gesto del North Star (Raycast): saltar
- * a cualquier herramienta desde cualquier página sin volver al inicio. Búsqueda
- * insensible a acentos; con la consulta vacía muestra Recientes (o todas si aún
- * no hay historial). Teclado-primero (combobox + listbox con activedescendant).
+ * a cualquier herramienta desde cualquier página sin volver al inicio.
  *
- * Se abre con el atajo o con el evento `gainco:open-command-palette` (botón del
- * header). Reusa la atmósfera del sistema: papel, borde navy 4px, mono, sin sombra.
+ *  - Buscando: resultados planos (insensible a acentos), con su categoría a la
+ *    derecha para desambiguar.
+ *  - Vacío: Recientes arriba + el catálogo COMPLETO por categoría debajo, todo
+ *    navegable con teclado (no solo los recientes).
+ *
+ * Teclado-primero (combobox + listbox con activedescendant; ↑↓/↵/esc). Se abre
+ * con el atajo o con el evento `gainco:open-command-palette` (botón del header).
+ * Reusa la atmósfera del sistema: papel, borde navy 4px, mono, sin sombra.
  */
+const GROUPS = toolsByCategory();
 const CATEGORY_LABEL: Record<string, string> = Object.fromEntries(
-  toolsByCategory().map((g) => [g.category, g.label])
+  GROUPS.map((g) => [g.category, g.label])
 );
 
 const norm = (s: string) =>
   s.normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase();
+
+type Row =
+  | { kind: 'header'; label: string }
+  | { kind: 'tool'; tool: ToolDef; index: number };
 
 export default function CommandPalette() {
   const router = useRouter();
@@ -51,14 +60,32 @@ export default function CommandPalette() {
   }, []);
 
   const q = query.trim();
-  const showingRecents = !q && recents.length > 0;
-  const results = useMemo<ToolDef[]>(() => {
+
+  // Filas a renderizar. El `index` solo corre en las filas seleccionables
+  // (herramientas), no en las cabeceras; `flatTools` mapea índice → herramienta
+  // para la navegación con teclado.
+  const { rows, flatTools } = useMemo(() => {
+    const rows: Row[] = [];
+    const flatTools: ToolDef[] = [];
+    const push = (tool: ToolDef) => {
+      rows.push({ kind: 'tool', tool, index: flatTools.length });
+      flatTools.push(tool);
+    };
     if (q) {
-      return TOOLS.filter((t) =>
+      TOOLS.filter((t) =>
         norm(`${t.name} ${t.title} ${t.tagline}`).includes(norm(q))
-      );
+      ).forEach(push);
+    } else {
+      if (recents.length) {
+        rows.push({ kind: 'header', label: 'Recientes' });
+        recents.forEach(push);
+      }
+      for (const group of GROUPS) {
+        rows.push({ kind: 'header', label: group.label });
+        group.tools.forEach(push);
+      }
     }
-    return recents.length ? recents : TOOLS;
+    return { rows, flatTools };
   }, [q, recents]);
 
   // Reiniciar al abrir; mantener el índice activo en rango.
@@ -77,7 +104,7 @@ export default function CommandPalette() {
     listRef.current
       ?.querySelector(`[data-idx="${activeIndex}"]`)
       ?.scrollIntoView({ block: 'nearest' });
-  }, [activeIndex, results.length]);
+  }, [activeIndex, flatTools.length]);
 
   const go = (tool?: ToolDef) => {
     if (!tool) return;
@@ -88,17 +115,17 @@ export default function CommandPalette() {
   const onInputKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'ArrowDown') {
       e.preventDefault();
-      setActiveIndex((i) => Math.min(i + 1, results.length - 1));
+      setActiveIndex((i) => Math.min(i + 1, flatTools.length - 1));
     } else if (e.key === 'ArrowUp') {
       e.preventDefault();
       setActiveIndex((i) => Math.max(i - 1, 0));
     } else if (e.key === 'Enter') {
       e.preventDefault();
-      go(results[activeIndex]);
+      go(flatTools[activeIndex]);
     }
   };
 
-  const listLabel = q ? null : showingRecents ? 'Recientes' : 'Todas las herramientas';
+  const count = q ? flatTools.length : TOOLS.length;
 
   return (
     <Dialog.Root open={open} onOpenChange={setOpen}>
@@ -110,12 +137,13 @@ export default function CommandPalette() {
             inputRef.current?.focus();
           }}
           aria-label="Buscar herramienta"
-          className="fixed left-1/2 top-[12vh] z-50 w-[min(40rem,92vw)] -translate-x-1/2 overflow-hidden rounded-xl border-4 border-ink bg-surface data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=open]:fade-in-0 data-[state=closed]:fade-out-0 data-[state=open]:slide-in-from-top-2"
+          aria-describedby={undefined}
+          className="fixed left-1/2 top-[12vh] z-50 flex max-h-[76vh] w-[min(40rem,92vw)] -translate-x-1/2 flex-col overflow-hidden rounded-xl border-4 border-ink bg-surface data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=open]:fade-in-0 data-[state=closed]:fade-out-0 data-[state=open]:slide-in-from-top-2"
         >
           <Dialog.Title className="sr-only">Buscar herramienta</Dialog.Title>
 
           {/* Campo de búsqueda (combobox). */}
-          <div className="flex items-center gap-2.5 border-b-3 border-ink px-4 py-3">
+          <div className="flex shrink-0 items-center gap-2.5 border-b-3 border-ink px-4 py-3">
             <Search aria-hidden="true" className="h-4 w-4 shrink-0 text-muted-foreground" />
             <input
               ref={inputRef}
@@ -123,7 +151,7 @@ export default function CommandPalette() {
               aria-expanded
               aria-controls="cmdk-list"
               aria-activedescendant={
-                results[activeIndex] ? `cmdk-opt-${activeIndex}` : undefined
+                flatTools[activeIndex] ? `cmdk-opt-${activeIndex}` : undefined
               }
               value={query}
               onChange={(e) => setQuery(e.target.value)}
@@ -135,48 +163,56 @@ export default function CommandPalette() {
           </div>
 
           {/* Resultados. */}
-          <div className="max-h-[min(24rem,56vh)] overflow-y-auto p-2">
-            {results.length > 0 ? (
-              <>
-                {listLabel && (
-                  <p className="px-2 pb-1 pt-1.5 text-[0.7rem] font-bold uppercase tracking-[0.15em] text-muted-foreground">
-                    {listLabel}
-                  </p>
-                )}
-                <ul id="cmdk-list" ref={listRef} role="listbox" aria-label="Herramientas">
-                  {results.map((tool, i) => {
-                    const active = i === activeIndex;
+          <div className="min-h-0 flex-1 overflow-y-auto p-2">
+            {flatTools.length > 0 ? (
+              <ul id="cmdk-list" ref={listRef} role="listbox" aria-label="Herramientas">
+                {rows.map((row, i) => {
+                  if (row.kind === 'header') {
                     return (
                       <li
-                        key={tool.slug}
-                        id={`cmdk-opt-${i}`}
-                        data-idx={i}
-                        role="option"
-                        aria-selected={active}
-                        onClick={() => go(tool)}
-                        onMouseMove={() => setActiveIndex(i)}
-                        className={cn(
-                          'group flex cursor-pointer items-center gap-3 rounded-lg px-2.5 py-2 text-sm font-bold transition-colors',
-                          active ? 'bg-muted' : ''
-                        )}
+                        key={`h-${i}`}
+                        role="presentation"
+                        className="px-2 pb-1 pt-3 text-[0.7rem] font-bold uppercase tracking-[0.15em] text-muted-foreground first:pt-1.5"
                       >
-                        <tool.Icon
-                          className={cn(
-                            'h-4 w-4 shrink-0 transition-colors',
-                            active ? tool.accent.text : 'text-muted-foreground'
-                          )}
-                          strokeWidth={2}
-                          aria-hidden="true"
-                        />
-                        <span className="flex-1 text-ink">{tool.name}</span>
+                        {row.label}
+                      </li>
+                    );
+                  }
+                  const { tool, index } = row;
+                  const active = index === activeIndex;
+                  const Icon = tool.Icon;
+                  return (
+                    <li
+                      key={`${tool.slug}-${index}`}
+                      id={`cmdk-opt-${index}`}
+                      data-idx={index}
+                      role="option"
+                      aria-selected={active}
+                      onClick={() => go(tool)}
+                      onMouseMove={() => setActiveIndex(index)}
+                      className={cn(
+                        'group flex cursor-pointer items-center gap-3 rounded-lg px-2.5 py-2 text-sm font-bold transition-colors',
+                        active ? 'bg-muted' : ''
+                      )}
+                    >
+                      <Icon
+                        className={cn(
+                          'h-4 w-4 shrink-0 transition-colors',
+                          active ? tool.accent.text : 'text-muted-foreground'
+                        )}
+                        strokeWidth={2}
+                        aria-hidden="true"
+                      />
+                      <span className="flex-1 text-ink">{tool.name}</span>
+                      {q && (
                         <span className="shrink-0 text-[0.7rem] font-bold uppercase tracking-[0.12em] text-muted-foreground">
                           {CATEGORY_LABEL[tool.category]}
                         </span>
-                      </li>
-                    );
-                  })}
-                </ul>
-              </>
+                      )}
+                    </li>
+                  );
+                })}
+              </ul>
             ) : (
               <p className="px-3 py-8 text-center text-sm text-muted-foreground">
                 Sin resultados para «{q}».
@@ -185,10 +221,9 @@ export default function CommandPalette() {
           </div>
 
           {/* Pie con ayudas de teclado. */}
-          <div className="flex items-center justify-between gap-3 border-t-3 border-ink px-4 py-2 text-[0.7rem] font-bold text-muted-foreground">
+          <div className="flex shrink-0 items-center justify-between gap-3 border-t-3 border-ink px-4 py-2 text-[0.7rem] font-bold text-muted-foreground">
             <span className="tabular-nums">
-              {results.length}{' '}
-              {results.length === 1 ? 'herramienta' : 'herramientas'}
+              {count} {count === 1 ? 'herramienta' : 'herramientas'}
             </span>
             <span className="hidden items-center gap-1.5 sm:flex">
               <Kbd>↑↓</Kbd> navegar
