@@ -33,7 +33,15 @@ export default function ToolShell({
           <li aria-hidden="true">
             <ChevronRight className="h-3.5 w-3.5" />
           </li>
-          <li aria-current="page" className="font-bold text-ink">
+          <li
+            aria-current="page"
+            className="flex items-center gap-1.5 font-bold text-ink"
+          >
+            <tool.Icon
+              className={cn('h-4 w-4 shrink-0', tool.accent.text)}
+              strokeWidth={2}
+              aria-hidden="true"
+            />
             {tool.name}
           </li>
         </ol>

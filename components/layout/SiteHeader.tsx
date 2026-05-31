@@ -190,15 +190,9 @@ export default function SiteHeader() {
           </span>
         </Link>
 
-        {/* Escritorio (lg+): chip de herramienta activa + mega-menú propio */}
+        {/* Escritorio (lg+): mega-menú propio. La herramienta activa se indica en
+            el breadcrumb de la página (ToolShell), no aquí. */}
         <div ref={megaRef} className="relative hidden items-center gap-3 lg:flex">
-          {activeTool && (
-            <span className="flex items-center gap-2 px-1 text-sm font-bold text-ink">
-              <activeTool.Icon className={cn('h-4 w-4', activeTool.accent.text)} />
-              {activeTool.name}
-            </span>
-          )}
-
           <button
             type="button"
             aria-expanded={megaOpen}
