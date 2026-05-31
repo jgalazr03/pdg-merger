@@ -354,18 +354,13 @@ export default function SiteHeader() {
                             <span className="flex-1 whitespace-nowrap text-xs font-bold uppercase tracking-[0.15em] text-ink">
                               {group.label}
                             </span>
-                            <span className="flex shrink-0 items-center gap-2">
-                              <span className="text-xs font-bold tabular-nums text-muted-foreground">
-                                {group.tools.length}
-                              </span>
-                              <ChevronDown
-                                aria-hidden="true"
-                                className={cn(
-                                  'h-4 w-4 text-muted-foreground transition-transform duration-200 ease-out',
-                                  open && 'rotate-180'
-                                )}
-                              />
-                            </span>
+                            <ChevronDown
+                              aria-hidden="true"
+                              className={cn(
+                                'h-4 w-4 shrink-0 text-muted-foreground transition-transform duration-200 ease-out',
+                                open && 'rotate-180'
+                              )}
+                            />
                           </button>
                           {/* Expandir/colapsar con ALTURA animada (truco
                               grid-rows 0fr→1fr): entrada y salida suaves sin
