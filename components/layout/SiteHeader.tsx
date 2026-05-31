@@ -78,6 +78,10 @@ export default function SiteHeader() {
   // --- Menú móvil (Sheet): buscador + categorías colapsables ---
   const [menuQuery, setMenuQuery] = useState('');
   const [openCats, setOpenCats] = useState<Set<string>>(new Set());
+  // Foco al abrir: al título, NO al buscador. Como el buscador es el primer
+  // enfocable del panel, Radix lo autoenfocaba y abría el teclado en móvil; el
+  // teclado solo debe salir cuando el usuario toca el buscador.
+  const menuTitleRef = useRef<HTMLHeadingElement>(null);
 
   // Al navegar, deja expandida SOLO la categoría de la herramienta activa (el
   // resto colapsado) para abrir el menú con el mínimo scroll.
@@ -286,8 +290,18 @@ export default function SiteHeader() {
             <SheetContent
               side="right"
               className="flex w-[min(22rem,88vw)] flex-col"
+              onOpenAutoFocus={(e) => {
+                e.preventDefault();
+                menuTitleRef.current?.focus();
+              }}
             >
-              <SheetTitle className="mb-4 shrink-0">Herramientas</SheetTitle>
+              <SheetTitle
+                ref={menuTitleRef}
+                tabIndex={-1}
+                className="mb-4 shrink-0 outline-none"
+              >
+                Herramientas
+              </SheetTitle>
 
               {/* Buscador: salto directo a cualquiera de las herramientas */}
               <div className="relative mb-4 shrink-0">
@@ -327,29 +341,31 @@ export default function SiteHeader() {
                       const open = openCats.has(group.category);
                       return (
                         <div key={group.category}>
-                          {/* Encabezado-disparador: pestaña con borde sobre regla. */}
+                          {/* Encabezado-disparador: fila uniforme sobre regla
+                              navy. Filas de igual alto, etiqueta a la izquierda y
+                              conteo + chevron alineados a la derecha (sin
+                              pestañas de ancho variable ni números flotantes). */}
                           <button
                             type="button"
                             onClick={() => toggleCat(group.category)}
                             aria-expanded={open}
-                            className="block w-full rounded-t-lg text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink focus-visible:ring-offset-2"
+                            className="flex w-full items-center gap-3 rounded-t border-b-[3px] border-ink py-2.5 text-left transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink focus-visible:ring-offset-2"
                           >
-                            <div className="flex items-center gap-2.5">
-                              <span className="rounded-t-lg border-3 border-b-0 border-ink bg-surface px-3 py-1.5 text-xs font-bold uppercase leading-none tracking-[0.2em] text-ink">
-                                {group.label}
-                              </span>
-                              <span className="text-[0.7rem] font-bold tabular-nums text-muted-foreground">
+                            <span className="flex-1 whitespace-nowrap text-xs font-bold uppercase tracking-[0.15em] text-ink">
+                              {group.label}
+                            </span>
+                            <span className="flex shrink-0 items-center gap-2">
+                              <span className="text-xs font-bold tabular-nums text-muted-foreground">
                                 {group.tools.length}
                               </span>
                               <ChevronDown
                                 aria-hidden="true"
                                 className={cn(
-                                  'ml-auto h-4 w-4 shrink-0 text-muted-foreground transition-transform duration-200 ease-out',
+                                  'h-4 w-4 text-muted-foreground transition-transform duration-200 ease-out',
                                   open && 'rotate-180'
                                 )}
                               />
-                            </div>
-                            <div aria-hidden="true" className="h-[3px] w-full bg-ink" />
+                            </span>
                           </button>
                           {/* Expandir/colapsar con ALTURA animada (truco
                               grid-rows 0fr→1fr): entrada y salida suaves sin
