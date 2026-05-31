@@ -7,13 +7,18 @@ export default function ToolCard({
   delayMs,
 }: {
   tool: ToolDef;
-  /** Retardo de entrada en la cascada de la landing (ms). */
+  /**
+   * Retardo de entrada en la cascada de la landing (ms). Solo se pasa en el
+   * montaje inicial de la vista completa; al filtrar/buscar va `undefined` para
+   * que los resultados aparezcan al instante (sin re-animar en cada tecla).
+   */
   delayMs?: number;
 }) {
+  const animateIn = delayMs != null;
   return (
     <Link
       href={tool.href}
-      style={delayMs != null ? { animationDelay: `${delayMs}ms` } : undefined}
+      style={animateIn ? { animationDelay: `${delayMs}ms` } : undefined}
       className={cn(
         // Panel del sistema: arena + borde navy 4px, color plano, sin sombra.
         // La tarjeta entera es el enlace. Hover TÁCTIL (sin sombra, on-system):
@@ -21,10 +26,10 @@ export default function ToolCard({
         // al presionar, cede con un scale. La elevación es motion-safe.
         'group flex flex-col rounded-lg border-4 border-ink bg-card p-5 text-left transition-[transform,background-color] duration-150 ease-out active:scale-[0.99] sm:p-6',
         'hover:bg-muted motion-safe:hover:-translate-y-[3px]',
-        // Entrada en cascada SOLO por opacidad: un `slide-up` con fill `both`
-        // fijaría el `transform` y mataría el hover-lift de arriba; el fade deja
-        // el `transform` libre para la elevación.
-        'motion-safe:animate-fade-in',
+        // Entrada en cascada SOLO por opacidad (y solo en el montaje inicial): un
+        // `slide-up` con fill `both` fijaría el `transform` y mataría el
+        // hover-lift; el fade deja el `transform` libre para la elevación.
+        animateIn && 'motion-safe:animate-fade-in',
         'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink focus-visible:ring-offset-2'
       )}
     >

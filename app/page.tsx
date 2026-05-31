@@ -1,4 +1,4 @@
-import ToolGrid from '@/components/landing/ToolGrid';
+import ToolCatalog from '@/components/landing/ToolCatalog';
 
 export default function Home() {
   return (
@@ -19,7 +19,7 @@ export default function Home() {
       </section>
 
       <section>
-        <ToolGrid />
+        <ToolCatalog />
       </section>
 
       {/*
