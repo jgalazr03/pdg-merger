@@ -32,16 +32,22 @@ SheetOverlay.displayName = SheetPrimitive.Overlay.displayName;
 
 const sheetVariants = cva(
   // Panel lateral: papel + borde navy grueso, sin sombra.
-  'fixed z-50 gap-4 bg-surface p-6 transition ease-out data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:duration-200 data-[state=open]:duration-300',
+  // p-6 en todos los lados; el inferior crece a la zona segura (home indicator)
+  // para que el contenido no quede bajo la barra de iOS cuando el panel llega
+  // hasta el borde del viewport.
+  'fixed z-50 gap-4 bg-surface p-6 pb-[max(theme(spacing.6),env(safe-area-inset-bottom))] transition ease-out data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:duration-200 data-[state=open]:duration-300',
   {
     variants: {
       side: {
         top: 'inset-x-0 top-0 border-b-4 border-ink data-[state=closed]:slide-out-to-top data-[state=open]:slide-in-from-top',
         bottom:
           'inset-x-0 bottom-0 border-t-4 border-ink data-[state=closed]:slide-out-to-bottom data-[state=open]:slide-in-from-bottom',
-        left: 'inset-y-0 left-0 h-full w-3/4 border-r-4 border-ink data-[state=closed]:slide-out-to-left data-[state=open]:slide-in-from-left sm:max-w-sm',
+        // Sin `h-full`: con viewport-fit=cover, height:100% se quedaba corto (no
+        // cubría la franja inferior segura). Con solo `inset-y-0` (top:0 + bottom:0)
+        // el panel llena el viewport completo, hasta el borde de abajo.
+        left: 'inset-y-0 left-0 w-3/4 border-r-4 border-ink data-[state=closed]:slide-out-to-left data-[state=open]:slide-in-from-left sm:max-w-sm',
         right:
-          'inset-y-0 right-0 h-full w-3/4  border-l-4 border-ink data-[state=closed]:slide-out-to-right data-[state=open]:slide-in-from-right sm:max-w-sm',
+          'inset-y-0 right-0 w-3/4 border-l-4 border-ink data-[state=closed]:slide-out-to-right data-[state=open]:slide-in-from-right sm:max-w-sm',
       },
     },
     defaultVariants: {
