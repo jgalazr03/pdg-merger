@@ -108,35 +108,19 @@
   }
 
   /*
-   * Overscroll (rubber-band), nunca blanco. Dos mecanismos según la plataforma:
-   *
-   * MÓVIL (iOS): split html/body — iOS pinta el rebote SUPERIOR con el fondo de
-   * <html> y el INFERIOR con el de <body>. Así:
-   *  - <html> = papel siempre → rebote superior nunca blanco, en toda ruta.
-   *  - <body> = papel por defecto; navy solo en home (clase `has-footer`) →
-   *    rebote inferior combina con el footer. El navy NO asoma en el flujo
-   *    normal porque el footer va pegado (sin margen) y <main> es papel.
-   *
-   * ESCRITORIO (macOS Chrome/Safari): el rebote muestra SIEMPRE el fondo de
-   * <html> en ambos extremos (no respeta el split), así que el truco de arriba
-   * dejaría el fondo blanco. Como no se puede dar dos colores al canvas, se
-   * DESACTIVA el rebote en punteros finos (mouse) → no hay zona blanca. El
-   * `pointer: fine` no toca el táctil, que conserva su rebote navy.
+   * Fondo SIEMPRE papel en <html> y <body>, en toda ruta. Antes el <body> se
+   * pintaba navy en la home (clase `has-footer`) para que el rebote inferior no
+   * saliera blanco; pero con `viewport-fit=cover` ese navy queda bajo la barra
+   * inferior translúcida de Safari, que lo muestrea y se ve como una BANDA NAVY
+   * en vez de translucir el contenido. Con el body en papel, la barra de Safari
+   * queda translúcida sobre la página (lo deseado). Para que tampoco haya rebote
+   * blanco se DESACTIVA el overscroll en TODOS los punteros (antes solo en
+   * escritorio): sin rebote no hay zona de otro color en ningún borde.
    */
-  html {
-    background-color: hsl(var(--surface));
-  }
+  html,
   body {
     background-color: hsl(var(--surface));
-  }
-  html.has-footer body {
-    background-color: hsl(var(--brand-navy));
-  }
-  @media (pointer: fine) {
-    html,
-    body {
-      overscroll-behavior-y: none;
-    }
+    overscroll-behavior-y: none;
   }
 
   /*
