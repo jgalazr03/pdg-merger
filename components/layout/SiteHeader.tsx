@@ -388,28 +388,39 @@ export default function SiteHeader() {
                               )}
                             />
                           </button>
-                          {/* Reveal en dos capas para que se vea IGUAL en toda
-                              sección (la última no tiene hermanos debajo que
-                              empujen, y eso hacía que su entrada se leyera
-                              distinta):
-                                1) ALTURA — truco grid-rows 0fr→1fr: hace sitio
-                                   sin salto de layout.
-                                2) APARICIÓN — fundido de opacidad FIJO e idéntico
-                                   en todas, independiente del nº de ítems y de la
-                                   posición. Es el cue que el ojo lee como "los
-                                   ítems aparecen", y al ser uniforme elimina la
-                                   incongruencia. ease-out, 200ms. */}
+                          {/* Reveal en DOS FASES para que los íconos aparezcan
+                              siempre a la vez (no uno por uno):
+
+                              Causa del problema: el truco grid-rows 0fr→1fr
+                              destapa los ítems con una ventana de recorte. Su
+                              velocidad = altura/duración, así que en una sección
+                              corta (2 ítems) la ventana es lenta y los revela en
+                              secuencia ("uno por uno"); en una larga (12 ítems)
+                              vuela y aparecen "de golpe". Un fundido sincronizado
+                              no lo tapa porque el recorte sigue mandando.
+
+                              Solución:
+                                1) ALTURA — abre el hueco con el contenido AÚN
+                                   invisible (opacity 0): el barrido ocurre pero no
+                                   se ve.
+                                2) FUNDIDO — ya abierto el hueco (delay = duración
+                                   de la altura), TODOS los íconos funden juntos.
+                                   Idéntico sin importar nº de ítems ni posición.
+                                   Al cerrar se invierte (funden y luego colapsa).
+                                   ease-out, 150ms por fase. */}
                           <div
                             className={cn(
-                              'grid transition-[grid-template-rows] duration-200 ease-out motion-reduce:transition-none',
-                              open ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'
+                              'grid transition-[grid-template-rows] duration-150 ease-out motion-reduce:transition-none',
+                              open
+                                ? 'grid-rows-[1fr]'
+                                : 'grid-rows-[0fr] delay-150'
                             )}
                           >
                             <div className="overflow-hidden" aria-hidden={!open}>
                               <div
                                 className={cn(
-                                  'mt-2 flex flex-col gap-1 transition-opacity duration-200 ease-out motion-reduce:transition-none',
-                                  open ? 'opacity-100' : 'opacity-0'
+                                  'mt-2 flex flex-col gap-1 transition-opacity duration-150 ease-out motion-reduce:transition-none',
+                                  open ? 'opacity-100 delay-150' : 'opacity-0'
                                 )}
                               >
                                 {group.tools.map((tool) =>
