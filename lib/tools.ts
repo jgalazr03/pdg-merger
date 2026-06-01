@@ -776,7 +776,7 @@ export const CATEGORY_LABELS: Record<ToolCategory, string> = {
   editar: 'Editar',
   convertir: 'Convertir',
   optimizar: 'Optimizar',
-  seguridad: 'Seguridad y privacidad',
+  seguridad: 'Privacidad',
 };
 
 /** Orden en que se muestran las categorías en nav, landing y footer. */
