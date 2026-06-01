@@ -365,16 +365,6 @@ export default function SiteHeader() {
                   <div className="flex flex-col gap-3">
                     {groups.map((group) => {
                       const open = openCats.has(group.category);
-                      // Reveal proporcional al tamaño (Emil: igualar la duración
-                      // a la distancia). Con una duración fija, una sección de 12
-                      // ítems se "barría" ~6× más rápido que una de 2; escalar al
-                      // nº de herramientas —acotado al rango de UI 180–300ms—
-                      // iguala la VELOCIDAD percibida de apertura entre todas las
-                      // categorías. El chevron se queda fijo y ágil (giro idéntico).
-                      const revealMs = Math.min(
-                        300,
-                        Math.max(180, group.tools.length * 28)
-                      );
                       return (
                         <div key={group.category}>
                           {/* Encabezado-disparador: fila uniforme sobre regla
@@ -398,18 +388,30 @@ export default function SiteHeader() {
                               )}
                             />
                           </button>
-                          {/* Expandir/colapsar con ALTURA animada (truco
-                              grid-rows 0fr→1fr): entrada y salida suaves sin
-                              salto de layout; ease-out, 200ms. */}
+                          {/* Reveal en dos capas para que se vea IGUAL en toda
+                              sección (la última no tiene hermanos debajo que
+                              empujen, y eso hacía que su entrada se leyera
+                              distinta):
+                                1) ALTURA — truco grid-rows 0fr→1fr: hace sitio
+                                   sin salto de layout.
+                                2) APARICIÓN — fundido de opacidad FIJO e idéntico
+                                   en todas, independiente del nº de ítems y de la
+                                   posición. Es el cue que el ojo lee como "los
+                                   ítems aparecen", y al ser uniforme elimina la
+                                   incongruencia. ease-out, 200ms. */}
                           <div
                             className={cn(
-                              'grid transition-[grid-template-rows] ease-out motion-reduce:transition-none',
+                              'grid transition-[grid-template-rows] duration-200 ease-out motion-reduce:transition-none',
                               open ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'
                             )}
-                            style={{ transitionDuration: `${revealMs}ms` }}
                           >
                             <div className="overflow-hidden" aria-hidden={!open}>
-                              <div className="mt-2 flex flex-col gap-1">
+                              <div
+                                className={cn(
+                                  'mt-2 flex flex-col gap-1 transition-opacity duration-200 ease-out motion-reduce:transition-none',
+                                  open ? 'opacity-100' : 'opacity-0'
+                                )}
+                              >
                                 {group.tools.map((tool) =>
                                   renderToolLink(tool, open)
                                 )}
