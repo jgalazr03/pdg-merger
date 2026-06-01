@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { usePathname } from 'next/navigation';
@@ -138,6 +138,51 @@ export default function SiteHeader() {
       return next;
     });
 
+  // --- Peek de scroll (móvil): cuando una sección desplegada desborda el panel,
+  // el contenido se corta EN SECO media fila antes del borde (máscara dura, sin
+  // degradado: dos paradas en el mismo punto) para que asome la siguiente
+  // herramienta y se note que hay más abajo. Se apaga al llegar al final para no
+  // fingir contenido inexistente.
+  //  - `moreBelow`: hay contenido oculto bajo el viewport (scroll + ResizeObserver,
+  //    que además capta el crecimiento durante la animación de despliegue).
+  //  - `peekPx`: media fila, medida de una fila real (la rejilla de espaciado del
+  //    sistema es propia, no la de Tailwind, así que no se hardcodea).
+  // Callback ref porque el <nav> vive en el portal del Sheet (solo existe abierto).
+  const [moreBelow, setMoreBelow] = useState(false);
+  const [peekPx, setPeekPx] = useState(0);
+  const navCleanupRef = useRef<(() => void) | null>(null);
+  const setNavRef = useCallback((node: HTMLElement | null) => {
+    navCleanupRef.current?.();
+    navCleanupRef.current = null;
+    if (!node) {
+      setMoreBelow(false);
+      return;
+    }
+    const updateMore = () => {
+      const more = node.scrollHeight - node.scrollTop - node.clientHeight > 2;
+      setMoreBelow((prev) => (prev !== more ? more : prev));
+    };
+    const measure = () => {
+      const row = node.querySelector('[data-tool-row]') as HTMLElement | null;
+      if (!row) return;
+      const half = Math.round(row.offsetHeight / 2);
+      setPeekPx((prev) => (prev !== half ? half : prev));
+    };
+    const onContentChange = () => {
+      measure();
+      updateMore();
+    };
+    onContentChange();
+    node.addEventListener('scroll', updateMore, { passive: true });
+    const ro = new ResizeObserver(onContentChange);
+    ro.observe(node);
+    if (node.firstElementChild) ro.observe(node.firstElementChild);
+    navCleanupRef.current = () => {
+      node.removeEventListener('scroll', updateMore);
+      ro.disconnect();
+    };
+  }, []);
+
   // Fila de herramienta del menú móvil (reutilizada en búsqueda y categorías).
   const renderToolLink = (tool: ToolDef, tabbable = true) => {
     const active = isActive(tool.href);
@@ -145,6 +190,7 @@ export default function SiteHeader() {
       <SheetClose asChild key={tool.slug}>
         <Link
           href={tool.href}
+          data-tool-row=""
           tabIndex={tabbable ? undefined : -1}
           aria-current={active ? 'page' : undefined}
           className={cn(
@@ -346,9 +392,22 @@ export default function SiteHeader() {
               </div>
 
               <nav
+                ref={setNavRef}
                 className="-mr-2 flex-1 overflow-y-auto pr-2"
                 aria-label="Herramientas"
+                style={
+                  moreBelow && peekPx
+                    ? {
+                        WebkitMaskImage: `linear-gradient(to bottom, #000 calc(100% - ${peekPx}px), transparent calc(100% - ${peekPx}px))`,
+                        maskImage: `linear-gradient(to bottom, #000 calc(100% - ${peekPx}px), transparent calc(100% - ${peekPx}px))`,
+                      }
+                    : undefined
+                }
               >
+                {/* Envoltorio estable: el ResizeObserver observa SIEMPRE este
+                    nodo (no cambia de identidad al alternar búsqueda/categorías),
+                    así capta cualquier cambio de alto del contenido. */}
+                <div>
                 {menuQuery.trim() ? (
                   /* Resultados de búsqueda: lista plana */
                   menuResults.length > 0 ? (
@@ -434,6 +493,7 @@ export default function SiteHeader() {
                     })}
                   </div>
                 )}
+                </div>
               </nav>
             </SheetContent>
           </Sheet>
