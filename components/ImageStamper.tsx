@@ -358,7 +358,7 @@ export default function ImageStamper() {
                           'flex h-10 w-10 items-center justify-center rounded border-2 border-ink text-base font-bold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink focus-visible:ring-offset-2',
                           active
                             ? cn(accent.solid, 'border-ink')
-                            : 'bg-surface text-ink hover:bg-muted'
+                            : 'bg-surface text-ink hover-fine:bg-muted'
                         )}
                       >
                         {a.label}

@@ -191,13 +191,13 @@ export default function CommandPalette() {
                       onClick={() => go(tool)}
                       onMouseMove={() => setActiveIndex(index)}
                       className={cn(
-                        'group flex cursor-pointer items-center gap-3 rounded-lg px-2.5 py-2 text-sm font-bold transition-colors',
+                        'group flex cursor-pointer items-center gap-3 rounded-lg px-2.5 py-2 text-sm font-bold',
                         active ? 'bg-muted' : ''
                       )}
                     >
                       <Icon
                         className={cn(
-                          'h-4 w-4 shrink-0 transition-colors',
+                          'h-4 w-4 shrink-0',
                           active ? tool.accent.text : 'text-muted-foreground'
                         )}
                         strokeWidth={2}

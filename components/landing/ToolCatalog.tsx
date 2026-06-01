@@ -124,7 +124,7 @@ export default function ToolCatalog() {
               type="button"
               onClick={clear}
               aria-label="Limpiar búsqueda"
-              className="absolute right-2 top-1/2 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink"
+              className="absolute right-2 top-1/2 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-md text-muted-foreground transition-colors hover-fine:bg-muted hover-fine:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink"
             >
               <X className="h-4 w-4" />
             </button>
@@ -153,7 +153,7 @@ export default function ToolCatalog() {
                   'rounded-lg border-3 border-ink px-3 py-1.5 text-sm font-bold transition-colors duration-150 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink focus-visible:ring-offset-2',
                   active
                     ? 'bg-ink text-white'
-                    : 'bg-surface text-ink hover:bg-muted'
+                    : 'bg-surface text-ink hover-fine:bg-muted'
                 )}
               >
                 {chip.label}
@@ -175,7 +175,7 @@ export default function ToolCatalog() {
               <Link
                 key={tool.slug}
                 href={tool.href}
-                className="group inline-flex items-center gap-2 rounded-lg border-3 border-ink bg-card px-3 py-2 text-sm font-bold text-ink transition-[background-color,transform] duration-150 ease-out hover:bg-muted active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink focus-visible:ring-offset-2"
+                className="group inline-flex items-center gap-2 rounded-lg border-3 border-ink bg-card px-3 py-2 text-sm font-bold text-ink transition-[background-color,transform] duration-150 ease-out hover-fine:bg-muted active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink focus-visible:ring-offset-2"
               >
                 <tool.Icon
                   className={cn('h-4 w-4 shrink-0', tool.accent.text)}
@@ -218,7 +218,7 @@ export default function ToolCatalog() {
             <button
               type="button"
               onClick={clear}
-              className="mt-6 inline-flex items-center gap-2 rounded-lg border-3 border-ink bg-surface px-4 py-2 text-sm font-bold text-ink transition-colors hover:bg-muted active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink focus-visible:ring-offset-2"
+              className="mt-6 inline-flex items-center gap-2 rounded-lg border-3 border-ink bg-surface px-4 py-2 text-sm font-bold text-ink transition-colors hover-fine:bg-muted active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink focus-visible:ring-offset-2"
             >
               <X className="h-4 w-4" />
               Limpiar búsqueda

@@ -25,7 +25,7 @@ export default function ToolShell({
           <li>
             <Link
               href="/"
-              className="rounded font-bold transition-colors hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink focus-visible:ring-offset-2"
+              className="rounded font-bold transition-colors hover-fine:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink focus-visible:ring-offset-2"
             >
               Inicio
             </Link>

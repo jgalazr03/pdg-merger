@@ -25,7 +25,7 @@ export default function ToolCard({
         // el panel se eleva 3px, el fondo se desplaza y el título se subraya;
         // al presionar, cede con un scale. La elevación es motion-safe.
         'group flex flex-col rounded-lg border-4 border-ink bg-card p-5 text-left transition-[transform,background-color] duration-150 ease-out active:scale-[0.99] sm:p-6',
-        'hover:bg-muted motion-safe:hover:-translate-y-[3px]',
+        'hover-fine:bg-muted motion-safe:hover-fine:-translate-y-[3px]',
         // Entrada en cascada SOLO por opacidad (y solo en el montaje inicial): un
         // `slide-up` con fill `both` fijaría el `transform` y mataría el
         // hover-lift; el fade deja el `transform` libre para la elevación.
@@ -37,14 +37,14 @@ export default function ToolCard({
           el hover con un salto sutil para reforzar el feedback táctil. */}
       <div
         className={cn(
-          'flex h-12 w-12 items-center justify-center rounded-lg border-3 border-ink transition-transform duration-150 ease-out motion-safe:group-hover:scale-105',
+          'flex h-12 w-12 items-center justify-center rounded-lg border-3 border-ink transition-transform duration-150 ease-out motion-safe:group-hover-fine:scale-105',
           tool.accent.iconBg
         )}
       >
         <tool.Icon className="h-6 w-6 text-white" strokeWidth={2} />
       </div>
 
-      <h2 className="mt-5 text-lg font-bold text-ink decoration-2 underline-offset-4 group-hover:underline">
+      <h2 className="mt-5 text-lg font-bold text-ink decoration-2 underline-offset-4 group-hover-fine:underline">
         {tool.title}
       </h2>
       <p className="mt-2 text-sm leading-relaxed text-muted-foreground">

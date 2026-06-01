@@ -101,7 +101,7 @@ export default function FileDropzone({
         // no hay altura extra, así que mt-auto = 0 y el layout no cambia.
         'group relative flex cursor-pointer flex-col items-center rounded-lg border-[3px] border-dashed border-ink px-5 py-10 text-center transition-colors duration-150 ease-out sm:px-6 sm:py-12',
         'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink focus-visible:ring-offset-2',
-        isDragOver ? 'bg-highlight-soft' : 'bg-surface hover:bg-muted',
+        isDragOver ? 'bg-highlight-soft' : 'bg-surface hover-fine:bg-muted',
         className
       )}
     >

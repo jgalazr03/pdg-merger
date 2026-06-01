@@ -194,21 +194,25 @@
       duration-150 ease-out active:scale-[0.98]
       disabled:pointer-events-none disabled:opacity-50;
   }
-  .ds-btn:hover {
-    @apply opacity-85;
+  /* Hover solo en punteros finos: en táctil el feedback es active:scale (Emil). */
+  @media (hover: hover) and (pointer: fine) {
+    .ds-btn:hover {
+      @apply opacity-85;
+    }
   }
 
   /* Botón secundario: papel con borde navy */
   .ds-btn-secondary {
     @apply inline-flex items-center justify-center gap-2 rounded-lg border-3 border-ink
       bg-surface px-6 py-2 font-bold text-ink transition-colors duration-150 ease-out
-      hover:bg-muted active:scale-[0.98];
+      hover-fine:bg-muted active:scale-[0.98];
   }
 
   /* Botón ícono cuadrado */
   .ds-btn-icon {
     @apply inline-flex h-11 w-11 items-center justify-center rounded-lg border-3
-      border-ink bg-surface text-ink transition-colors hover:bg-muted;
+      border-ink bg-surface text-ink transition-[background-color,transform]
+      duration-150 ease-out hover-fine:bg-muted active:scale-[0.98];
   }
 
   /* Input / select / textarea */

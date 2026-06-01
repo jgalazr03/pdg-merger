@@ -13,15 +13,15 @@ const buttonVariants = cva(
       variant: {
         // Primario por defecto = navy (--primary). En los flujos de herramienta
         // el CTA se tiñe con el color de la herramienta vía `accent.solid`.
-        default: 'bg-primary text-primary-foreground hover:opacity-85',
+        default: 'bg-primary text-primary-foreground hover-fine:opacity-85',
         // Destructivo = rojo de señal (eliminar, limpiar permanente, errores).
-        destructive: 'bg-destructive text-destructive-foreground hover:opacity-85',
+        destructive: 'bg-destructive text-destructive-foreground hover-fine:opacity-85',
         // Secundario: papel con borde navy.
-        outline: 'bg-surface text-ink hover:bg-muted',
-        secondary: 'bg-card text-ink hover:bg-muted',
+        outline: 'bg-surface text-ink hover-fine:bg-muted',
+        secondary: 'bg-card text-ink hover-fine:bg-muted',
         // Ghost: sin borde, relleno suave al hover.
-        ghost: 'border-transparent text-ink hover:bg-muted',
-        link: 'border-transparent text-brand-ocean underline-offset-4 hover:underline',
+        ghost: 'border-transparent text-ink hover-fine:bg-muted',
+        link: 'border-transparent text-brand-ocean underline-offset-4 hover-fine:underline',
       },
       size: {
         default: 'h-10 px-4 py-2',

@@ -362,7 +362,7 @@ export default function PDFOrganizer() {
                 aria-label="Restablecer cambios"
                 title="Restablecer cambios"
                 className={cn(
-                  'flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-muted-foreground transition-colors duration-150 ease-out hover:bg-muted hover:text-ink active:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink focus-visible:ring-offset-2',
+                  'flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-muted-foreground transition-colors duration-150 ease-out hover-fine:bg-muted hover-fine:text-ink active:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink focus-visible:ring-offset-2',
                   dirty ? '' : 'invisible pointer-events-none'
                 )}
               >
@@ -435,7 +435,7 @@ export default function PDFOrganizer() {
                         disabled={isProcessing || i === 0}
                         aria-label={`Mover página ${p.pageNumber} hacia atrás`}
                         title="Mover hacia atrás"
-                        className="flex h-8 items-center justify-center border-r-2 border-ink text-ink transition-colors duration-150 ease-out hover:bg-muted active:bg-muted disabled:opacity-30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ink"
+                        className="flex h-9 items-center justify-center border-r-2 border-ink text-ink transition-colors duration-150 ease-out hover-fine:bg-muted active:bg-muted disabled:opacity-30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ink"
                       >
                         <ChevronLeft className="h-4 w-4" />
                       </button>
@@ -445,7 +445,7 @@ export default function PDFOrganizer() {
                         disabled={isProcessing || i === pages.length - 1}
                         aria-label={`Mover página ${p.pageNumber} hacia adelante`}
                         title="Mover hacia adelante"
-                        className="flex h-8 items-center justify-center text-ink transition-colors duration-150 ease-out hover:bg-muted active:bg-muted disabled:opacity-30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ink"
+                        className="flex h-9 items-center justify-center text-ink transition-colors duration-150 ease-out hover-fine:bg-muted active:bg-muted disabled:opacity-30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ink"
                       >
                         <ChevronRight className="h-4 w-4" />
                       </button>
@@ -458,7 +458,7 @@ export default function PDFOrganizer() {
                         disabled={isProcessing}
                         aria-label={`Girar página ${p.pageNumber} a la izquierda`}
                         title="Girar a la izquierda"
-                        className="flex h-8 items-center justify-center border-r-2 border-ink text-ink transition-colors duration-150 ease-out hover:bg-muted active:bg-muted disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ink"
+                        className="flex h-9 items-center justify-center border-r-2 border-ink text-ink transition-colors duration-150 ease-out hover-fine:bg-muted active:bg-muted disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ink"
                       >
                         <RotateCcw className="h-4 w-4" />
                       </button>
@@ -468,7 +468,7 @@ export default function PDFOrganizer() {
                         disabled={isProcessing}
                         aria-label={`Girar página ${p.pageNumber} a la derecha`}
                         title="Girar a la derecha"
-                        className="flex h-8 items-center justify-center text-ink transition-colors duration-150 ease-out hover:bg-muted active:bg-muted disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ink"
+                        className="flex h-9 items-center justify-center text-ink transition-colors duration-150 ease-out hover-fine:bg-muted active:bg-muted disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ink"
                       >
                         <RotateCw className="h-4 w-4" />
                       </button>
@@ -481,7 +481,7 @@ export default function PDFOrganizer() {
                       disabled={isProcessing || pages.length <= 1}
                       aria-label={`Eliminar página ${p.pageNumber}`}
                       title="Eliminar página"
-                      className="flex h-8 items-center justify-center gap-1.5 rounded-md border-2 border-ink text-xs font-bold text-brand-red transition-colors duration-150 ease-out hover:bg-brand-red hover:text-white active:bg-brand-red disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:text-brand-red focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ink"
+                      className="flex h-9 items-center justify-center gap-1.5 rounded-md border-2 border-ink text-xs font-bold text-brand-red transition-colors duration-150 ease-out hover-fine:bg-brand-red hover-fine:text-white active:bg-brand-red disabled:opacity-30 disabled:hover-fine:bg-transparent disabled:hover-fine:text-brand-red focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ink"
                     >
                       <Trash2 className="h-4 w-4" />
                       Eliminar

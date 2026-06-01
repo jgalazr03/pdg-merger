@@ -234,8 +234,8 @@ export default function TextToPDF() {
                     onClick={() => setPageSize(key)}
                     aria-pressed={pageSize === key}
                     className={cn(
-                      'rounded-lg border-3 border-ink p-4 text-left transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink focus-visible:ring-offset-2',
-                      pageSize === key ? 'bg-highlight-soft' : 'bg-surface hover:bg-muted'
+                      'rounded-lg border-3 border-ink p-4 text-left transition-[transform,background-color] duration-150 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink focus-visible:ring-offset-2',
+                      pageSize === key ? 'bg-highlight-soft' : 'bg-surface hover-fine:bg-muted'
                     )}
                   >
                     <div className="font-bold text-ink">{PAGE_SIZES[key].label}</div>

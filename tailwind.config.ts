@@ -1,4 +1,5 @@
 import type { Config } from 'tailwindcss';
+import plugin from 'tailwindcss/plugin';
 
 const config: Config = {
   darkMode: ['class'],
@@ -60,6 +61,16 @@ const config: Config = {
       // Curvas de Emil Kowalski (animations.dev): entradas con ease-out,
       // movimiento on-screen con ease-in-out.
       transitionTimingFunction: {
+        'out-quint': 'cubic-bezier(0.22, 1, 0.36, 1)',
+        'out-cubic': 'cubic-bezier(0.215, 0.61, 0.355, 1)',
+        'in-out-quint': 'cubic-bezier(0.86, 0, 0.07, 1)',
+      },
+      // Mismas curvas pero para ANIMACIONES (keyframes). tailwindcss-animate
+      // genera `ease-*` desde aquí aplicándolas a `animation-timing-function`, así
+      // que `ease-out-quint` en un `animate-in` (overlays Radix) usa la curva
+      // premium en vez del `ease` débil por defecto. (Las nativas linear/in/out/
+      // in-out las aporta el plugin; aquí solo extendemos.)
+      animationTimingFunction: {
         'out-quint': 'cubic-bezier(0.22, 1, 0.36, 1)',
         'out-cubic': 'cubic-bezier(0.215, 0.61, 0.355, 1)',
         'in-out-quint': 'cubic-bezier(0.86, 0, 0.07, 1)',
@@ -196,6 +207,21 @@ const config: Config = {
       },
     },
   },
-  plugins: [require('tailwindcss-animate')],
+  plugins: [
+    require('tailwindcss-animate'),
+    // Tailwind v3 NO auto-gatea `hover:` (solo v4). Esta variante aplica el hover
+    // SOLO en punteros finos con hover real, evitando el hover "pegajoso" tras un
+    // toque en móvil/tablet (Emil: filtrar el hover en táctil). Misma convención
+    // que el `@media (pointer: fine)` ya usado en globals.css.
+    plugin(({ addVariant }) => {
+      addVariant('hover-fine', '@media (hover: hover) and (pointer: fine) { &:hover }');
+      // Igual que `group-hover` pero filtrado a punteros finos (para subrayados /
+      // realces que dependen del hover del contenedor `.group`).
+      addVariant(
+        'group-hover-fine',
+        '@media (hover: hover) and (pointer: fine) { :merge(.group):hover & }'
+      );
+    }),
+  ],
 };
 export default config;

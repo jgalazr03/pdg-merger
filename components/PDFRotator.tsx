@@ -312,7 +312,7 @@ export default function PDFRotator() {
                     aria-label="Restablecer rotación"
                     title="Restablecer rotación"
                     className={cn(
-                      'flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-muted-foreground transition-colors duration-150 ease-out hover:bg-muted hover:text-ink active:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink focus-visible:ring-offset-2 sm:hidden',
+                      'flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-muted-foreground transition-colors duration-150 ease-out hover-fine:bg-muted hover-fine:text-ink active:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink focus-visible:ring-offset-2 sm:hidden',
                       anyRotated ? '' : 'invisible pointer-events-none'
                     )}
                   >
@@ -332,7 +332,7 @@ export default function PDFRotator() {
                     aria-label="Restablecer rotación"
                     title="Restablecer rotación"
                     className={cn(
-                      'hidden h-10 w-10 shrink-0 items-center justify-center rounded-lg text-muted-foreground transition-colors duration-150 ease-out hover:bg-muted hover:text-ink active:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink focus-visible:ring-offset-2 sm:flex',
+                      'hidden h-10 w-10 shrink-0 items-center justify-center rounded-lg text-muted-foreground transition-colors duration-150 ease-out hover-fine:bg-muted hover-fine:text-ink active:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink focus-visible:ring-offset-2 sm:flex',
                       anyRotated ? '' : 'sm:invisible sm:pointer-events-none'
                     )}
                   >
@@ -343,7 +343,7 @@ export default function PDFRotator() {
                       type="button"
                       onClick={() => rotateAll(-90)}
                       disabled={isProcessing}
-                      className="flex items-center justify-center gap-2 border-r-3 border-ink px-4 py-2 text-sm font-bold text-ink transition-colors duration-150 ease-out hover:bg-muted active:bg-muted disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ink"
+                      className="flex min-h-[45px] items-center justify-center gap-2 border-r-3 border-ink px-4 py-2 text-sm font-bold text-ink transition-colors duration-150 ease-out hover-fine:bg-muted active:bg-muted disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ink"
                     >
                       <RotateCcw className="h-4 w-4 shrink-0" />
                       Izquierda
@@ -352,7 +352,7 @@ export default function PDFRotator() {
                       type="button"
                       onClick={() => rotateAll(90)}
                       disabled={isProcessing}
-                      className="flex items-center justify-center gap-2 px-4 py-2 text-sm font-bold text-ink transition-colors duration-150 ease-out hover:bg-muted active:bg-muted disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ink"
+                      className="flex min-h-[45px] items-center justify-center gap-2 px-4 py-2 text-sm font-bold text-ink transition-colors duration-150 ease-out hover-fine:bg-muted active:bg-muted disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ink"
                     >
                       <RotateCw className="h-4 w-4 shrink-0" />
                       Derecha
@@ -398,7 +398,7 @@ export default function PDFRotator() {
                         onClick={() => rotatePage(p.pageNumber, -90)}
                         disabled={isProcessing}
                         aria-label={`Girar página ${p.pageNumber} a la izquierda`}
-                        className="flex h-8 items-center justify-center border-r-2 border-ink text-ink transition-colors duration-150 ease-out hover:bg-muted active:bg-muted disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ink"
+                        className="flex h-9 items-center justify-center border-r-2 border-ink text-ink transition-colors duration-150 ease-out hover-fine:bg-muted active:bg-muted disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ink"
                       >
                         <RotateCcw className="h-4 w-4" />
                       </button>
@@ -407,7 +407,7 @@ export default function PDFRotator() {
                         onClick={() => rotatePage(p.pageNumber, 90)}
                         disabled={isProcessing}
                         aria-label={`Girar página ${p.pageNumber} a la derecha`}
-                        className="flex h-8 items-center justify-center text-ink transition-colors duration-150 ease-out hover:bg-muted active:bg-muted disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ink"
+                        className="flex h-9 items-center justify-center text-ink transition-colors duration-150 ease-out hover-fine:bg-muted active:bg-muted disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ink"
                       >
                         <RotateCw className="h-4 w-4" />
                       </button>

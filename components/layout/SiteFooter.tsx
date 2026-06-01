@@ -66,14 +66,14 @@ export default function SiteFooter() {
                     <li key={tool.slug}>
                       <Link
                         href={tool.href}
-                        className="group inline-flex items-center gap-2.5 text-sm font-bold text-white/75 transition-colors hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-brand-navy"
+                        className="group inline-flex items-center gap-2.5 text-sm font-bold text-white/75 transition-colors hover-fine:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-brand-navy"
                       >
                         <tool.Icon
                           className={cn('h-4 w-4 shrink-0', tool.accent.onDark)}
                           strokeWidth={2}
                           aria-hidden="true"
                         />
-                        <span className="decoration-2 underline-offset-4 group-hover:underline">
+                        <span className="decoration-2 underline-offset-4 group-hover-fine:underline">
                           {tool.name}
                         </span>
                       </Link>

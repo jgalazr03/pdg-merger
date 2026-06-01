@@ -691,10 +691,10 @@ export default function PDFCompressor() {
                     onClick={() => setCompressionLevel(level as CompressionLevel)}
                     aria-pressed={compressionLevel === level}
                     className={cn(
-                      'rounded-lg border-3 border-ink p-4 text-left transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink focus-visible:ring-offset-2',
+                      'rounded-lg border-3 border-ink p-4 text-left transition-[transform,background-color] duration-150 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink focus-visible:ring-offset-2',
                       compressionLevel === level
                         ? 'bg-highlight-soft'
-                        : 'bg-surface hover:bg-muted'
+                        : 'bg-surface hover-fine:bg-muted'
                     )}
                   >
                     <div className="mb-1 font-bold capitalize text-ink">
@@ -780,7 +780,7 @@ export default function PDFCompressor() {
                       size="sm"
                       onClick={() => removeFile(file.id)}
                       aria-label={`Quitar ${file.name}`}
-                      className="shrink-0 text-muted-foreground hover:text-ink"
+                      className="shrink-0 text-muted-foreground hover-fine:text-ink"
                     >
                       <X className="w-4 h-4" />
                     </Button>

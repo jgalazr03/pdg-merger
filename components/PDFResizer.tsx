@@ -268,10 +268,10 @@ export default function PDFResizer() {
                     }}
                     aria-pressed={target === opt.key}
                     className={cn(
-                      'rounded-lg border-3 border-ink px-3 py-3 text-sm font-bold transition-colors',
+                      'rounded-lg border-3 border-ink px-3 py-3 text-sm font-bold transition-[transform,background-color,color] active:scale-[0.98]',
                       target === opt.key
                         ? accent.solid
-                        : 'bg-surface text-ink hover:bg-muted'
+                        : 'bg-surface text-ink hover-fine:bg-muted'
                     )}
                   >
                     {opt.label}

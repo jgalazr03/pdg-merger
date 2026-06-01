@@ -589,7 +589,7 @@ export default function FileConverter() {
                     size="sm"
                     onClick={() => removeFile(f.id)}
                     aria-label={`Quitar ${f.file.name}`}
-                    className="shrink-0 text-muted-foreground hover:text-ink"
+                    className="shrink-0 text-muted-foreground hover-fine:text-ink"
                     disabled={isProcessing}
                   >
                     <X className="h-4 w-4" />
@@ -615,7 +615,7 @@ export default function FileConverter() {
                       disabled={isProcessing}
                       className={cn(
                         'rounded-lg border-3 border-ink p-4 text-left transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink focus-visible:ring-offset-2 disabled:opacity-50',
-                        level === lv ? 'bg-indigo-soft' : 'bg-surface hover:bg-muted'
+                        level === lv ? 'bg-indigo-soft' : 'bg-surface hover-fine:bg-muted'
                       )}
                     >
                       <div className="mb-1 font-bold text-ink">{LEVELS[lv].label}</div>

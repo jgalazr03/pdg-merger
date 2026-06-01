@@ -24,7 +24,7 @@ export default function ToolConstraints({
         className
       )}
     >
-      <summary className="flex cursor-pointer list-none items-center gap-2 px-4 py-2.5 text-sm font-bold text-ink transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink focus-visible:ring-offset-2 [&::-webkit-details-marker]:hidden">
+      <summary className="flex cursor-pointer list-none items-center gap-2 px-4 py-2.5 text-sm font-bold text-ink transition-colors hover-fine:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink focus-visible:ring-offset-2 [&::-webkit-details-marker]:hidden">
         <Info className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true" />
         Formatos y límites
         <ChevronDown

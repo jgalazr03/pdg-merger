@@ -480,7 +480,7 @@ export default function PDFSigner() {
                 <span className="text-sm text-muted-foreground">o</span>
                 <label
                   className={cn(
-                    'inline-flex h-9 cursor-pointer items-center rounded-lg border-3 border-ink bg-surface px-3 text-sm font-bold text-ink transition-colors hover:bg-muted'
+                    'inline-flex h-9 cursor-pointer items-center rounded-lg border-3 border-ink bg-surface px-3 text-sm font-bold text-ink transition-[transform,background-color] hover-fine:bg-muted active:scale-[0.98]'
                   )}
                 >
                   <ImageIcon className="mr-2 h-4 w-4" />
@@ -584,10 +584,10 @@ export default function PDFSigner() {
                     onClick={() => setAnchor(a.value)}
                     aria-pressed={anchor === a.value}
                     className={cn(
-                      'rounded-lg border-3 border-ink px-2 py-2 text-sm font-bold transition-colors',
+                      'rounded-lg border-3 border-ink px-2 py-2 text-sm font-bold transition-[transform,background-color,color] active:scale-[0.98]',
                       anchor === a.value
                         ? accent.solid
-                        : 'bg-surface text-ink hover:bg-muted'
+                        : 'bg-surface text-ink hover-fine:bg-muted'
                     )}
                   >
                     {a.label}

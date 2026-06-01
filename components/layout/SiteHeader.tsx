@@ -197,7 +197,7 @@ export default function SiteHeader() {
             'flex items-center gap-3 rounded-lg border-3 px-3 py-2.5 text-sm font-bold transition-colors',
             active
               ? 'border-ink bg-card text-ink'
-              : 'border-transparent text-muted-foreground hover:bg-muted'
+              : 'border-transparent text-muted-foreground hover-fine:bg-muted active:bg-muted'
           )}
         >
           <tool.Icon
@@ -256,7 +256,7 @@ export default function SiteHeader() {
               window.dispatchEvent(new Event('gainco:open-command-palette'))
             }
             aria-label="Buscar herramienta"
-            className="inline-flex items-center gap-2 rounded-lg border-3 border-ink bg-surface px-3 py-2 text-sm font-bold text-ink transition-[background-color,transform] duration-150 ease-out hover:bg-muted active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink focus-visible:ring-offset-2"
+            className="inline-flex items-center gap-2 rounded-lg border-3 border-ink bg-surface px-3 py-2 text-sm font-bold text-ink transition-[background-color,transform] duration-150 ease-out hover-fine:bg-muted active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink focus-visible:ring-offset-2"
           >
             <Search className="h-4 w-4" />
             Buscar
@@ -270,7 +270,7 @@ export default function SiteHeader() {
             aria-expanded={megaOpen}
             aria-haspopup="menu"
             onClick={() => setMegaOpen((v) => !v)}
-            className="inline-flex items-center gap-2 rounded-lg border-3 border-ink bg-surface px-3 py-2 text-sm font-bold text-ink transition-[background-color,transform] duration-150 ease-out hover:bg-muted active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink focus-visible:ring-offset-2"
+            className="inline-flex items-center gap-2 rounded-lg border-3 border-ink bg-surface px-3 py-2 text-sm font-bold text-ink transition-[background-color,transform] duration-150 ease-out hover-fine:bg-muted active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink focus-visible:ring-offset-2"
           >
             <LayoutGrid className="h-4 w-4" />
             Todas las herramientas
@@ -320,7 +320,7 @@ export default function SiteHeader() {
                                     'group flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm font-bold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink focus-visible:ring-offset-2',
                                     active
                                       ? 'bg-card text-ink'
-                                      : 'text-muted-foreground hover:text-ink'
+                                      : 'text-muted-foreground hover-fine:text-ink'
                                   )}
                                 >
                                   {/* Hover estilo footer: el ícono toma su color
@@ -333,7 +333,7 @@ export default function SiteHeader() {
                                         : cn('text-current', tool.accent.iconHover)
                                     )}
                                   />
-                                  <span className="decoration-2 underline-offset-4 group-hover:underline">
+                                  <span className="decoration-2 underline-offset-4 group-hover-fine:underline">
                                     {tool.name}
                                   </span>
                                 </Link>
@@ -354,7 +354,7 @@ export default function SiteHeader() {
         <div className="lg:hidden">
           <Sheet onOpenChange={(o) => !o && setMenuQuery('')}>
             <SheetTrigger
-              className="inline-flex h-11 w-11 items-center justify-center rounded-lg border-3 border-ink bg-surface text-ink transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink focus-visible:ring-offset-2"
+              className="inline-flex h-11 w-11 items-center justify-center rounded-lg border-3 border-ink bg-surface text-ink transition-[background-color,transform] duration-150 ease-out hover-fine:bg-muted active:scale-[0.98] active:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink focus-visible:ring-offset-2"
               aria-label="Abrir menú"
             >
               <Menu className="h-5 w-5" />
@@ -434,7 +434,7 @@ export default function SiteHeader() {
                             type="button"
                             onClick={() => toggleCat(group.category)}
                             aria-expanded={open}
-                            className="flex w-full items-center gap-3 rounded-t border-b-[3px] border-ink py-2.5 text-left transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink focus-visible:ring-offset-2"
+                            className="flex w-full items-center gap-3 rounded-t border-b-[3px] border-ink py-2.5 text-left transition-colors duration-150 ease-out hover-fine:bg-muted active:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink focus-visible:ring-offset-2"
                           >
                             <span className="flex-1 whitespace-nowrap text-xs font-bold uppercase tracking-[0.15em] text-ink">
                               {group.label}
@@ -442,44 +442,37 @@ export default function SiteHeader() {
                             <ChevronDown
                               aria-hidden="true"
                               className={cn(
-                                'h-4 w-4 shrink-0 text-muted-foreground transition-transform duration-200 ease-out',
+                                'h-4 w-4 shrink-0 text-muted-foreground transition-transform duration-150 ease-out motion-reduce:transition-none',
                                 open && 'rotate-180'
                               )}
                             />
                           </button>
-                          {/* Reveal en DOS FASES para que los íconos aparezcan
-                              siempre a la vez (no uno por uno):
+                          {/* Reveal SOLO por opacidad (filosofía de Emil / Raycast:
+                              no animar la altura). El alto colapsa/expande al
+                              instante vía grid-rows 0fr/1fr SIN transición —un único
+                              reflow, no por-frame, así que cumple la regla de oro de
+                              animar solo transform/opacity—; los íconos funden juntos
+                              en 150ms, concurrentes con el chevron.
 
-                              Causa del problema: el truco grid-rows 0fr→1fr
-                              destapa los ítems con una ventana de recorte. Su
-                              velocidad = altura/duración, así que en una sección
-                              corta (2 ítems) la ventana es lenta y los revela en
-                              secuencia ("uno por uno"); en una larga (12 ítems)
-                              vuela y aparecen "de golpe". Un fundido sincronizado
-                              no lo tapa porque el recorte sigue mandando.
-
-                              Solución:
-                                1) ALTURA — abre el hueco con el contenido AÚN
-                                   invisible (opacity 0): el barrido ocurre pero no
-                                   se ve.
-                                2) FUNDIDO — ya abierto el hueco (delay = duración
-                                   de la altura), TODOS los íconos funden juntos.
-                                   Idéntico sin importar nº de ítems ni posición.
-                                   Al cerrar se invierte (funden y luego colapsa).
-                                   ease-out, 150ms por fase. */}
+                              Por qué se quitó el "crecer": animar grid-template-rows
+                              destapaba los ítems con una ventana de recorte cuya
+                              velocidad = altura/duración, de modo que en una sección
+                              corta los revelaba "uno por uno" y en una larga "de
+                              golpe". Sin animar la altura desaparece el recorte
+                              progresivo (y con él toda la maquinaria de dos fases /
+                              duración proporcional). El contenido sigue montado para
+                              conservar el gating de tabIndex y el aria-hidden. */}
                           <div
                             className={cn(
-                              'grid transition-[grid-template-rows] duration-150 ease-out motion-reduce:transition-none',
-                              open
-                                ? 'grid-rows-[1fr]'
-                                : 'grid-rows-[0fr] delay-150'
+                              'grid',
+                              open ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'
                             )}
                           >
                             <div className="overflow-hidden" aria-hidden={!open}>
                               <div
                                 className={cn(
                                   'mt-2 flex flex-col gap-1 transition-opacity duration-150 ease-out motion-reduce:transition-none',
-                                  open ? 'opacity-100 delay-150' : 'opacity-0'
+                                  open ? 'opacity-100' : 'opacity-0'
                                 )}
                               >
                                 {group.tools.map((tool) =>

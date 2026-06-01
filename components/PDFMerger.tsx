@@ -350,7 +350,7 @@ export default function PDFMerger() {
                   className={cn(
                     // flex-wrap: en móvil las acciones de imagen (recortar/quitar)
                     // bajan a una segunda línea con sitio, en vez de desbordar.
-                    'flex flex-wrap items-center gap-2.5 rounded-lg border-3 border-ink bg-surface p-3 transition-colors duration-150 ease-out hover:bg-muted sm:gap-3 sm:p-4',
+                    'flex flex-wrap items-center gap-2.5 rounded-lg border-3 border-ink bg-surface p-3 transition-colors duration-150 ease-out hover-fine:bg-muted active:bg-muted sm:gap-3 sm:p-4',
                     draggedIndex === index && 'opacity-50 motion-safe:scale-95'
                   )}
                 >
@@ -367,7 +367,7 @@ export default function PDFMerger() {
                       disabled={index === 0}
                       aria-label={`Mover ${file.name} hacia arriba`}
                       className={cn(
-                        'flex h-9 w-9 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-ink disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-1',
+                        'flex h-9 w-9 items-center justify-center rounded-md text-muted-foreground transition-colors hover-fine:bg-muted hover-fine:text-ink active:bg-muted disabled:opacity-30 disabled:hover-fine:bg-transparent disabled:hover-fine:text-muted-foreground disabled:active:bg-transparent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-1',
                         accent.ring
                       )}
                     >
@@ -379,7 +379,7 @@ export default function PDFMerger() {
                       disabled={index === files.length - 1}
                       aria-label={`Mover ${file.name} hacia abajo`}
                       className={cn(
-                        'flex h-9 w-9 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-ink disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-1',
+                        'flex h-9 w-9 items-center justify-center rounded-md text-muted-foreground transition-colors hover-fine:bg-muted hover-fine:text-ink active:bg-muted disabled:opacity-30 disabled:hover-fine:bg-transparent disabled:hover-fine:text-muted-foreground disabled:active:bg-transparent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-1',
                         accent.ring
                       )}
                     >
@@ -440,7 +440,7 @@ export default function PDFMerger() {
                       size="sm"
                       onClick={() => removeFile(file.id)}
                       aria-label={`Quitar ${file.name}`}
-                      className="shrink-0 text-muted-foreground hover:text-ink"
+                      className="shrink-0 text-muted-foreground hover-fine:text-ink"
                     >
                       <X className="h-4 w-4" />
                     </Button>

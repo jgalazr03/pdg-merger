@@ -288,10 +288,10 @@ export default function BlankPagesInserter() {
                   onClick={() => setPlacement('after')}
                   aria-pressed={placement === 'after'}
                   className={cn(
-                    'rounded-lg border-3 border-ink px-4 py-3 text-sm font-bold transition-colors duration-150 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink focus-visible:ring-offset-2',
+                    'rounded-lg border-3 border-ink px-4 py-3 text-sm font-bold transition-[transform,background-color,color] duration-150 ease-out active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink focus-visible:ring-offset-2',
                     placement === 'after'
                       ? cn(accent.solid)
-                      : 'bg-surface text-ink hover:bg-muted'
+                      : 'bg-surface text-ink hover-fine:bg-muted'
                   )}
                 >
                   Después de la página
@@ -301,10 +301,10 @@ export default function BlankPagesInserter() {
                   onClick={() => setPlacement('before')}
                   aria-pressed={placement === 'before'}
                   className={cn(
-                    'rounded-lg border-3 border-ink px-4 py-3 text-sm font-bold transition-colors duration-150 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink focus-visible:ring-offset-2',
+                    'rounded-lg border-3 border-ink px-4 py-3 text-sm font-bold transition-[transform,background-color,color] duration-150 ease-out active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink focus-visible:ring-offset-2',
                     placement === 'before'
                       ? cn(accent.solid)
-                      : 'bg-surface text-ink hover:bg-muted'
+                      : 'bg-surface text-ink hover-fine:bg-muted'
                   )}
                 >
                   Antes de la página
