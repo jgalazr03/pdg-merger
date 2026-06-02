@@ -17,8 +17,15 @@ const nextConfig = {
       config.externals['exceljs'] = 'commonjs exceljs';
     }
 
-    // qpdf-wasm (Emscripten) hace require('fs'|'path'|'crypto') en su glue;
-    // en el build de cliente esos builtins de Node no existen, los neutralizamos.
+    // tesseract.js arrastra node-fetch -> 'encoding' (dep opcional) por su ruta
+    // Node, que en el navegador nunca se ejecuta. Neutralizamos 'encoding' en
+    // ambos builds para que webpack no avise.
+    config.resolve.fallback = {
+      ...config.resolve.fallback,
+      encoding: false,
+    };
+    // qpdf-wasm (Emscripten) hace require('fs'|'path'|'crypto') en su glue; en el
+    // build de cliente esos builtins de Node no existen, los neutralizamos.
     if (!isServer) {
       config.resolve.fallback = {
         ...config.resolve.fallback,

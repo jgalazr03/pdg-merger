@@ -26,6 +26,7 @@ import {
   Eraser,
   Layers,
   Lock,
+  ScanText,
   type LucideIcon,
 } from 'lucide-react';
 
@@ -58,7 +59,8 @@ export type ToolSlug =
   | 'aplanar-pdf'
   | 'contrasena-pdf'
   | 'unir-excel'
-  | 'dividir-excel';
+  | 'dividir-excel'
+  | 'ocr';
 
 /** Categorías del catálogo (agrupan herramientas en nav, landing y footer). */
 export type ToolCategory =
@@ -825,6 +827,24 @@ export const TOOLS: ToolDef[] = [
       'Conserva valores, estilos básicos y celdas combinadas',
     ],
     accent: TONES.indigo,
+  },
+  {
+    slug: 'ocr',
+    href: '/ocr',
+    category: 'convertir',
+    name: 'OCR',
+    title: 'Reconocer texto de imágenes y PDF escaneados',
+    tagline: 'Convierte un escaneo en texto y en un PDF donde puedes buscar.',
+    description:
+      'Reconoce el texto (OCR, en español) de una imagen o un PDF escaneado y te lo entrega como texto editable y como PDF buscable. Todo ocurre en tu navegador; el archivo nunca se sube.',
+    Icon: ScanText,
+    constraints: [
+      'Entrada: PDF escaneado o imagen (JPG, PNG, WebP)',
+      'Salida: PDF buscable (con capa de texto) y archivo .txt',
+      'Reconocimiento en español; funciona mejor con escaneos nítidos',
+      'La primera vez descarga el modelo (~2 MB) y lo guarda en el navegador',
+    ],
+    accent: TONES.fuchsia,
   },
 ];
 
