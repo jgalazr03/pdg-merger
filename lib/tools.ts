@@ -27,6 +27,7 @@ import {
   Layers,
   Lock,
   ScanText,
+  FormInput,
   type LucideIcon,
 } from 'lucide-react';
 
@@ -50,6 +51,7 @@ export type ToolSlug =
   | 'paginas-en-blanco'
   | 'metadatos-pdf'
   | 'portada-pdf'
+  | 'rellenar-formularios'
   | 'escala-grises'
   | 'info-pdf'
   | 'texto-a-pdf'
@@ -653,6 +655,24 @@ export const TOOLS: ToolDef[] = [
       'Se inserta como primera página del documento',
     ],
     accent: TONES.pink,
+  },
+  {
+    slug: 'rellenar-formularios',
+    href: '/rellenar-formularios',
+    category: 'editar',
+    name: 'Rellenar formularios',
+    title: 'Rellenar formularios PDF',
+    tagline: 'Detecta los campos del PDF y rellénalos desde el navegador.',
+    description:
+      'Abre un PDF con formulario (AcroForm), detecta sus campos —texto, casillas, listas y opciones— y rellénalos con un formulario en pantalla. Puedes aplanarlo para que quede fijo. Todo ocurre en tu navegador.',
+    Icon: FormInput,
+    constraints: [
+      'Formato: PDF con campos de formulario (AcroForm)',
+      'Rellena texto, casillas, listas desplegables y opciones',
+      'Opción de aplanar para dejarlo no editable',
+      'No soporta formularios XFA (Adobe LiveCycle)',
+    ],
+    accent: TONES.teal,
   },
   {
     slug: 'escala-grises',
