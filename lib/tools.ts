@@ -28,6 +28,7 @@ import {
   Lock,
   ScanText,
   FormInput,
+  EyeOff,
   type LucideIcon,
 } from 'lucide-react';
 
@@ -60,6 +61,7 @@ export type ToolSlug =
   | 'limpiar-metadatos'
   | 'aplanar-pdf'
   | 'contrasena-pdf'
+  | 'censurar-pdf'
   | 'unir-excel'
   | 'dividir-excel'
   | 'ocr';
@@ -813,6 +815,24 @@ export const TOOLS: ToolDef[] = [
       'El archivo nunca sale de tu dispositivo',
     ],
     accent: TONES.rose,
+  },
+  {
+    slug: 'censurar-pdf',
+    href: '/censurar-pdf',
+    category: 'seguridad',
+    name: 'Censurar PDF',
+    title: 'Censurar (tachar) datos de un PDF',
+    tagline: 'Dibuja cajas negras y elimina de verdad el texto tapado.',
+    description:
+      'Oculta información sensible dibujando cajas negras sobre el PDF. Las páginas censuradas se aplanan a imagen, así que el texto tapado deja de existir (no se puede copiar ni buscar). Todo ocurre en tu navegador; el archivo nunca se sube.',
+    Icon: EyeOff,
+    constraints: [
+      'Formato: PDF (un archivo a la vez)',
+      'Dibuja cajas negras sobre lo que quieras ocultar',
+      'Las páginas censuradas se aplanan: el texto tapado se elimina de verdad',
+      'Las páginas sin cajas conservan su texto seleccionable',
+    ],
+    accent: TONES.amber,
   },
   {
     slug: 'unir-excel',
