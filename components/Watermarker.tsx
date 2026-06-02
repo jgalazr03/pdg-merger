@@ -1,198 +1,86 @@
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
-import { PDFDocument, StandardFonts, degrees, rgb } from 'pdf-lib';
-import { FileText, Download, Loader2, X, Droplets } from 'lucide-react';
+import { useState } from 'react';
+import { Droplets } from 'lucide-react';
 import { toast } from 'sonner';
-import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { cn, scrollIntoViewSafe } from '@/lib/utils';
-import { toastUndo } from '@/lib/toast';
+import { cn } from '@/lib/utils';
 import { getTool } from '@/lib/tools';
+import { useBatchProcessor } from '@/hooks/use-batch-processor';
+import { watermarkPdf, type WatermarkParams } from '@/lib/watermark';
 import ToolShell from '@/components/tools/ToolShell';
 import FileDropzone from '@/components/tools/FileDropzone';
 import ToolConstraints from '@/components/tools/ToolConstraints';
+import BatchPanel from '@/components/tools/BatchPanel';
 
 const tool = getTool('marca-de-agua');
 const accent = tool.accent;
 
-interface ResultPDF {
-  name: string;
-  blob: Blob;
+const isPdf = (f: File) => f.type === 'application/pdf' || /\.pdf$/i.test(f.name);
+
+type WmColorKey = 'gris' | 'navy' | 'rojo' | 'azul' | 'verde';
+
+interface WmColor {
+  key: WmColorKey;
+  label: string;
+  rgb: [number, number, number];
+  css: string;
 }
 
+const WM_COLORS: WmColor[] = [
+  { key: 'gris', label: 'Gris', rgb: [0.5, 0.5, 0.5], css: 'rgb(128,128,128)' },
+  { key: 'navy', label: 'Navy', rgb: [0.09, 0.13, 0.24], css: 'rgb(23,33,61)' },
+  { key: 'rojo', label: 'Rojo', rgb: [0.8, 0.1, 0.1], css: 'rgb(204,26,26)' },
+  { key: 'azul', label: 'Azul', rgb: [0.1, 0.3, 0.8], css: 'rgb(26,77,204)' },
+  { key: 'verde', label: 'Verde', rgb: [0.13, 0.5, 0.23], css: 'rgb(33,128,59)' },
+];
+
 export default function Watermarker() {
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [totalPages, setTotalPages] = useState<number>(0);
-  const [text, setText] = useState<string>('CONFIDENCIAL');
-  const [opacity, setOpacity] = useState<number>(30);
-  const [rotation, setRotation] = useState<number>(45);
-  const [fontSize, setFontSize] = useState<number>(50);
-  const [isProcessing, setIsProcessing] = useState(false);
-  const [result, setResult] = useState<ResultPDF | null>(null);
-  const fileInfoRef = useRef<HTMLDivElement>(null);
-  const resultRef = useRef<HTMLDivElement>(null);
+  const [text, setText] = useState('CONFIDENCIAL');
+  const [opacity, setOpacity] = useState(30);
+  const [rotation, setRotation] = useState(45);
+  const [fontSize, setFontSize] = useState(50);
+  const [colorKey, setColorKey] = useState<WmColorKey>('gris');
+  const [pageRange, setPageRange] = useState('');
 
-  useEffect(() => {
-    if (selectedFile && fileInfoRef.current) {
-      setTimeout(() => scrollIntoViewSafe(fileInfoRef.current), 100);
-    }
-  }, [selectedFile]);
+  const batch = useBatchProcessor({
+    accept: isPdf,
+    process: (file, onProgress) => {
+      const color = WM_COLORS.find((c) => c.key === colorKey)!.rgb;
+      const params: WatermarkParams = {
+        text,
+        opacity,
+        rotation,
+        fontSize,
+        color,
+        pageRange,
+      };
+      return watermarkPdf(file, params, onProgress);
+    },
+    outName: (f) => `${f.name.replace(/\.pdf$/i, '')}_marca-de-agua.pdf`,
+    zipName: 'pdfs-marca-de-agua.zip',
+    rejectMessage: 'Solo se aceptan archivos PDF',
+  });
 
-  useEffect(() => {
-    if (result) {
-      setTimeout(() => scrollIntoViewSafe(resultRef.current), 100);
-    }
-  }, [result]);
-
-  const formatFileSize = (bytes: number): string => {
-    if (bytes < 1024) return `${bytes} B`;
-    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-  };
-
-  const handleFileSelect = async (file: File) => {
-    if (file.type !== 'application/pdf' && !/\.pdf$/i.test(file.name)) {
-      toast.error('Archivo no válido', {
-        description: 'Por favor selecciona un archivo PDF.',
-      });
-      return;
-    }
-
-    setSelectedFile(file);
-    setResult(null);
-
-    try {
-      const arrayBuffer = await file.arrayBuffer();
-      const pdf = await PDFDocument.load(arrayBuffer);
-      setTotalPages(pdf.getPageCount());
-    } catch (error) {
-      console.error('Error loading PDF:', error);
-      toast.error('No se pudo cargar el PDF', {
-        description: 'Asegúrate de que sea un archivo válido.',
-      });
-      setSelectedFile(null);
-      setTotalPages(0);
-    }
-  };
-
-  const clampNumber = (value: number, min: number, max: number, fallback: number) => {
-    if (Number.isNaN(value)) return fallback;
-    return Math.min(max, Math.max(min, value));
-  };
-
-  const applyWatermark = async () => {
-    if (!selectedFile) return;
-
+  const handleRun = () => {
     if (!text.trim()) {
       toast.error('Falta el texto', {
         description: 'Escribe el texto de la marca de agua.',
       });
       return;
     }
-
-    setIsProcessing(true);
-    try {
-      const arrayBuffer = await selectedFile.arrayBuffer();
-      const pdf = await PDFDocument.load(arrayBuffer);
-      const font = await pdf.embedFont(StandardFonts.HelveticaBold);
-
-      const op = clampNumber(opacity, 0, 100, 30) / 100;
-      const rot = clampNumber(rotation, -360, 360, 45);
-      const size = clampNumber(fontSize, 6, 400, 50);
-      const rad = (rot * Math.PI) / 180;
-      const label = text.trim();
-
-      const textWidth = font.widthOfTextAtSize(label, size);
-      const textHeight = font.heightAtSize(size);
-
-      const pages = pdf.getPages();
-      for (const page of pages) {
-        const { width, height } = page.getSize();
-        // Punto de anclaje del texto para que el centro de la cadena (girada en
-        // torno a ese punto) caiga en el centro de la página.
-        const x =
-          width / 2 -
-          (textWidth / 2) * Math.cos(rad) +
-          (textHeight / 2) * Math.sin(rad);
-        const y =
-          height / 2 -
-          (textWidth / 2) * Math.sin(rad) -
-          (textHeight / 2) * Math.cos(rad);
-
-        page.drawText(label, {
-          x,
-          y,
-          size,
-          font,
-          color: rgb(0.5, 0.5, 0.5),
-          opacity: op,
-          rotate: degrees(rot),
-        });
-      }
-
-      const pdfBytes = await pdf.save();
-      const blob = new Blob([pdfBytes], { type: 'application/pdf' });
-      setResult({
-        name: `${selectedFile.name.replace(/\.pdf$/i, '')}_marca-de-agua.pdf`,
-        blob,
-      });
-      toast.success('Marca de agua aplicada', {
-        description: `Se estampó "${label}" en ${totalPages} página${totalPages !== 1 ? 's' : ''}.`,
-      });
-    } catch (error) {
-      console.error('Error applying watermark:', error);
-      toast.error('No se pudo aplicar la marca de agua', {
-        description: 'Inténtalo de nuevo.',
-      });
-    } finally {
-      setIsProcessing(false);
-    }
+    batch.run();
   };
 
-  const downloadPDF = () => {
-    if (!result) return;
-    const url = URL.createObjectURL(result.blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = result.name;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
-  };
+  const allFinished =
+    batch.items.length > 0 &&
+    batch.done &&
+    batch.doneCount + batch.errorCount >= batch.items.length;
 
-  const resetAll = () => {
-    setSelectedFile(null);
-    setTotalPages(0);
-    setText('CONFIDENCIAL');
-    setOpacity(30);
-    setRotation(45);
-    setFontSize(50);
-    setResult(null);
-  };
-
-  const changeFileWithUndo = () => {
-    if (!selectedFile) return;
-    const snap = { selectedFile, totalPages, text, opacity, rotation, fontSize, result };
-    resetAll();
-    toastUndo('Archivo descartado', {
-      description: 'Selecciona otro PDF, o recupéralo si fue un error.',
-      onUndo: () => {
-        setSelectedFile(snap.selectedFile);
-        setTotalPages(snap.totalPages);
-        setText(snap.text);
-        setOpacity(snap.opacity);
-        setRotation(snap.rotation);
-        setFontSize(snap.fontSize);
-        setResult(snap.result);
-      },
-    });
-  };
-
-  const step: 1 | 2 | 3 = !selectedFile ? 1 : result ? 3 : 2;
+  const step: 1 | 2 | 3 =
+    batch.items.length === 0 ? 1 : batch.doneCount > 0 ? 3 : 2;
 
   return (
     <ToolShell tool={tool} step={step}>
@@ -200,47 +88,24 @@ export default function Watermarker() {
         className="mb-4"
         accent={accent}
         accept=".pdf,application/pdf"
-        idleTitle="Selecciona un archivo PDF"
-        idleSubtitle="Haz clic aquí o arrastra y suelta tu archivo PDF"
-        dragTitle="Suelta el archivo PDF aquí"
-        buttonLabel="Seleccionar archivo"
-        ariaLabel="Seleccionar o arrastrar un archivo PDF"
-        onFiles={(files) => handleFileSelect(files[0])}
+        multiple
+        idleTitle="Selecciona archivos PDF"
+        idleSubtitle="Haz clic o arrastra uno o varios PDF"
+        dragTitle="Suelta los archivos aquí"
+        buttonLabel="Seleccionar archivos"
+        ariaLabel="Seleccionar o arrastrar archivos PDF"
+        onFiles={batch.addFiles}
       />
 
       <ToolConstraints items={tool.constraints} />
 
-      {selectedFile && (
-        <Card className="mb-8 motion-safe:animate-slide-up" ref={fileInfoRef}>
+      {batch.items.length > 0 && !allFinished && (
+        <Card className="mb-8 motion-safe:animate-slide-up">
           <CardContent className="p-4 sm:p-6">
-            <div className="mb-6 flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:justify-between">
-              <h2 className="font-display text-lg font-bold text-ink">
-                Archivo seleccionado
-              </h2>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={changeFileWithUndo}
-                className="shrink-0"
-              >
-                <X className="mr-2 h-4 w-4" />
-                Cambiar archivo
-              </Button>
-            </div>
-
-            <div className="flex items-center gap-4 rounded-lg border-3 border-ink bg-surface p-4">
-              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded border-2 border-ink bg-card">
-                <FileText className="h-6 w-6 text-ink" />
-              </div>
-              <div className="min-w-0 flex-1">
-                <p className="truncate font-medium text-ink">{selectedFile.name}</p>
-                <p className="text-sm text-muted-foreground">
-                  {formatFileSize(selectedFile.size)} • {totalPages} páginas
-                </p>
-              </div>
-            </div>
-
-            <div className="mt-6 space-y-5">
+            <h2 className="mb-5 font-display text-lg font-bold text-ink">
+              Ajustes de la marca de agua
+            </h2>
+            <div className="space-y-5">
               <div>
                 <Label htmlFor="wm-text" className="mb-2 block">
                   <Droplets className="mr-2 inline h-4 w-4" />
@@ -251,6 +116,7 @@ export default function Watermarker() {
                   type="text"
                   placeholder="CONFIDENCIAL"
                   value={text}
+                  disabled={batch.isProcessing}
                   onChange={(e) => setText(e.target.value)}
                 />
               </div>
@@ -267,8 +133,12 @@ export default function Watermarker() {
                     max={100}
                     step={1}
                     value={opacity}
+                    disabled={batch.isProcessing}
                     onChange={(e) => setOpacity(Number(e.target.value))}
-                    className={cn('h-2 w-full cursor-pointer appearance-none rounded-lg border-2 border-ink', accent.soft)}
+                    className={cn(
+                      'h-2 w-full cursor-pointer appearance-none rounded-lg border-2 border-ink',
+                      accent.soft
+                    )}
                     aria-label="Opacidad de la marca de agua"
                   />
                 </div>
@@ -282,6 +152,7 @@ export default function Watermarker() {
                     min={-360}
                     max={360}
                     value={rotation}
+                    disabled={batch.isProcessing}
                     onChange={(e) => setRotation(Number(e.target.value))}
                   />
                 </div>
@@ -295,15 +166,60 @@ export default function Watermarker() {
                     min={6}
                     max={400}
                     value={fontSize}
+                    disabled={batch.isProcessing}
                     onChange={(e) => setFontSize(Number(e.target.value))}
+                  />
+                </div>
+              </div>
+
+              <div className="grid gap-5 sm:grid-cols-2">
+                <div>
+                  <Label className="mb-2 block">Color</Label>
+                  <div className="flex flex-wrap gap-2">
+                    {WM_COLORS.map((c) => (
+                      <button
+                        key={c.key}
+                        type="button"
+                        onClick={() => setColorKey(c.key)}
+                        disabled={batch.isProcessing}
+                        aria-label={`Color ${c.label}`}
+                        aria-pressed={colorKey === c.key}
+                        className={cn(
+                          'flex items-center gap-2 rounded-lg border-3 px-3 py-2 text-sm font-medium transition-colors disabled:opacity-50',
+                          colorKey === c.key
+                            ? 'border-ink bg-surface text-ink'
+                            : 'border-transparent text-muted-foreground hover-fine:border-ink'
+                        )}
+                      >
+                        <span
+                          className="h-4 w-4 rounded-full border-2 border-ink"
+                          style={{ backgroundColor: c.css }}
+                        />
+                        {c.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <div>
+                  <Label htmlFor="wm-range" className="mb-2 block">
+                    Páginas
+                  </Label>
+                  <Input
+                    id="wm-range"
+                    type="text"
+                    placeholder="Todas (ej. 1-3,5,8-10)"
+                    value={pageRange}
+                    disabled={batch.isProcessing}
+                    onChange={(e) => setPageRange(e.target.value)}
                   />
                 </div>
               </div>
 
               <div className={cn('rounded-lg border-3 border-ink p-3', accent.soft)}>
                 <p className={cn('text-sm', accent.softText)}>
-                  La marca se dibuja centrada y en diagonal sobre cada una de las{' '}
-                  {totalPages} páginas, en gris translúcido.
+                  La marca se dibuja centrada y en diagonal. Deja «Páginas» en
+                  blanco para aplicarla a todo el documento, o indica un rango como
+                  «1-3,5,8-10». Los mismos ajustes se usan en todos los archivos.
                 </p>
               </div>
             </div>
@@ -311,63 +227,23 @@ export default function Watermarker() {
         </Card>
       )}
 
-      {selectedFile && !result && (
-        <Card className="mb-8">
-          <CardContent className="p-4 text-center sm:p-6">
-            <h2 className="mb-4 font-display text-lg font-bold text-ink">
-              ¿Listo para estampar?
-            </h2>
-            <p className="mb-6 text-muted-foreground">
-              Se aplicará la marca de agua a todas las páginas del documento.
-            </p>
-            <Button
-              onClick={applyWatermark}
-              disabled={isProcessing}
-              aria-busy={isProcessing}
-              size="lg"
-              className={accent.solid}
-            >
-              {isProcessing ? (
-                <>
-                  <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                  Aplicando…
-                </>
-              ) : (
-                <>
-                  <Droplets className="mr-2 h-5 w-5" />
-                  Añadir marca de agua
-                </>
-              )}
-            </Button>
-          </CardContent>
-        </Card>
-      )}
-
-      {result && (
-        <Card ref={resultRef} className="motion-safe:animate-slide-up">
-          <CardContent className="p-4 sm:p-6">
-            <div className="mb-6 text-center">
-              <div className="mb-4 inline-flex h-16 w-16 items-center justify-center rounded-full border-3 border-ink bg-success text-white">
-                <Download className="h-8 w-8" />
-              </div>
-              <h2 className="mb-2 text-lg font-bold text-success">
-                ¡Marca de agua añadida!
-              </h2>
-              <p className="mb-4 text-ink">Tu PDF está listo para descargar.</p>
-              <Button onClick={downloadPDF} size="lg" className={accent.solid}>
-                <Download className="mr-2 h-5 w-5" />
-                Descargar PDF
-              </Button>
-            </div>
-
-            <div className="mt-6 text-center">
-              <Button variant="outline" onClick={resetAll} size="lg">
-                Procesar otro PDF
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-      )}
+      <BatchPanel
+        items={batch.items}
+        accent={accent}
+        isProcessing={batch.isProcessing}
+        done={batch.done}
+        doneCount={batch.doneCount}
+        errorCount={batch.errorCount}
+        actionLabel="Añadir marca de agua"
+        actioningLabel="Aplicando…"
+        ActionIcon={Droplets}
+        onRun={handleRun}
+        onRemove={batch.removeItem}
+        onReset={batch.reset}
+        onDownloadAll={batch.downloadAll}
+        onDownloadOne={batch.downloadOne}
+        resultHint="La marca de agua quedó estampada en tus PDF."
+      />
     </ToolShell>
   );
 }
