@@ -56,7 +56,9 @@ export type ToolSlug =
   | 'csv-a-pdf'
   | 'limpiar-metadatos'
   | 'aplanar-pdf'
-  | 'contrasena-pdf';
+  | 'contrasena-pdf'
+  | 'unir-excel'
+  | 'dividir-excel';
 
 /** Categorías del catálogo (agrupan herramientas en nav, landing y footer). */
 export type ToolCategory =
@@ -784,6 +786,42 @@ export const TOOLS: ToolDef[] = [
       'El archivo nunca sale de tu dispositivo',
     ],
     accent: TONES.rose,
+  },
+  {
+    slug: 'unir-excel',
+    href: '/unir-excel',
+    category: 'organizar',
+    name: 'Unir Excel',
+    title: 'Unir varios archivos Excel',
+    tagline: 'Combina las hojas de varios libros .xlsx en uno solo.',
+    description:
+      'Une varios archivos Excel (.xlsx) en un único libro, juntando todas sus hojas. Todo ocurre en tu navegador; los archivos nunca se suben.',
+    Icon: Combine,
+    constraints: [
+      'Formato: Excel .xlsx (varios archivos)',
+      'Junta todas las hojas de cada libro en uno solo',
+      'Conserva valores, estilos básicos y celdas combinadas',
+      'Las fórmulas entre hojas de libros distintos pueden no recalcularse',
+    ],
+    accent: TONES.emerald,
+  },
+  {
+    slug: 'dividir-excel',
+    href: '/dividir-excel',
+    category: 'organizar',
+    name: 'Dividir Excel',
+    title: 'Dividir un Excel por hojas',
+    tagline: 'Separa cada hoja de un libro en su propio archivo .xlsx.',
+    description:
+      'Divide un archivo Excel (.xlsx) en archivos independientes, uno por cada hoja que elijas (en .zip si son varias). Todo ocurre en tu navegador.',
+    Icon: Scissors,
+    constraints: [
+      'Formato: Excel .xlsx (un archivo a la vez)',
+      'Genera un archivo por cada hoja seleccionada',
+      'Si son varias, se descargan juntas en un .zip',
+      'Conserva valores, estilos básicos y celdas combinadas',
+    ],
+    accent: TONES.indigo,
   },
 ];
 
