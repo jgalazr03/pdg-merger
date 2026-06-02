@@ -16,7 +16,18 @@ const nextConfig = {
     if (isServer) {
       config.externals['exceljs'] = 'commonjs exceljs';
     }
-    
+
+    // qpdf-wasm (Emscripten) hace require('fs'|'path'|'crypto') en su glue;
+    // en el build de cliente esos builtins de Node no existen, los neutralizamos.
+    if (!isServer) {
+      config.resolve.fallback = {
+        ...config.resolve.fallback,
+        fs: false,
+        path: false,
+        crypto: false,
+      };
+    }
+
     // Better handling of worker files
     config.module.rules.push({
       test: /\.worker\.(js|ts)$/,

@@ -25,6 +25,7 @@ import {
   Table,
   Eraser,
   Layers,
+  Lock,
   type LucideIcon,
 } from 'lucide-react';
 
@@ -54,7 +55,8 @@ export type ToolSlug =
   | 'extraer-texto'
   | 'csv-a-pdf'
   | 'limpiar-metadatos'
-  | 'aplanar-pdf';
+  | 'aplanar-pdf'
+  | 'contrasena-pdf';
 
 /** Categorías del catálogo (agrupan herramientas en nav, landing y footer). */
 export type ToolCategory =
@@ -764,6 +766,24 @@ export const TOOLS: ToolDef[] = [
       'Tras aplanar, los formularios dejan de ser editables',
     ],
     accent: TONES.purple,
+  },
+  {
+    slug: 'contrasena-pdf',
+    href: '/contrasena-pdf',
+    category: 'seguridad',
+    name: 'Proteger PDF',
+    title: 'Proteger o quitar contraseña de un PDF',
+    tagline: 'Cifra tu PDF con contraseña, o quítasela si ya la conoces.',
+    description:
+      'Protege un PDF con contraseña (cifrado AES-256) para que pida clave al abrirse, o quítale la contraseña si ya la sabes. Todo ocurre en tu navegador; el archivo nunca se sube.',
+    Icon: Lock,
+    constraints: [
+      'Formato: PDF (un archivo a la vez)',
+      'Proteger: cifra con AES-256 y pide la contraseña al abrir',
+      'Quitar: necesitas saber la contraseña actual del PDF',
+      'El archivo nunca sale de tu dispositivo',
+    ],
+    accent: TONES.rose,
   },
 ];
 
