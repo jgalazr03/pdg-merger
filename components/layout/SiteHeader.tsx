@@ -224,9 +224,9 @@ export default function SiteHeader() {
     <header className="sticky top-0 z-40 w-full border-b-4 border-ink bg-surface">
       <div className="container mx-auto flex h-16 max-w-6xl items-center justify-between pl-[max(20px,env(safe-area-inset-left))] pr-[max(20px,env(safe-area-inset-right))]">
         {/*
-         * Lockup nativo al sistema: el isotipo de marca + "Herramientas" como
-         * nombre de producto en la tipografía mono. El logotipo GAINCO completo
-         * vive en el footer.
+         * Lockup nativo al sistema: el icono de herramientas + "Herramientas"
+         * como nombre de producto en la tipografía mono. El logotipo GAINCO
+         * completo vive en el footer.
          */}
         <Link
           href="/"
@@ -234,11 +234,11 @@ export default function SiteHeader() {
           aria-label="Inicio · Herramientas GAINCO"
         >
           <Image
-            src="/logos/isotipo-color.svg"
-            alt="GAINCO"
+            src="/logos/Icono_herramientas.svg"
+            alt="Herramientas GAINCO"
             width={36}
-            height={38}
-            className="h-9 w-auto"
+            height={36}
+            className="h-9 w-9"
             priority
           />
           <span className="text-xl font-bold tracking-tight text-ink">
