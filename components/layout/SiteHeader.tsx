@@ -262,7 +262,7 @@ export default function SiteHeader() {
               window.dispatchEvent(new Event('gainco:open-command-palette'))
             }
             aria-label="Buscar herramienta"
-            className="inline-flex items-center gap-2 rounded-lg border-3 border-ink bg-surface px-3 py-2 text-sm font-bold text-ink transition-[background-color,transform] duration-150 ease-out hover-fine:bg-muted active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink focus-visible:ring-offset-2"
+            className="inline-flex items-center gap-2 rounded-lg border-3 border-ink bg-surface h-9 px-3 text-sm font-bold text-ink transition-[background-color,transform] duration-150 ease-out hover-fine:bg-muted active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink focus-visible:ring-offset-2"
           >
             <Search className="h-4 w-4" />
             Buscar
@@ -276,7 +276,7 @@ export default function SiteHeader() {
             aria-expanded={megaOpen}
             aria-haspopup="menu"
             onClick={() => setMegaOpen((v) => !v)}
-            className="inline-flex items-center gap-2 rounded-lg border-3 border-ink bg-surface px-3 py-2 text-sm font-bold text-ink transition-[background-color,transform] duration-150 ease-out hover-fine:bg-muted active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink focus-visible:ring-offset-2"
+            className="inline-flex items-center gap-2 rounded-lg border-3 border-ink bg-surface h-9 px-3 text-sm font-bold text-ink transition-[background-color,transform] duration-150 ease-out hover-fine:bg-muted active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink focus-visible:ring-offset-2"
           >
             <LayoutGrid className="h-4 w-4" />
             Todas las herramientas
