@@ -230,15 +230,21 @@ export default function SiteHeader() {
          */}
         <Link
           href="/"
-          className="flex items-center gap-2.5 rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink focus-visible:ring-offset-2"
+          className="flex items-center gap-2 rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink focus-visible:ring-offset-2"
           aria-label="Inicio · Herramientas GAINCO"
         >
+          {/*
+           * El SVG trae aire interno (el dibujo ocupa ~65% del viewBox), así que
+           * la caja se lleva a 50px (h-10) para que el dibujo visible equilibre
+           * ópticamente con el wordmark; el gap se ciñe a 10px (gap-2) para
+           * cohesionar el lockup (balance óptico, no matemático).
+           */}
           <Image
             src="/logos/Icono_herramientas.svg"
             alt="Herramientas GAINCO"
-            width={36}
-            height={36}
-            className="h-9 w-9"
+            width={40}
+            height={40}
+            className="h-10 w-10"
             priority
           />
           <span className="text-xl font-bold tracking-tight text-ink">
