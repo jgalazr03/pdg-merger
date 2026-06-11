@@ -221,6 +221,10 @@ const config: Config = {
         'group-hover-fine',
         '@media (hover: hover) and (pointer: fine) { :merge(.group):hover & }'
       );
+      // Variante de DISPOSITIVO (sin :hover): estilos que solo aplican donde hay
+      // puntero fino con hover real. Permite ocultar acciones secundarias hasta
+      // el hover en escritorio sin esconderlas en táctil (progressive disclosure).
+      addVariant('pointer-fine', '@media (hover: hover) and (pointer: fine) { & }');
     }),
   ],
 };

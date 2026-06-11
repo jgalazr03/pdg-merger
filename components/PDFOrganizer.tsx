@@ -600,7 +600,7 @@ export default function PDFOrganizer() {
                     setOverIndex(null);
                   }}
                   className={cn(
-                    'relative flex flex-col overflow-hidden rounded-lg border-3 border-ink bg-surface transition-[opacity,box-shadow] duration-150 ease-out sm:cursor-grab sm:active:cursor-grabbing',
+                    'group relative flex flex-col overflow-hidden rounded-lg border-3 border-ink bg-surface transition-[opacity,box-shadow] duration-150 ease-out sm:cursor-grab sm:active:cursor-grabbing',
                     dragIndex === i && 'opacity-50',
                     overIndex === i && dragIndex !== null && dragIndex !== i &&
                       'ring-2 ring-ink ring-offset-2'
@@ -610,6 +610,39 @@ export default function PDFOrganizer() {
                   <span className="pointer-events-none absolute left-2 top-2 z-10 inline-flex h-6 min-w-[24px] items-center justify-center rounded-md border-2 border-ink bg-surface px-1.5 text-xs font-bold text-ink">
                     {i + 1}
                   </span>
+
+                  {/* Girar = acción poco frecuente → fuera del flujo principal
+                      (progressive disclosure): overlay en la esquina de la
+                      miniatura, invisible en escritorio hasta hover o foco de
+                      teclado (solo opacidad, 150ms ease-out). En táctil no hay
+                      hover, así que queda siempre visible. */}
+                  <div
+                    className={cn(
+                      'absolute right-2 top-2 z-10 grid grid-cols-2 overflow-hidden rounded-md border-2 border-ink bg-surface',
+                      'transition-opacity duration-150 ease-out pointer-fine:opacity-0 group-hover-fine:opacity-100 focus-within:opacity-100'
+                    )}
+                  >
+                    <button
+                      type="button"
+                      onClick={() => rotatePage(p.id, -90)}
+                      disabled={isProcessing}
+                      aria-label={`Girar ${cardLabel(p)} a la izquierda`}
+                      title="Girar a la izquierda"
+                      className="flex h-7 w-7 items-center justify-center border-r-2 border-ink text-ink transition-colors duration-150 ease-out hover-fine:bg-muted active:bg-muted disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ink"
+                    >
+                      <RotateCcw className="h-4 w-4" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => rotatePage(p.id, 90)}
+                      disabled={isProcessing}
+                      aria-label={`Girar ${cardLabel(p)} a la derecha`}
+                      title="Girar a la derecha"
+                      className="flex h-7 w-7 items-center justify-center text-ink transition-colors duration-150 ease-out hover-fine:bg-muted active:bg-muted disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ink"
+                    >
+                      <RotateCw className="h-4 w-4" />
+                    </button>
+                  </div>
 
                   <div className="flex aspect-square items-center justify-center overflow-hidden border-b-3 border-ink bg-card p-3">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -626,9 +659,10 @@ export default function PDFOrganizer() {
                     />
                   </div>
 
-                  {/* Pie de acciones: mover (◀ ▶), girar (↺ ↻) y eliminar, cada
-                      grupo en su propia fila a ancho completo (grid 2 cols →
-                      minmax(0,1fr), nunca recorta en tarjetas angostas). */}
+                  {/* Pie de acciones frecuentes: mover (◀ ▶) y eliminar; girar
+                      vive en el overlay de la miniatura. Cada grupo en su propia
+                      fila a ancho completo (grid 2 cols → minmax(0,1fr), nunca
+                      recorta en tarjetas angostas). */}
                   <div className="flex flex-col gap-2 p-2">
                     <span className="truncate text-xs font-bold text-ink" title={p.label}>
                       {cardLabel(p)}
@@ -654,29 +688,6 @@ export default function PDFOrganizer() {
                         className="flex h-9 items-center justify-center text-ink transition-colors duration-150 ease-out hover-fine:bg-muted active:bg-muted disabled:opacity-30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ink"
                       >
                         <ChevronRight className="h-4 w-4" />
-                      </button>
-                    </div>
-
-                    <div className="grid grid-cols-2 overflow-hidden rounded-md border-2 border-ink">
-                      <button
-                        type="button"
-                        onClick={() => rotatePage(p.id, -90)}
-                        disabled={isProcessing}
-                        aria-label={`Girar ${cardLabel(p)} a la izquierda`}
-                        title="Girar a la izquierda"
-                        className="flex h-9 items-center justify-center border-r-2 border-ink text-ink transition-colors duration-150 ease-out hover-fine:bg-muted active:bg-muted disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ink"
-                      >
-                        <RotateCcw className="h-4 w-4" />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => rotatePage(p.id, 90)}
-                        disabled={isProcessing}
-                        aria-label={`Girar ${cardLabel(p)} a la derecha`}
-                        title="Girar a la derecha"
-                        className="flex h-9 items-center justify-center text-ink transition-colors duration-150 ease-out hover-fine:bg-muted active:bg-muted disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ink"
-                      >
-                        <RotateCw className="h-4 w-4" />
                       </button>
                     </div>
 
