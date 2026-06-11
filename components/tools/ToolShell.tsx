@@ -19,8 +19,10 @@ export default function ToolShell({
   children: React.ReactNode;
 }) {
   return (
-    <div className="container mx-auto max-w-4xl py-8 pl-[max(20px,env(safe-area-inset-left))] pr-[max(20px,env(safe-area-inset-right))] md:py-16">
-      <nav aria-label="Ruta de navegación" className="mb-6 sm:mb-8">
+    // Móvil: preludio comprimido (la tarea primero — el dropzone debe asomar
+    // sin scroll al entrar); escritorio conserva el aire generoso.
+    <div className="container mx-auto max-w-4xl py-5 pl-[max(20px,env(safe-area-inset-left))] pr-[max(20px,env(safe-area-inset-right))] sm:py-8 md:py-16">
+      <nav aria-label="Ruta de navegación" className="mb-4 sm:mb-8">
         <ol className="flex items-center gap-1.5 text-sm text-muted-foreground">
           <li>
             <Link
@@ -48,21 +50,21 @@ export default function ToolShell({
       </nav>
 
       {/* Hero asimétrico: tile a la izquierda, título a la derecha */}
-      <header className="mb-8 flex items-start gap-4 motion-safe:animate-fade-in sm:mb-10 sm:gap-5">
+      <header className="mb-5 flex items-start gap-4 motion-safe:animate-fade-in sm:mb-10 sm:gap-5">
         <div
           className={cn(
-            'flex h-14 w-14 shrink-0 items-center justify-center rounded-lg border-3 border-ink sm:h-16 sm:w-16',
+            'flex h-12 w-12 shrink-0 items-center justify-center rounded-lg border-3 border-ink sm:h-16 sm:w-16',
             tool.accent.iconBg
           )}
         >
-          <tool.Icon className="h-7 w-7 text-white sm:h-8 sm:w-8" strokeWidth={2} />
+          <tool.Icon className="h-6 w-6 text-white sm:h-8 sm:w-8" strokeWidth={2} />
         </div>
 
         <div className="min-w-0 pt-0.5 sm:pt-1">
           <h1 className="text-[clamp(1.6rem,6vw,2.25rem)] font-bold leading-[1.1] tracking-tight text-ink">
             {tool.title}
           </h1>
-          <p className="mt-2 max-w-xl text-base text-muted-foreground md:text-lg">
+          <p className="mt-2 max-w-xl text-sm text-muted-foreground sm:text-base md:text-lg">
             {tool.tagline}{' '}
             <span className="text-ink/60">Todo se procesa en tu navegador.</span>
           </p>
@@ -74,7 +76,7 @@ export default function ToolShell({
         <StepIndicator
           current={step}
           accent={tool.accent}
-          className="mb-8 md:mb-0 md:sticky md:top-24 md:self-start"
+          className="mb-5 md:mb-0 md:sticky md:top-24 md:self-start"
         />
         <div className="min-w-0">{children}</div>
       </div>

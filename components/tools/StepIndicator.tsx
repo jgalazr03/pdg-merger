@@ -58,7 +58,7 @@ export default function StepIndicator({
               <span
                 aria-hidden="true"
                 className={cn(
-                  'flex h-8 w-8 shrink-0 items-center justify-center rounded-full border-3 border-ink text-xs font-bold transition-colors',
+                  'flex h-7 w-7 shrink-0 items-center justify-center rounded-full border-3 border-ink text-xs font-bold transition-colors md:h-8 md:w-8',
                   isDone && 'bg-ink text-white',
                   isCurrent && cn(accent ? accent.line : 'bg-ink', 'text-white'),
                   !isDone && !isCurrent && 'bg-surface text-muted-foreground'
@@ -90,7 +90,7 @@ export default function StepIndicator({
             </div>
 
             {/* Etiqueta: debajo del círculo (móvil) / a su lado (md+) */}
-            <div className="mt-1.5 md:mt-0 md:flex md:h-8 md:items-center">
+            <div className="mt-1 md:mt-0 md:flex md:h-8 md:items-center">
               <span
                 className={cn(
                   'text-xs font-bold sm:text-sm',

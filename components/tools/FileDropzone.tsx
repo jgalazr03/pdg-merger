@@ -99,7 +99,7 @@ export default function FileDropzone({
         // así, en layouts lado a lado (p. ej. dos zonas A/B), los botones quedan
         // alineados aunque el subtítulo tenga 1 o 2 renglones. En uso individual
         // no hay altura extra, así que mt-auto = 0 y el layout no cambia.
-        'group relative flex cursor-pointer flex-col items-center rounded-lg border-[3px] border-dashed border-ink px-5 py-10 text-center transition-colors duration-150 ease-out sm:px-6 sm:py-12',
+        'group relative flex cursor-pointer flex-col items-center rounded-lg border-[3px] border-dashed border-ink px-5 py-7 text-center transition-colors duration-150 ease-out sm:px-6 sm:py-12',
         'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink focus-visible:ring-offset-2',
         isDragOver ? 'bg-highlight-soft' : 'bg-surface hover-fine:bg-muted',
         className
@@ -107,7 +107,7 @@ export default function FileDropzone({
     >
       <div
         className={cn(
-          'mx-auto mb-5 flex h-14 w-14 items-center justify-center rounded-lg border-3 border-ink transition-colors',
+          'mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-lg border-3 border-ink transition-colors sm:mb-5 sm:h-14 sm:w-14',
           isDragOver ? 'bg-highlight text-white' : 'bg-surface text-ink'
         )}
       >
@@ -116,7 +116,7 @@ export default function FileDropzone({
       <h3 className="mb-1.5 text-lg font-bold text-ink">
         {isDragOver ? dragTitle : idleTitle}
       </h3>
-      <p className="mx-auto mb-6 max-w-md text-sm text-muted-foreground">
+      <p className="mx-auto mb-5 max-w-md text-sm text-muted-foreground sm:mb-6">
         {idleSubtitle}
       </p>
       {!isDragOver && (
