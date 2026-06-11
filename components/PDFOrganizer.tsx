@@ -1,11 +1,13 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
+import type { PDFDocument as PDFDocType, PDFImage, PDFPage } from 'pdf-lib';
 import {
   FileText,
   Download,
   Loader2,
   X,
+  Plus,
   RotateCw,
   RotateCcw,
   Undo2,
@@ -28,6 +30,10 @@ import ToolConstraints from '@/components/tools/ToolConstraints';
 const tool = getTool('organizar');
 const accent = tool.accent;
 
+// PDF + imágenes que el navegador sabe decodificar (mismo criterio que Convertir).
+const ACCEPT =
+  '.pdf,.jpg,.jpeg,.png,.webp,.gif,.bmp,.svg,.avif,application/pdf,image/*';
+
 // Carga perezosa y memoizada de pdfjs-dist (solo para las miniaturas); configura
 // el worker una sola vez. pdf-lib (la reorganización real, sin pérdida) se
 // importa aparte al guardar. Así la herramienta abre al instante.
@@ -42,18 +48,83 @@ const loadPdfjs = async () => {
   return pdfjsPromise;
 };
 
+type SourceKind = 'pdf' | 'image';
+
+interface SourceDoc {
+  id: string;
+  file: File;
+  kind: SourceKind;
+}
+
 interface PageItem {
   id: string; // clave estable para DnD/animación (no cambia al reordenar)
-  sourceIndex: number; // índice 0-based en el PDF original (para copyPages)
+  srcId: string; // archivo de origen (para copyPages / embed)
+  kind: SourceKind;
+  sourceIndex: number; // índice 0-based en el PDF original (0 en imágenes)
   pageNumber: number; // número 1-based original (etiqueta)
+  label: string; // "nombre · pág. N" (PDF) o "nombre" (imagen)
   thumbnail: string; // data URL
   rotation: number; // delta a aplicar: 0 | 90 | 180 | 270
 }
 
 const norm = (deg: number) => ((deg % 360) + 360) % 360;
 
+const isPdf = (file: File) =>
+  file.type === 'application/pdf' || /\.pdf$/i.test(file.name);
+const stripExt = (name: string) => name.replace(/\.[^./\\]+$/, '');
+
+/** Carga la imagen en un <img> decodificado; rechaza si el navegador no puede. */
+function loadImageElement(file: File): Promise<HTMLImageElement> {
+  return new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = () => resolve(img);
+    img.onerror = () => {
+      URL.revokeObjectURL(url);
+      reject(new Error('No se pudo decodificar la imagen'));
+    };
+    img.src = url;
+  });
+}
+
+function canvasToBlob(canvas: HTMLCanvasElement, mime: string, quality: number): Promise<Blob> {
+  return new Promise((resolve, reject) => {
+    canvas.toBlob(
+      (b) => (b ? resolve(b) : reject(new Error('No se pudo exportar la imagen'))),
+      mime,
+      quality
+    );
+  });
+}
+
+/**
+ * Embebe una imagen en el PDF de salida. JPG y PNG van con sus bytes
+ * originales (sin recomprimir); el resto (WebP, GIF, BMP, SVG, AVIF…) se
+ * rasteriza a PNG vía canvas.
+ */
+async function embedImage(doc: PDFDocType, file: File): Promise<PDFImage> {
+  try {
+    if (file.type === 'image/jpeg' || /\.jpe?g$/i.test(file.name)) {
+      return await doc.embedJpg(new Uint8Array(await file.arrayBuffer()));
+    }
+    if (file.type === 'image/png' || /\.png$/i.test(file.name)) {
+      return await doc.embedPng(new Uint8Array(await file.arrayBuffer()));
+    }
+  } catch {
+    // pdf-lib no pudo leer los bytes originales: cae a la rasterización.
+  }
+  const img = await loadImageElement(file);
+  const canvas = document.createElement('canvas');
+  canvas.width = img.naturalWidth || img.width || 800;
+  canvas.height = img.naturalHeight || img.height || 600;
+  canvas.getContext('2d')!.drawImage(img, 0, 0, canvas.width, canvas.height);
+  URL.revokeObjectURL(img.src);
+  const blob = await canvasToBlob(canvas, 'image/png', 1);
+  return doc.embedPng(new Uint8Array(await blob.arrayBuffer()));
+}
+
 export default function PDFOrganizer() {
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [sources, setSources] = useState<SourceDoc[]>([]);
   const [pages, setPages] = useState<PageItem[]>([]);
   const [isRendering, setIsRendering] = useState(false);
   const [renderProgress, setRenderProgress] = useState(0);
@@ -62,8 +133,9 @@ export default function PDFOrganizer() {
   // Estado de arrastre (solo escritorio; en táctil se usan los botones de mover).
   const [dragIndex, setDragIndex] = useState<number | null>(null);
   const [overIndex, setOverIndex] = useState<number | null>(null);
-  // Foto del documento recién cargado para "Restablecer".
+  // Foto del documento "como se cargó" para "Restablecer"; crece al agregar archivos.
   const initialRef = useRef<PageItem[]>([]);
+  const addInputRef = useRef<HTMLInputElement>(null);
   const editorRef = useRef<HTMLDivElement>(null);
   const resultRef = useRef<HTMLDivElement>(null);
 
@@ -93,64 +165,138 @@ export default function PDFOrganizer() {
   };
 
   const baseName = (): string =>
-    selectedFile ? selectedFile.name.replace(/\.pdf$/i, '') : 'documento';
+    sources.length > 0 ? stripExt(sources[0].file.name) : 'documento';
 
-  const handleFileSelect = async (file: File) => {
-    if (file.type !== 'application/pdf' && !/\.pdf$/i.test(file.name)) {
-      toast.error('Archivo no válido', {
-        description: 'Por favor selecciona un archivo PDF.',
-      });
-      return;
-    }
+  const totalSize = sources.reduce((sum, s) => sum + s.file.size, 0);
 
-    setSelectedFile(file);
-    setDownloadUrl(null);
-    setPages([]);
+  // Con un solo PDF basta "Pág. N"; con varios archivos, el nombre desambigua.
+  const cardLabel = (p: PageItem) =>
+    sources.length === 1 && p.kind === 'pdf' ? `Pág. ${p.pageNumber}` : p.label;
+
+  /**
+   * Agrega archivos (PDF o imágenes) a la rejilla: cada PDF aporta sus páginas
+   * y cada imagen, una página. Los que no se puedan abrir se descartan con aviso.
+   */
+  const addFiles = async (list: FileList | File[]) => {
+    const incoming = Array.from(list);
+    if (incoming.length === 0) return;
+    const firstLoad = pages.length === 0;
     setIsRendering(true);
     setRenderProgress(0);
 
+    const newSources: SourceDoc[] = [];
+    const newPages: PageItem[] = [];
+    let rejected = 0;
+
     try {
-      const pdfjs = await loadPdfjs();
-      const arrayBuffer = await file.arrayBuffer();
-      const pdf = await pdfjs.getDocument({ data: arrayBuffer }).promise;
-      const items: PageItem[] = [];
+      for (let f = 0; f < incoming.length; f++) {
+        const file = incoming[f];
+        const srcId = Math.random().toString(36).substring(2, 11);
 
-      for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
-        const page = await pdf.getPage(pageNum);
-        // Miniatura ligera: escalamos a ~220px de ancho.
-        const base = page.getViewport({ scale: 1 });
-        const scale = Math.min(1.5, 220 / base.width);
-        const viewport = page.getViewport({ scale });
-        const canvas = document.createElement('canvas');
-        const ctx = canvas.getContext('2d')!;
-        canvas.width = viewport.width;
-        canvas.height = viewport.height;
-        ctx.fillStyle = '#ffffff';
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-        await page.render({ canvasContext: ctx, viewport }).promise;
+        if (isPdf(file)) {
+          try {
+            const pdfjs = await loadPdfjs();
+            const arrayBuffer = await file.arrayBuffer();
+            const pdf = await pdfjs.getDocument({ data: arrayBuffer }).promise;
+            const items: PageItem[] = [];
 
-        items.push({
-          id: `p-${pageNum - 1}`,
-          sourceIndex: pageNum - 1,
-          pageNumber: pageNum,
-          thumbnail: canvas.toDataURL('image/jpeg', 0.7),
-          rotation: 0,
-        });
-        setRenderProgress(Math.round((pageNum / pdf.numPages) * 100));
-        // Cede el hilo para que la barra de progreso respire.
-        await new Promise((r) => setTimeout(r, 0));
+            for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
+              const page = await pdf.getPage(pageNum);
+              // Miniatura ligera: escalamos a ~220px de ancho.
+              const base = page.getViewport({ scale: 1 });
+              const scale = Math.min(1.5, 220 / base.width);
+              const viewport = page.getViewport({ scale });
+              const canvas = document.createElement('canvas');
+              const ctx = canvas.getContext('2d')!;
+              canvas.width = viewport.width;
+              canvas.height = viewport.height;
+              ctx.fillStyle = '#ffffff';
+              ctx.fillRect(0, 0, canvas.width, canvas.height);
+              await page.render({ canvasContext: ctx, viewport }).promise;
+
+              items.push({
+                id: `${srcId}-${pageNum - 1}`,
+                srcId,
+                kind: 'pdf',
+                sourceIndex: pageNum - 1,
+                pageNumber: pageNum,
+                label: `${stripExt(file.name)} · pág. ${pageNum}`,
+                thumbnail: canvas.toDataURL('image/jpeg', 0.7),
+                rotation: 0,
+              });
+              setRenderProgress(
+                Math.round(((f + pageNum / pdf.numPages) / incoming.length) * 100)
+              );
+              // Cede el hilo para que la barra de progreso respire.
+              await new Promise((r) => setTimeout(r, 0));
+            }
+
+            newSources.push({ id: srcId, file, kind: 'pdf' });
+            newPages.push(...items);
+          } catch (error) {
+            console.error('Error loading PDF:', error);
+            rejected += 1;
+          }
+        } else {
+          try {
+            const img = await loadImageElement(file);
+            const w = img.naturalWidth || img.width || 800;
+            const h = img.naturalHeight || img.height || 600;
+            const scale = Math.min(1.5, 220 / w);
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d')!;
+            canvas.width = Math.max(1, Math.round(w * scale));
+            canvas.height = Math.max(1, Math.round(h * scale));
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+            URL.revokeObjectURL(img.src);
+
+            newSources.push({ id: srcId, file, kind: 'image' });
+            newPages.push({
+              id: `${srcId}-0`,
+              srcId,
+              kind: 'image',
+              sourceIndex: 0,
+              pageNumber: 1,
+              label: stripExt(file.name),
+              thumbnail: canvas.toDataURL('image/jpeg', 0.7),
+              rotation: 0,
+            });
+          } catch {
+            rejected += 1;
+          }
+          setRenderProgress(Math.round(((f + 1) / incoming.length) * 100));
+        }
       }
-
-      initialRef.current = items.map((p) => ({ ...p }));
-      setPages(items);
-    } catch (error) {
-      console.error('Error loading PDF:', error);
-      toast.error('No se pudo cargar el PDF', {
-        description: 'Asegúrate de que sea un archivo válido.',
-      });
-      setSelectedFile(null);
     } finally {
       setIsRendering(false);
+    }
+
+    if (newPages.length > 0) {
+      setSources((prev) => [...prev, ...newSources]);
+      setPages((prev) => [...prev, ...newPages]);
+      // "Restablecer" vuelve al orden de carga, conservando los archivos agregados.
+      initialRef.current = [...initialRef.current, ...newPages.map((p) => ({ ...p }))];
+      setDownloadUrl(null);
+      if (!firstLoad) {
+        toast.success(
+          `${newPages.length} página${newPages.length !== 1 ? 's' : ''} agregada${
+            newPages.length !== 1 ? 's' : ''
+          }`
+        );
+      }
+    }
+    if (rejected > 0) {
+      toast.error(
+        `${rejected} archivo${rejected !== 1 ? 's' : ''} no se ${
+          rejected !== 1 ? 'pudieron' : 'pudo'
+        } abrir`,
+        {
+          description:
+            'Solo PDF e imágenes que el navegador pueda abrir (JPG, PNG, WebP, GIF, BMP, SVG, AVIF).',
+        }
+      );
     }
   };
 
@@ -183,7 +329,7 @@ export default function PDFOrganizer() {
       const removed = prev[idx];
       const next = prev.filter((p) => p.id !== id);
       toastUndo('Página eliminada', {
-        description: `Quitaste la página ${removed.pageNumber}.`,
+        description: `Quitaste «${cardLabel(removed)}».`,
         onUndo: () =>
           setPages((cur) => {
             const restored = [...cur];
@@ -199,7 +345,7 @@ export default function PDFOrganizer() {
     setPages(initialRef.current.map((p) => ({ ...p, rotation: 0 })));
   };
 
-  // ¿Hay cambios respecto al documento original? (orden, giros o eliminaciones)
+  // ¿Hay cambios respecto a los documentos cargados? (orden, giros o eliminaciones)
   const dirty =
     pages.length !== initialRef.current.length ||
     pages.some((p, i) => {
@@ -215,24 +361,51 @@ export default function PDFOrganizer() {
   };
 
   const applyOrganize = async () => {
-    if (!selectedFile || pages.length === 0) return;
+    if (pages.length === 0) return;
     setIsProcessing(true);
     try {
       const { PDFDocument, degrees } = await import('pdf-lib');
-      const arrayBuffer = await selectedFile.arrayBuffer();
-      const src = await PDFDocument.load(arrayBuffer);
       const out = await PDFDocument.create();
 
-      // Copia (sin pérdida) las páginas en el nuevo orden y aplica los giros.
-      const copied = await out.copyPages(
-        src,
-        pages.map((p) => p.sourceIndex)
-      );
-      copied.forEach((page, i) => {
-        const current = page.getRotation().angle;
-        page.setRotation(degrees(norm(current + pages[i].rotation)));
-        out.addPage(page);
-      });
+      // 1) Copia (sin pérdida) las páginas de cada PDF de origen — cargándolo
+      //    una sola vez — y guárdalas por id para ensamblarlas después.
+      const copiedById = new Map<string, PDFPage>();
+      for (const src of sources) {
+        if (src.kind !== 'pdf') continue;
+        const items = pages.filter((p) => p.srcId === src.id);
+        if (items.length === 0) continue;
+        const doc = await PDFDocument.load(await src.file.arrayBuffer());
+        const copied = await out.copyPages(
+          doc,
+          items.map((p) => p.sourceIndex)
+        );
+        copied.forEach((page, i) => copiedById.set(items[i].id, page));
+      }
+
+      const srcById = new Map(sources.map((s) => [s.id, s]));
+
+      // 2) Ensambla el documento en el orden de la rejilla y aplica los giros.
+      for (const p of pages) {
+        if (p.kind === 'pdf') {
+          const page = copiedById.get(p.id);
+          if (!page) continue;
+          const current = page.getRotation().angle;
+          page.setRotation(degrees(norm(current + p.rotation)));
+          out.addPage(page);
+        } else {
+          const src = srcById.get(p.srcId);
+          if (!src) continue;
+          const embedded = await embedImage(out, src.file);
+          const page = out.addPage([embedded.width, embedded.height]);
+          page.drawImage(embedded, {
+            x: 0,
+            y: 0,
+            width: embedded.width,
+            height: embedded.height,
+          });
+          if (p.rotation !== 0) page.setRotation(degrees(norm(p.rotation)));
+        }
+      }
 
       const pdfBytes = await out.save();
       const blob = new Blob([pdfBytes], { type: 'application/pdf' });
@@ -259,52 +432,68 @@ export default function PDFOrganizer() {
   };
 
   const resetAll = () => {
-    setSelectedFile(null);
+    setSources([]);
     setPages([]);
     setDownloadUrl(null);
     setRenderProgress(0);
     initialRef.current = [];
   };
 
-  const changeFileWithUndo = () => {
-    if (!selectedFile) return;
-    const snap = { selectedFile, pages, downloadUrl, initial: initialRef.current };
-    setSelectedFile(null);
+  const clearAllWithUndo = () => {
+    if (sources.length === 0) return;
+    const snap = { sources, pages, initial: initialRef.current };
+    setSources([]);
     setPages([]);
     setDownloadUrl(null);
-    toastUndo('Archivo descartado', {
-      description: 'Selecciona otro PDF, o recupéralo si fue un error.',
+    initialRef.current = [];
+    toastUndo('Archivos descartados', {
+      description: 'Agrega otros archivos, o recupéralos si fue un error.',
       onUndo: () => {
         initialRef.current = snap.initial;
-        setSelectedFile(snap.selectedFile);
+        setSources(snap.sources);
         setPages(snap.pages);
-        setDownloadUrl(snap.downloadUrl);
       },
     });
   };
 
-  const step: 1 | 2 | 3 = !selectedFile ? 1 : downloadUrl ? 3 : 2;
+  const step: 1 | 2 | 3 =
+    sources.length === 0 && !isRendering ? 1 : downloadUrl ? 3 : 2;
 
   return (
     <ToolShell tool={tool} step={step}>
-      {!selectedFile && (
+      {/* Entrada oculta para "Agregar" desde el editor; value se limpia para
+          permitir volver a elegir el mismo archivo. */}
+      <input
+        ref={addInputRef}
+        type="file"
+        multiple
+        accept={ACCEPT}
+        className="hidden"
+        onChange={(e) => {
+          if (e.target.files && e.target.files.length > 0) addFiles(e.target.files);
+          e.target.value = '';
+        }}
+      />
+
+      {sources.length === 0 && !isRendering && (
         <>
           <FileDropzone
             className="mb-4"
             accent={accent}
-            accept=".pdf,application/pdf"
-            idleTitle="Selecciona un archivo PDF"
-            idleSubtitle="Haz clic aquí o arrastra y suelta tu archivo PDF"
-            dragTitle="Suelta el archivo PDF aquí"
-            buttonLabel="Seleccionar archivo"
-            ariaLabel="Seleccionar o arrastrar un archivo PDF"
-            onFiles={(files) => handleFileSelect(files[0])}
+            accept={ACCEPT}
+            multiple
+            idleTitle="Selecciona PDF o imágenes"
+            idleSubtitle="Haz clic aquí o arrastra y suelta uno o varios archivos: PDF, JPG, PNG, WebP, GIF, BMP, SVG o AVIF."
+            dragTitle="Suelta los archivos aquí"
+            buttonLabel="Seleccionar archivos"
+            ariaLabel="Seleccionar o arrastrar archivos PDF o imágenes"
+            onFiles={(files) => addFiles(files)}
           />
           <ToolConstraints items={tool.constraints} />
         </>
       )}
 
-      {selectedFile && isRendering && (
+      {isRendering && pages.length === 0 && (
         <Card className="mb-8">
           <CardContent className="p-4 sm:p-6">
             <div className="mx-auto max-w-md space-y-3 py-8 text-center" aria-live="polite">
@@ -317,42 +506,62 @@ export default function PDFOrganizer() {
         </Card>
       )}
 
-      {selectedFile && !isRendering && pages.length > 0 && !downloadUrl && (
+      {pages.length > 0 && !downloadUrl && (
         <Card className="mb-8 motion-safe:animate-slide-up" ref={editorRef}>
           <CardContent className="p-4 sm:p-6">
-            {/* Encabezado + cambiar archivo: apilado en móvil. */}
+            {/* Encabezado + agregar/quitar: apilado en móvil. */}
             <div className="mb-5 flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div className="flex w-full min-w-0 items-center gap-3 sm:flex-1">
                 <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded border-2 border-ink bg-card">
                   <FileText className="h-5 w-5 text-ink" />
                 </div>
                 <div className="min-w-0">
-                  <p className="truncate font-bold text-ink">{selectedFile.name}</p>
+                  <p className="truncate font-bold text-ink">
+                    {sources.length === 1
+                      ? sources[0].file.name
+                      : `${sources.length} archivos`}
+                  </p>
                   <p className="text-sm text-muted-foreground">
-                    {formatFileSize(selectedFile.size)} • {pages.length} página
+                    {formatFileSize(totalSize)} • {pages.length} página
                     {pages.length !== 1 ? 's' : ''}
                   </p>
                 </div>
               </div>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={changeFileWithUndo}
-                className="shrink-0"
-                disabled={isProcessing}
-              >
-                <X className="mr-2 h-4 w-4" />
-                Cambiar archivo
-              </Button>
+              <div className="flex w-full shrink-0 gap-2 sm:w-auto">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => addInputRef.current?.click()}
+                  className="flex-1 sm:flex-none"
+                  disabled={isProcessing || isRendering}
+                >
+                  {isRendering ? (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  ) : (
+                    <Plus className="mr-2 h-4 w-4" />
+                  )}
+                  Agregar
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={clearAllWithUndo}
+                  className="flex-1 sm:flex-none"
+                  disabled={isProcessing || isRendering}
+                >
+                  <X className="mr-2 h-4 w-4" />
+                  Quitar todo
+                </Button>
+              </div>
             </div>
 
-            {/* Barra de control: rótulo a la izquierda + Restablecer (ícono) a la
-                derecha. Restablecer reserva su lugar siempre (invisible si no hay
-                cambios): sin layout shift. Un solo botón sirve en ambos breakpoints. */}
-            <div className="mb-4 flex items-center justify-between gap-3 rounded-lg border-3 border-ink bg-surface p-3">
-              <span className="min-w-0 truncate text-sm font-bold text-ink">
-                Organiza tus páginas
-              </span>
+            {/* Pista de la única afordancia no obvia (arrastrar) + Restablecer
+                en la misma línea: el botón reserva su lugar siempre (invisible
+                si no hay cambios), sin layout shift. */}
+            <div className="mb-4 flex min-h-[32px] items-center justify-between gap-3">
+              <p className="min-w-0 text-xs text-muted-foreground">
+                Arrastra una página para reordenarla, o usa los botones de mover.
+              </p>
               <button
                 type="button"
                 onClick={resetChanges}
@@ -362,18 +571,13 @@ export default function PDFOrganizer() {
                 aria-label="Restablecer cambios"
                 title="Restablecer cambios"
                 className={cn(
-                  'flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-muted-foreground transition-colors duration-150 ease-out hover-fine:bg-muted hover-fine:text-ink active:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink focus-visible:ring-offset-2',
+                  'flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-muted-foreground transition-colors duration-150 ease-out hover-fine:bg-muted hover-fine:text-ink active:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink focus-visible:ring-offset-2',
                   dirty ? '' : 'invisible pointer-events-none'
                 )}
               >
                 <Undo2 className="h-4 w-4" />
               </button>
             </div>
-
-            {/* Pista de la única afordancia no obvia (arrastrar); el resto se ve. */}
-            <p className="mb-4 text-xs text-muted-foreground">
-              Arrastra una página para reordenarla, o usa los botones de mover.
-            </p>
 
             {/* Rejilla de páginas: 2 cols móvil → 4 escritorio. Cada tarjeta es
                 arrastrable (escritorio); los botones cubren táctil y teclado. */}
@@ -414,7 +618,7 @@ export default function PDFOrganizer() {
                         no la imagen. reduced-motion lo neutraliza el catch-all global. */}
                     <img
                       src={p.thumbnail}
-                      alt={`Página ${p.pageNumber}`}
+                      alt={cardLabel(p)}
                       draggable={false}
                       className="max-h-full max-w-full object-contain transition-transform duration-300 ease-in-out"
                       style={{ transform: `rotate(${p.rotation}deg)` }}
@@ -426,14 +630,16 @@ export default function PDFOrganizer() {
                       grupo en su propia fila a ancho completo (grid 2 cols →
                       minmax(0,1fr), nunca recorta en tarjetas angostas). */}
                   <div className="flex flex-col gap-2 p-2">
-                    <span className="text-xs font-bold text-ink">Pág. {p.pageNumber}</span>
+                    <span className="truncate text-xs font-bold text-ink" title={p.label}>
+                      {cardLabel(p)}
+                    </span>
 
                     <div className="grid grid-cols-2 overflow-hidden rounded-md border-2 border-ink">
                       <button
                         type="button"
                         onClick={() => movePage(i, i - 1)}
                         disabled={isProcessing || i === 0}
-                        aria-label={`Mover página ${p.pageNumber} hacia atrás`}
+                        aria-label={`Mover ${cardLabel(p)} hacia atrás`}
                         title="Mover hacia atrás"
                         className="flex h-9 items-center justify-center border-r-2 border-ink text-ink transition-colors duration-150 ease-out hover-fine:bg-muted active:bg-muted disabled:opacity-30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ink"
                       >
@@ -443,7 +649,7 @@ export default function PDFOrganizer() {
                         type="button"
                         onClick={() => movePage(i, i + 1)}
                         disabled={isProcessing || i === pages.length - 1}
-                        aria-label={`Mover página ${p.pageNumber} hacia adelante`}
+                        aria-label={`Mover ${cardLabel(p)} hacia adelante`}
                         title="Mover hacia adelante"
                         className="flex h-9 items-center justify-center text-ink transition-colors duration-150 ease-out hover-fine:bg-muted active:bg-muted disabled:opacity-30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ink"
                       >
@@ -456,7 +662,7 @@ export default function PDFOrganizer() {
                         type="button"
                         onClick={() => rotatePage(p.id, -90)}
                         disabled={isProcessing}
-                        aria-label={`Girar página ${p.pageNumber} a la izquierda`}
+                        aria-label={`Girar ${cardLabel(p)} a la izquierda`}
                         title="Girar a la izquierda"
                         className="flex h-9 items-center justify-center border-r-2 border-ink text-ink transition-colors duration-150 ease-out hover-fine:bg-muted active:bg-muted disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ink"
                       >
@@ -466,7 +672,7 @@ export default function PDFOrganizer() {
                         type="button"
                         onClick={() => rotatePage(p.id, 90)}
                         disabled={isProcessing}
-                        aria-label={`Girar página ${p.pageNumber} a la derecha`}
+                        aria-label={`Girar ${cardLabel(p)} a la derecha`}
                         title="Girar a la derecha"
                         className="flex h-9 items-center justify-center text-ink transition-colors duration-150 ease-out hover-fine:bg-muted active:bg-muted disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ink"
                       >
@@ -479,7 +685,7 @@ export default function PDFOrganizer() {
                       type="button"
                       onClick={() => deletePage(p.id)}
                       disabled={isProcessing || pages.length <= 1}
-                      aria-label={`Eliminar página ${p.pageNumber}`}
+                      aria-label={`Eliminar ${cardLabel(p)}`}
                       title="Eliminar página"
                       className="flex h-9 items-center justify-center gap-1.5 rounded-md border-2 border-ink text-xs font-bold text-brand-red transition-colors duration-150 ease-out hover-fine:bg-brand-red hover-fine:text-white active:bg-brand-red disabled:opacity-30 disabled:hover-fine:bg-transparent disabled:hover-fine:text-brand-red focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ink"
                     >
@@ -494,7 +700,7 @@ export default function PDFOrganizer() {
             <div className="mt-6 text-center">
               <Button
                 onClick={applyOrganize}
-                disabled={isProcessing}
+                disabled={isProcessing || isRendering}
                 aria-busy={isProcessing}
                 size="lg"
                 className={accent.solid}
@@ -532,7 +738,7 @@ export default function PDFOrganizer() {
                 Descargar PDF
               </Button>
               <Button variant="outline" onClick={resetAll} size="lg">
-                Organizar otro PDF
+                Organizar otros archivos
               </Button>
             </div>
           </CardContent>
