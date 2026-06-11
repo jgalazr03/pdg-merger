@@ -347,7 +347,7 @@ export const TOOLS: ToolDef[] = [
     category: 'organizar',
     name: 'Dividir PDF',
     title: 'Dividir PDF',
-    tagline: 'Extrae páginas o rangos de un PDF en documentos independientes.',
+    tagline: 'Separa un PDF en varios documentos por páginas o rangos.',
     description:
       'Separa un PDF en varios documentos indicando páginas o rangos (1-3, 5, 8-10). Rápido, preciso y 100% en tu navegador.',
     Icon: Scissors,
@@ -383,7 +383,7 @@ export const TOOLS: ToolDef[] = [
     category: 'convertir',
     name: 'Convertir archivos',
     title: 'Convertir archivos',
-    tagline: 'Convierte entre PDF e imágenes (JPG, PNG, WebP) en tu navegador.',
+    tagline: 'Convierte entre PDF e imágenes (JPG, PNG, WebP).',
     description:
       'Convierte archivos entre PDF e imágenes: pasa un PDF a imágenes (una por página), una imagen a PDF, o entre formatos de imagen (JPG, PNG, WebP). Todo ocurre en tu navegador.',
     Icon: Repeat,
@@ -493,7 +493,7 @@ export const TOOLS: ToolDef[] = [
     category: 'editar',
     name: 'Numerar páginas',
     title: 'Numerar páginas de un PDF',
-    tagline: 'Añade números de página con posición y formato a tu elección.',
+    tagline: 'Añade números de página con posición y formato.',
     description:
       'Inserta números de página en el PDF, eligiendo posición, formato (1, 1/20, Página 1) y desde qué página empezar. Procesa uno o varios PDF a la vez. Todo ocurre en tu navegador.',
     Icon: Hash,
@@ -682,7 +682,7 @@ export const TOOLS: ToolDef[] = [
     category: 'optimizar',
     name: 'Escala de grises',
     title: 'Convertir un PDF a escala de grises',
-    tagline: 'Pasa el documento a blanco y negro para imprimir o reducir peso.',
+    tagline: 'Convierte tu PDF a blanco y negro para imprimir.',
     description:
       'Convierte cada página a escala de grises rasterizándolas, útil para imprimir en monocromo o estandarizar el documento. Todo ocurre en tu navegador.',
     Icon: Contrast,
@@ -700,7 +700,7 @@ export const TOOLS: ToolDef[] = [
     category: 'optimizar',
     name: 'Información',
     title: 'Información de un PDF',
-    tagline: 'Analiza páginas, tamaño, dimensiones, metadatos y cifrado.',
+    tagline: 'Analiza páginas, tamaño, metadatos y cifrado.',
     description:
       'Inspecciona un PDF y muestra su número de páginas, tamaño, dimensiones, metadatos y si está cifrado, sin modificarlo. Todo ocurre en tu navegador.',
     Icon: Info,
