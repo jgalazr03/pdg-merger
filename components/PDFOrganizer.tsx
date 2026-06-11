@@ -612,13 +612,16 @@ export default function PDFOrganizer() {
                   </span>
 
                   {/* Girar = acción poco frecuente → fuera del flujo principal
-                      (progressive disclosure): overlay en la esquina de la
-                      miniatura, invisible en escritorio hasta hover o foco de
+                      (progressive disclosure): overlay discreto en la esquina de
+                      la miniatura, invisible en escritorio hasta hover o foco de
                       teclado (solo opacidad, 150ms ease-out). En táctil no hay
-                      hover, así que queda siempre visible. */}
+                      hover, así que queda siempre visible. Registro "callado"
+                      (Vercel): chico, borde fino de 1px e icono apagado que solo
+                      toma tinta al interactuar, sin competir con la insignia de
+                      posición ni el contenido. */}
                   <div
                     className={cn(
-                      'absolute right-2 top-2 z-10 grid grid-cols-2 overflow-hidden rounded-md border-2 border-ink bg-surface',
+                      'absolute right-2 top-2 z-10 flex overflow-hidden rounded-md border border-ink bg-surface',
                       'transition-opacity duration-150 ease-out pointer-fine:opacity-0 group-hover-fine:opacity-100 focus-within:opacity-100'
                     )}
                   >
@@ -628,9 +631,9 @@ export default function PDFOrganizer() {
                       disabled={isProcessing}
                       aria-label={`Girar ${cardLabel(p)} a la izquierda`}
                       title="Girar a la izquierda"
-                      className="flex h-7 w-7 items-center justify-center border-r-2 border-ink text-ink transition-colors duration-150 ease-out hover-fine:bg-muted active:bg-muted disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ink"
+                      className="flex h-6 w-6 items-center justify-center border-r border-ink text-muted-foreground transition-colors duration-150 ease-out hover-fine:bg-muted hover-fine:text-ink active:bg-muted disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ink"
                     >
-                      <RotateCcw className="h-4 w-4" />
+                      <RotateCcw className="h-3 w-3" />
                     </button>
                     <button
                       type="button"
@@ -638,9 +641,9 @@ export default function PDFOrganizer() {
                       disabled={isProcessing}
                       aria-label={`Girar ${cardLabel(p)} a la derecha`}
                       title="Girar a la derecha"
-                      className="flex h-7 w-7 items-center justify-center text-ink transition-colors duration-150 ease-out hover-fine:bg-muted active:bg-muted disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ink"
+                      className="flex h-6 w-6 items-center justify-center text-muted-foreground transition-colors duration-150 ease-out hover-fine:bg-muted hover-fine:text-ink active:bg-muted disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ink"
                     >
-                      <RotateCw className="h-4 w-4" />
+                      <RotateCw className="h-3 w-3" />
                     </button>
                   </div>
 
