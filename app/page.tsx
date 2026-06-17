@@ -9,7 +9,7 @@ export default function Home() {
             El salto de línea solo se fuerza con sitio (≥400px); por debajo,
             envuelve solo. */}
         <h1 className="text-[clamp(1.65rem,8vw,3.75rem)] font-bold leading-[1.05] tracking-tight text-ink">
-          Tus PDF y Excel,
+          Tus documentos,
           <br className="hidden min-[400px]:block" /> resueltos al instante.
         </h1>
         <p className="mt-5 max-w-xl text-base leading-relaxed text-muted-foreground sm:mt-6 sm:text-lg">
