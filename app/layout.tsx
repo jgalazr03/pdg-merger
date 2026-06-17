@@ -23,7 +23,7 @@ export const metadata: Metadata = {
     template: '%s | GAINCO',
   },
   description:
-    'Une, divide, comprime y convierte archivos PDF y Excel de forma rápida y segura, directo desde tu navegador.',
+    'Une, divide, comprime y convierte tus documentos PDF y Excel de forma rápida y segura, directo desde tu navegador.',
   // Favicon: icono de Herramientas en SVG que adapta su color al tema del
   // sistema (claro/oscuro) mediante prefers-color-scheme embebido en el archivo
   // (invierte papel/navy para no perder contraste contra el chrome del navegador).
