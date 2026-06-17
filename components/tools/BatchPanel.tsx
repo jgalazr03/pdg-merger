@@ -1,10 +1,11 @@
 'use client';
 
+import { useEffect, useRef } from 'react';
 import { FileText, Loader2, X, Check, AlertCircle, Download } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { cn } from '@/lib/utils';
+import { cn, scrollIntoViewSafe } from '@/lib/utils';
 import type { ToolAccent } from '@/lib/tools';
 import type { BatchItem } from '@/hooks/use-batch-processor';
 
@@ -54,11 +55,35 @@ export default function BatchPanel({
   onDownloadOne,
   resultHint,
 }: BatchPanelProps) {
-  if (items.length === 0) return null;
+  const panelRef = useRef<HTMLDivElement>(null);
+  const resultRef = useRef<HTMLDivElement>(null);
+  // Recuerda si ya había archivos para disparar el scroll solo al pasar del
+  // paso 1 (vacío) al paso 2 (con archivos), no al sumar más al lote.
+  const hadItems = useRef(false);
+
+  const hasItems = items.length > 0;
   const finished = done && doneCount > 0 && doneCount + errorCount >= items.length;
 
+  // Al seleccionar los primeros archivos, lleva el panel debajo del header
+  // (mismo gesto que las herramientas de un solo archivo).
+  useEffect(() => {
+    if (hasItems && !hadItems.current) {
+      setTimeout(() => scrollIntoViewSafe(panelRef.current), 100);
+    }
+    hadItems.current = hasItems;
+  }, [hasItems]);
+
+  // Al terminar el lote, revela el bloque de resultado.
+  useEffect(() => {
+    if (finished) {
+      setTimeout(() => scrollIntoViewSafe(resultRef.current), 100);
+    }
+  }, [finished]);
+
+  if (!hasItems) return null;
+
   return (
-    <Card className="mb-8 motion-safe:animate-slide-up">
+    <Card ref={panelRef} className="mb-8 motion-safe:animate-slide-up">
       <CardContent className="p-4 sm:p-6">
         <div className="mb-4 flex items-center justify-between gap-3">
           <h2 className="font-display text-lg font-bold text-ink">
@@ -166,6 +191,7 @@ export default function BatchPanel({
           </div>
         ) : (
           <div
+            ref={resultRef}
             className={cn(
               'mt-6 rounded-lg border-3 border-ink p-4 text-center',
               accent.soft

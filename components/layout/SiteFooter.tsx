@@ -33,7 +33,7 @@ export default function SiteFooter() {
               className="h-8 w-auto"
             />
             <p className="mt-5 text-sm leading-relaxed text-white/70">
-              Une, divide, comprime, convierte y edita archivos PDF, directo
+              Une, divide, comprime, convierte y edita tus documentos, directo
               desde tu navegador.
             </p>
             <p className="mt-6 flex items-center gap-2.5 text-sm font-bold text-white">
