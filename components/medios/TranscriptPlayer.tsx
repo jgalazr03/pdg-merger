@@ -138,6 +138,7 @@ function TranscriptPlayer(
             ref={(el) => (mediaRef.current = el)}
             src={mediaUrl}
             controls
+            playsInline
             className="w-full bg-black"
           />
         ) : (
@@ -152,8 +153,8 @@ function TranscriptPlayer(
 
       <p className="mb-2 mt-3 flex items-center gap-2 text-xs text-muted-foreground">
         <Play className={cn('h-3.5 w-3.5', accent.text)} strokeWidth={2.5} />
-        Toca cualquier línea para reproducir el audio desde ahí. El texto es
-        editable.
+        Toca una marca de tiempo para reproducir desde ahí. Toca el texto para
+        corregirlo.
       </p>
 
       {/* Transcripción sincronizada */}
@@ -191,18 +192,22 @@ function TranscriptPlayer(
                   </span>
                 </div>
               )}
-              <div className="flex items-start gap-2 sm:gap-3">
+              <div className="flex items-stretch gap-2 sm:gap-3">
                 <button
                   type="button"
                   onClick={() => seek(start, i)}
                   aria-label={`Reproducir desde ${clock(start)}`}
                   className={cn(
-                    'mt-0.5 shrink-0 rounded border-2 px-1.5 py-0.5 font-mono text-xs tabular-nums transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink focus-visible:ring-offset-1',
+                    'flex w-[4.5rem] shrink-0 items-center justify-center gap-1 rounded border-2 py-1 font-mono text-xs tabular-nums transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink focus-visible:ring-offset-1',
                     isActive
                       ? cn(accent.solid, 'border-ink')
-                      : cn('border-ink/20 hover-fine:border-ink', accent.text)
+                      : cn(
+                          'border-ink/20 text-ink hover-fine:border-ink hover-fine:bg-muted',
+                          accent.text
+                        )
                   )}
                 >
+                  <Play className="h-3 w-3 shrink-0" strokeWidth={2.5} />
                   {clock(start)}
                 </button>
                 <div

@@ -48,19 +48,8 @@ export default function ChaptersPanel({ chunks, accent, onSeek }: Props) {
   };
 
   return (
-    <div className="mt-6 rounded-lg border-3 border-ink bg-card">
-      <div
-        className={cn(
-          'flex items-center gap-2 border-b-3 border-ink px-4 py-3',
-          accent.soft
-        )}
-      >
-        <ListTree className={cn('h-5 w-5', accent.text)} strokeWidth={2.5} />
-        <h3 className="font-display text-base font-bold text-ink">Capítulos</h3>
-      </div>
-
-      <div className="p-4 sm:p-5">
-        {phase === 'done' && chapters.length > 0 ? (
+    <div className="p-4 sm:p-5">
+      {phase === 'done' && chapters.length > 0 ? (
           <>
             <ol className="space-y-1.5">
               {chapters.map((c, i) => (
@@ -132,7 +121,6 @@ export default function ChaptersPanel({ chunks, accent, onSeek }: Props) {
             )}
           </>
         )}
-      </div>
     </div>
   );
 }

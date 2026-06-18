@@ -6,12 +6,11 @@ import {
   FileAudio,
   FileVideo,
   X,
-  Download,
   Copy,
   Loader2,
   Check,
   AlertCircle,
-  Sparkles,
+  RotateCcw,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { getTool } from '@/lib/tools';
@@ -27,12 +26,8 @@ import { upload } from '@vercel/blob/client';
 import TranscriptPlayer, {
   type TranscriptPlayerHandle,
 } from '@/components/medios/TranscriptPlayer';
-import SummaryPanel from '@/components/medios/SummaryPanel';
-import AskPanel from '@/components/medios/AskPanel';
-import ChaptersPanel from '@/components/medios/ChaptersPanel';
 import DownloadMenu from '@/components/medios/DownloadMenu';
-import TranslatePanel from '@/components/medios/TranslatePanel';
-import DeliverablePanel from '@/components/medios/DeliverablePanel';
+import AiWorkspace from '@/components/medios/AiWorkspace';
 import {
   type Chunk,
   plainText,
@@ -40,7 +35,6 @@ import {
   toSrt,
   toVtt,
 } from '@/lib/transcript';
-import type { Minuta } from '@/lib/summary';
 import { decodeAudioTo16kMono, prepareForUpload } from '@/lib/audio';
 
 const tool = getTool('transcribir');
@@ -63,9 +57,6 @@ const isMedia = (f: File) =>
   f.type.startsWith('video/') ||
   /\.(mp3|wav|m4a|ogg|mp4|webm|aac|flac|mov)$/i.test(f.name);
 
-// Identidad estable de un archivo, para no relanzar la subida adelantada del
-// mismo archivo ni confundirla con otra.
-const fileKeyOf = (f: File) => `${f.name}:${f.size}:${f.lastModified}`;
 
 function formatFileSize(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
@@ -98,16 +89,6 @@ export default function Transcriber() {
   // Cambia con cada transcripción terminada: fuerza el remonte de
   // TranscriptPlayer para reinicializar el texto editable.
   const [runId, setRunId] = useState(0);
-  // Resumen / minuta automática (Claude).
-  const [summaryPhase, setSummaryPhase] = useState<
-    'idle' | 'loading' | 'done' | 'error'
-  >('idle');
-  const [minuta, setMinuta] = useState<Minuta | null>(null);
-  const [summaryError, setSummaryError] = useState('');
-  const [summaryTruncated, setSummaryTruncated] = useState(false);
-  // Subida adelantada (especulativa) del modo servidor.
-  const [speculating, setSpeculating] = useState(false);
-  const [specReady, setSpecReady] = useState(false);
 
   const workerRef = useRef<Worker | null>(null);
   const progressRef = useRef<Map<string, { loaded: number; total: number }>>(
@@ -118,15 +99,6 @@ export default function Transcriber() {
   // Control imperativo del reproductor (para que el panel de preguntas salte a
   // un momento citado).
   const playerRef = useRef<TranscriptPlayerHandle>(null);
-  // Subida adelantada en curso (o terminada): empieza al elegir "servidor" para
-  // que, al pulsar Transcribir, el blob ya esté listo. Se descarta si el usuario
-  // cambia a local o de archivo.
-  const specRef = useRef<{
-    fileKey: string;
-    abort: AbortController;
-    promise: Promise<string>;
-  } | null>(null);
-  const specUrlRef = useRef<string | null>(null);
 
   // Preview reproducible; libera el objectURL al cambiar/limpiar.
   useEffect(() => {
@@ -139,14 +111,9 @@ export default function Transcriber() {
     return () => URL.revokeObjectURL(url);
   }, [selectedFile]);
 
-  // Termina el worker al desmontar (libera el modelo en memoria) y descarta
-  // cualquier subida adelantada pendiente.
+  // Termina el worker al desmontar (libera el modelo en memoria).
   useEffect(() => {
-    return () => {
-      workerRef.current?.terminate();
-      cancelSpeculation();
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    return () => workerRef.current?.terminate();
   }, []);
 
   useEffect(() => {
@@ -173,10 +140,6 @@ export default function Transcriber() {
     setText('');
     setChunks([]);
     setErrorMsg('');
-    clearSummary();
-    // Si el usuario ya estaba en "servidor", adelanta la subida del nuevo archivo.
-    cancelSpeculation();
-    if (mode === 'server') startSpeculation(file);
   };
 
   const reset = () => {
@@ -186,8 +149,6 @@ export default function Transcriber() {
     setChunks([]);
     setErrorMsg('');
     setModelPct(0);
-    clearSummary();
-    cancelSpeculation();
   };
 
   // El usuario corrigió el texto de un segmento en el reproductor: re-derivamos
@@ -195,35 +156,6 @@ export default function Transcriber() {
   const handleEdit = (ch: Chunk[]) => {
     setChunks(ch);
     setText(plainText(ch));
-  };
-
-  const clearSummary = () => {
-    setSummaryPhase('idle');
-    setMinuta(null);
-    setSummaryError('');
-    setSummaryTruncated(false);
-  };
-
-  // Resumen / minuta con Claude. Envía solo el texto (sirve para ambos modos).
-  const generateSummary = async () => {
-    if (!text.trim()) return;
-    setSummaryError('');
-    setSummaryPhase('loading');
-    try {
-      const res = await fetch('/api/summarize', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data?.error || 'No se pudo generar el resumen.');
-      setMinuta(data.minuta as Minuta);
-      setSummaryTruncated(!!data.truncated);
-      setSummaryPhase('done');
-    } catch (e) {
-      setSummaryError((e as Error).message || 'No se pudo generar el resumen.');
-      setSummaryPhase('error');
-    }
   };
 
   const handleWorkerMessage = (e: MessageEvent) => {
@@ -266,7 +198,6 @@ export default function Transcriber() {
     setErrorMsg('');
     setText('');
     setChunks([]);
-    clearSummary();
     if (mode === 'server') void transcribeServer();
     else void transcribeLocal();
   };
@@ -304,104 +235,26 @@ export default function Transcriber() {
     workerRef.current.postMessage({ type: 'transcribe', audio }, [audio.buffer]);
   };
 
-  // Prepara (16 kHz mono) y sube a Vercel Blob, devolviendo la URL. `signal`
-  // permite cancelar una subida adelantada. `onPct` reporta el progreso.
-  const uploadToBlob = async (
-    file: File,
-    onPct: (n: number) => void,
-    signal?: AbortSignal
-  ): Promise<string> => {
-    const prepared = await prepareForUpload(file);
-    const blob = await upload(prepared.name, prepared.blob, {
-      access: 'public',
-      handleUploadUrl: '/api/blob-upload',
-      onUploadProgress: (e) => onPct(Math.round(e.percentage)),
-      abortSignal: signal,
-    });
-    return blob.url;
-  };
-
-  // Inicia la subida adelantada del archivo (al elegir "servidor"). Idempotente
-  // por archivo. El audio solo sale del equipo aquí, cuando el usuario ya optó
-  // por el servidor (el modo local nunca dispara esto).
-  const startSpeculation = (file: File) => {
-    const key = fileKeyOf(file);
-    if (specRef.current?.fileKey === key) return;
-    cancelSpeculation();
-    const abort = new AbortController();
-    setSpeculating(true);
-    setSpecReady(false);
-    setUploadPct(0);
-    const promise = uploadToBlob(file, (n) => setUploadPct(n), abort.signal)
-      .then((url) => {
-        specUrlRef.current = url;
-        setSpeculating(false);
-        setSpecReady(true);
-        return url;
-      })
-      .catch((err) => {
-        setSpeculating(false);
-        throw err;
-      });
-    specRef.current = { fileKey: key, abort, promise };
-  };
-
-  // Descarta la subida adelantada: aborta la que esté en curso y borra el blob
-  // ya subido (para no dejar basura en Blob).
-  const cancelSpeculation = () => {
-    const spec = specRef.current;
-    specRef.current = null;
-    setSpeculating(false);
-    setSpecReady(false);
-    const url = specUrlRef.current;
-    specUrlRef.current = null;
-    if (spec) spec.abort.abort();
-    if (url) {
-      void fetch('/api/blob-delete', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ url }),
-      }).catch(() => {});
-    }
-  };
-
-  // Modo servidor: aprovecha la subida adelantada si existe; si no (o si falló),
-  // sube ahora. Deepgram Nova-3 transcribe el blob por URL.
+  // Modo servidor: reduce a 16 kHz mono, sube a Vercel Blob (cualquier tamaño) y
+  // Deepgram Nova-3 transcribe el blob por URL. La subida empieza al pulsar
+  // Transcribir (nada sale del equipo antes de eso).
   const transcribeServer = async () => {
     if (!selectedFile) return;
-    const file = selectedFile;
     try {
-      let url: string;
-      const spec = specRef.current;
-      if (spec && spec.fileKey === fileKeyOf(file)) {
-        // Consumimos la subida adelantada (cancelSpeculation ya no la tocará).
-        specRef.current = null;
-        setPhase('uploading');
-        try {
-          url = await spec.promise;
-        } catch {
-          // La subida adelantada falló: reintenta desde cero.
-          setPhase('decoding');
-          setUploadPct(0);
-          setPhase('uploading');
-          url = await uploadToBlob(file, (n) => setUploadPct(n));
-        }
-      } else {
-        // Reduce a 16 kHz mono antes de subir (misma precisión, mucho menos que
-        // transferir dos veces: navegador→Blob y Blob→Deepgram).
-        setPhase('decoding');
-        setUploadPct(0);
-        setPhase('uploading');
-        url = await uploadToBlob(file, (n) => setUploadPct(n));
-      }
-      // El blob ya es nuestro y /api/transcribe lo borrará: no re-borrar.
-      specUrlRef.current = null;
-      setSpecReady(false);
+      setPhase('decoding');
+      const prepared = await prepareForUpload(selectedFile);
+      setUploadPct(0);
+      setPhase('uploading');
+      const blob = await upload(prepared.name, prepared.blob, {
+        access: 'public',
+        handleUploadUrl: '/api/blob-upload',
+        onUploadProgress: (e) => setUploadPct(Math.round(e.percentage)),
+      });
       setPhase('transcribing');
       const res = await fetch('/api/transcribe', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ url }),
+        body: JSON.stringify({ url: blob.url }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data?.error || 'Error del servidor');
@@ -448,7 +301,7 @@ export default function Transcriber() {
   const loaderPct = phase === 'uploading' ? uploadPct : modelPct;
 
   return (
-    <ToolShell tool={tool} step={step}>
+    <ToolShell tool={tool} step={step} wide>
       <FileDropzone
         className="mb-4"
         accent={accent}
@@ -525,13 +378,13 @@ export default function Transcriber() {
                       [
                         {
                           key: 'local',
-                          title: 'Privado · en tu navegador',
-                          desc: 'No sale de tu equipo',
+                          title: 'En tu navegador',
+                          desc: 'Privado, nada se sube. Puede ser más lento.',
                         },
                         {
                           key: 'server',
-                          title: 'Rápido · servidor (Nova-3)',
-                          desc: 'Máxima precisión · identifica hablantes',
+                          title: 'En el servidor (Nova-3)',
+                          desc: 'Más rápido y preciso. Identifica hablantes.',
                         },
                       ] as const
                     ).map((opt) => {
@@ -540,16 +393,7 @@ export default function Transcriber() {
                         <button
                           key={opt.key}
                           type="button"
-                          onClick={() => {
-                            setMode(opt.key);
-                            // Al elegir servidor, adelanta la subida; al volver a
-                            // local, descártala (el modo privado no sube nada).
-                            if (opt.key === 'server') {
-                              if (selectedFile) startSpeculation(selectedFile);
-                            } else {
-                              cancelSpeculation();
-                            }
-                          }}
+                          onClick={() => setMode(opt.key)}
                           disabled={busy}
                           aria-pressed={active}
                           className={cn(
@@ -579,28 +423,6 @@ export default function Transcriber() {
                       ? 'Tu grabación se procesa en el navegador; nada se sube. Ideal para audios cortos.'
                       : 'Tu grabación se sube para transcribirse con Deepgram Nova-3 (máxima precisión, cualquier tamaño, identifica a cada hablante) y se borra al terminar.'}
                   </p>
-                  {/* Adelanto: la subida ya va en marcha mientras el usuario
-                      decide; al pulsar Transcribir, será inmediata. */}
-                  {mode === 'server' && (speculating || specReady) && (
-                    <p
-                      className={cn(
-                        'mt-1.5 flex items-center gap-1.5 text-xs font-medium',
-                        accent.text
-                      )}
-                    >
-                      {specReady ? (
-                        <>
-                          <Check className="h-3.5 w-3.5" strokeWidth={3} />
-                          Audio adelantado · la transcripción empezará al instante
-                        </>
-                      ) : (
-                        <>
-                          <span className="inline-block h-2 w-2 animate-pulse rounded-full bg-current" />
-                          Adelantando la subida… {uploadPct}%
-                        </>
-                      )}
-                    </p>
-                  )}
                 </div>
 
                 {/* El botón se oculta mientras procesa: el loader de abajo es
@@ -665,9 +487,10 @@ export default function Transcriber() {
       )}
 
       {phase === 'done' && (
-        <Card ref={resultRef} className="motion-safe:animate-slide-up">
-          <CardContent className="p-4 sm:p-6">
-            <div className="mb-4 flex items-center gap-2">
+        <div ref={resultRef} className="motion-safe:animate-slide-up">
+          {/* Estado + acción de reinicio claramente separada del recurso actual */}
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+            <div className="flex items-center gap-2">
               <span className="inline-flex h-8 w-8 items-center justify-center rounded-full border-3 border-ink bg-success text-white">
                 <Check className="h-5 w-5" strokeWidth={3} />
               </span>
@@ -675,166 +498,103 @@ export default function Transcriber() {
                 Transcripción lista
               </h2>
             </div>
+            <Button variant="outline" size="sm" onClick={reset}>
+              <RotateCcw className="mr-2 h-4 w-4" />
+              Transcribir otro
+            </Button>
+          </div>
 
-            {chunks.length > 0 && previewUrl ? (
-              <TranscriptPlayer
-                key={runId}
-                ref={playerRef}
-                chunks={chunks}
-                mediaUrl={previewUrl}
-                isVideo={!!isVideo}
-                accent={accent}
-                onChange={handleEdit}
-              />
-            ) : (
-              <Textarea
-                value={text}
-                onChange={(e) => setText(e.target.value)}
-                rows={12}
-                aria-label="Texto de la transcripción (editable)"
-                className="font-mono"
-              />
-            )}
+          <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)]">
+            {/* Izquierda: reproductor + transcripción + exportar */}
+            <div className="space-y-4">
+              {chunks.length > 0 && previewUrl ? (
+                <TranscriptPlayer
+                  key={runId}
+                  ref={playerRef}
+                  chunks={chunks}
+                  mediaUrl={previewUrl}
+                  isVideo={!!isVideo}
+                  accent={accent}
+                  onChange={handleEdit}
+                />
+              ) : (
+                <Textarea
+                  value={text}
+                  onChange={(e) => setText(e.target.value)}
+                  rows={12}
+                  aria-label="Texto de la transcripción (editable)"
+                  className="font-mono"
+                />
+              )}
 
-            <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-start">
-              <Button
-                onClick={() => {
-                  void navigator.clipboard
-                    .writeText(text)
-                    .then(() => toast.success('Texto copiado'));
-                }}
-                variant="outline"
-              >
-                <Copy className="mr-2 h-4 w-4" />
-                Copiar
-              </Button>
-              {chunks.length > 0 && (
+              <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-start">
                 <Button
                   onClick={() => {
                     void navigator.clipboard
-                      .writeText(timedText(chunks))
-                      .then(() => toast.success('Copiado con marcas de tiempo'));
+                      .writeText(text)
+                      .then(() => toast.success('Texto copiado'));
                   }}
                   variant="outline"
                 >
                   <Copy className="mr-2 h-4 w-4" />
-                  Copiar con tiempos
+                  Copiar
                 </Button>
-              )}
-              {/* Todas las descargas en un solo botón con menú (libera el flujo). */}
-              <DownloadMenu
-                className={accent.solid}
-                items={[
-                  {
-                    label: 'Texto (.txt)',
-                    onSelect: () => triggerDownload(text, `${baseName}.txt`),
-                  },
-                  ...(chunks.length > 0
-                    ? [
-                        {
-                          label: 'Subtítulos (.srt)',
-                          onSelect: () =>
-                            triggerDownload(toSrt(chunks), `${baseName}.srt`),
-                        },
-                        {
-                          label: 'Subtítulos (.vtt)',
-                          onSelect: () =>
-                            triggerDownload(toVtt(chunks), `${baseName}.vtt`),
-                        },
-                      ]
-                    : []),
-                ]}
-              />
-              <Button variant="outline" onClick={reset}>
-                Transcribir otro
-              </Button>
-            </div>
-
-            {/* Capítulos/temas automáticos (Claude + saltos al reproductor) */}
-            {chunks.length > 0 && previewUrl && (
-              <ChaptersPanel
-                chunks={chunks}
-                accent={accent}
-                onSeek={(t) => playerRef.current?.seekTo(t)}
-              />
-            )}
-
-            {/* Pregúntale a tu grabación (Claude + citas clicables) */}
-            {chunks.length > 0 && previewUrl && (
-              <AskPanel
-                chunks={chunks}
-                accent={accent}
-                onSeek={(t) => playerRef.current?.seekTo(t)}
-              />
-            )}
-
-            {/* Resumen / minuta automática (Claude) */}
-            <div className="mt-6 border-t-3 border-ink/10 pt-5">
-              {summaryPhase === 'done' && minuta ? (
-                <>
-                  <SummaryPanel
-                    minuta={minuta}
-                    baseName={baseName}
-                    accent={accent}
-                  />
-                  {summaryTruncated && (
-                    <p className="mt-2 text-xs text-muted-foreground">
-                      La transcripción era muy larga; el resumen se basó en la
-                      primera parte.
-                    </p>
-                  )}
-                </>
-              ) : (
-                <>
+                {chunks.length > 0 && (
                   <Button
-                    onClick={generateSummary}
-                    disabled={summaryPhase === 'loading'}
-                    className={accent.solid}
-                    aria-busy={summaryPhase === 'loading'}
+                    onClick={() => {
+                      void navigator.clipboard
+                        .writeText(timedText(chunks))
+                        .then(() =>
+                          toast.success('Copiado con marcas de tiempo')
+                        );
+                    }}
+                    variant="outline"
                   >
-                    {summaryPhase === 'loading' ? (
-                      <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                    ) : (
-                      <Sparkles className="mr-2 h-5 w-5" />
-                    )}
-                    {summaryPhase === 'loading'
-                      ? 'Generando resumen…'
-                      : 'Generar resumen'}
+                    <Copy className="mr-2 h-4 w-4" />
+                    Copiar con tiempos
                   </Button>
-                  <p className="mt-2 text-xs text-muted-foreground">
-                    Crea una minuta con los puntos clave (y acuerdos y tareas si
-                    es una reunión). El texto de la transcripción se envía para
-                    resumirlo.
-                  </p>
-                  {summaryPhase === 'error' && summaryError && (
-                    <div className="mt-3 flex items-start gap-2 rounded-lg border-3 border-destructive bg-destructive/5 p-3">
-                      <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-destructive" />
-                      <p className="text-sm text-destructive">{summaryError}</p>
-                    </div>
-                  )}
-                </>
-              )}
+                )}
+                <DownloadMenu
+                  className={accent.solid}
+                  items={[
+                    {
+                      label: 'Texto (.txt)',
+                      onSelect: () => triggerDownload(text, `${baseName}.txt`),
+                    },
+                    ...(chunks.length > 0
+                      ? [
+                          {
+                            label: 'Subtítulos (.srt)',
+                            onSelect: () =>
+                              triggerDownload(toSrt(chunks), `${baseName}.srt`),
+                          },
+                          {
+                            label: 'Subtítulos (.vtt)',
+                            onSelect: () =>
+                              triggerDownload(toVtt(chunks), `${baseName}.vtt`),
+                          },
+                        ]
+                      : []),
+                  ]}
+                />
+              </div>
             </div>
 
-            {/* Generar documento (acta / correo / publicación) */}
-            {chunks.length > 0 && (
-              <DeliverablePanel
-                chunks={chunks}
-                accent={accent}
-                baseName={baseName}
-              />
+            {/* Derecha: workspace de herramientas AI (pestañas, no pila de cards) */}
+            {chunks.length > 0 && previewUrl && (
+              <div className="lg:sticky lg:top-24 lg:self-start">
+                <AiWorkspace
+                  key={runId}
+                  chunks={chunks}
+                  text={text}
+                  accent={accent}
+                  baseName={baseName}
+                  onSeek={(t) => playerRef.current?.seekTo(t)}
+                />
+              </div>
             )}
-
-            {/* Traducir transcripción / subtítulos */}
-            {chunks.length > 0 && (
-              <TranslatePanel
-                chunks={chunks}
-                accent={accent}
-                baseName={baseName}
-              />
-            )}
-          </CardContent>
-        </Card>
+          </div>
+        </div>
       )}
     </ToolShell>
   );

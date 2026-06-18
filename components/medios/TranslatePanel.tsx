@@ -78,19 +78,8 @@ export default function TranslatePanel({ chunks, accent, baseName }: Props) {
   const base = `${baseName}-${doneLang.toLowerCase()}`;
 
   return (
-    <div className="mt-6 rounded-lg border-3 border-ink bg-card">
-      <div
-        className={cn(
-          'flex items-center gap-2 border-b-3 border-ink px-4 py-3',
-          accent.soft
-        )}
-      >
-        <Languages className={cn('h-5 w-5', accent.text)} strokeWidth={2.5} />
-        <h3 className="font-display text-base font-bold text-ink">Traducir</h3>
-      </div>
-
-      <div className="p-4 sm:p-5">
-        <p className="mb-3 text-sm text-muted-foreground">
+    <div className="p-4 sm:p-5">
+      <p className="mb-3 text-sm text-muted-foreground">
           Traduce la transcripción conservando los tiempos. Útil para subtítulos
           en otro idioma.
         </p>
@@ -186,7 +175,6 @@ export default function TranslatePanel({ chunks, accent, baseName }: Props) {
             </div>
           </div>
         )}
-      </div>
     </div>
   );
 }

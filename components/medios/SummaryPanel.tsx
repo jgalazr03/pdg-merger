@@ -1,6 +1,16 @@
 'use client';
 
-import { Sparkles, ListChecks, Gavel, ListTodo, Copy, Download } from 'lucide-react';
+import { useState } from 'react';
+import {
+  Sparkles,
+  ListChecks,
+  Gavel,
+  ListTodo,
+  Copy,
+  Download,
+  Loader2,
+  AlertCircle,
+} from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import type { ToolAccent } from '@/lib/tools';
@@ -9,7 +19,7 @@ import { Button } from '@/components/ui/button';
 import Markdown from '@/components/medios/Markdown';
 
 type Props = {
-  minuta: Minuta;
+  text: string;
   baseName: string;
   accent: ToolAccent;
 };
@@ -48,20 +58,45 @@ function Section({
   );
 }
 
-/** Render neo-brutalista de la minuta generada por Claude. Oculta las secciones
- *  vacías (una clase o nota de voz no trae acuerdos ni tareas). */
-export default function SummaryPanel({ minuta, baseName, accent }: Props) {
-  const md = minutaToText(minuta);
+/**
+ * Resumen/minuta de la grabación (Claude). Autocontenido: botón → genera →
+ * render. Sin marco de card propio: vive dentro del workspace de herramientas.
+ */
+export default function SummaryPanel({ text, baseName, accent }: Props) {
+  const [phase, setPhase] = useState<'idle' | 'loading' | 'done' | 'error'>(
+    'idle'
+  );
+  const [minuta, setMinuta] = useState<Minuta | null>(null);
+  const [truncated, setTruncated] = useState(false);
+  const [error, setError] = useState('');
 
-  return (
-    <div className="mt-6 rounded-lg border-3 border-ink bg-card motion-safe:animate-slide-up">
-      <div className={cn('flex items-center gap-2 border-b-3 border-ink px-4 py-3', accent.soft)}>
-        <Sparkles className={cn('h-5 w-5', accent.text)} strokeWidth={2.5} />
-        <h3 className="font-display text-base font-bold text-ink">Resumen</h3>
-      </div>
+  const generate = async () => {
+    setError('');
+    setPhase('loading');
+    try {
+      const res = await fetch('/api/summarize', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data?.error || 'No se pudo generar el resumen.');
+      setMinuta(data.minuta as Minuta);
+      setTruncated(!!data.truncated);
+      setPhase('done');
+    } catch (e) {
+      setError((e as Error).message || 'No se pudo generar el resumen.');
+      setPhase('error');
+    }
+  };
 
-      <div className="p-4 sm:p-5">
-        <h2 className="text-lg font-bold leading-tight text-ink">{minuta.titulo}</h2>
+  if (phase === 'done' && minuta) {
+    const md = minutaToText(minuta);
+    return (
+      <div className="motion-safe:animate-fade-in">
+        <h2 className="text-lg font-bold leading-tight text-ink">
+          {minuta.titulo}
+        </h2>
         <Markdown className="mt-2 text-sm text-ink">{minuta.resumen}</Markdown>
 
         {minuta.puntosClave.length > 0 && (
@@ -110,6 +145,12 @@ export default function SummaryPanel({ minuta, baseName, accent }: Props) {
           </Section>
         )}
 
+        {truncated && (
+          <p className="mt-3 text-xs text-muted-foreground">
+            La transcripción era muy larga; el resumen se basó en la primera parte.
+          </p>
+        )}
+
         <div className="mt-5 flex flex-col gap-2 sm:flex-row">
           <Button
             variant="outline"
@@ -120,17 +161,45 @@ export default function SummaryPanel({ minuta, baseName, accent }: Props) {
             }}
           >
             <Copy className="mr-2 h-4 w-4" />
-            Copiar resumen
+            Copiar
           </Button>
           <Button
             variant="outline"
             onClick={() => downloadText(md, `${baseName}-resumen.md`)}
           >
             <Download className="mr-2 h-4 w-4" />
-            Descargar resumen
+            Descargar .md
           </Button>
         </div>
       </div>
+    );
+  }
+
+  return (
+    <div>
+      <p className="mb-3 text-sm text-muted-foreground">
+        Una minuta con los puntos clave, y los acuerdos y tareas si es una
+        reunión.
+      </p>
+      <Button
+        onClick={generate}
+        disabled={phase === 'loading'}
+        className={accent.solid}
+        aria-busy={phase === 'loading'}
+      >
+        {phase === 'loading' ? (
+          <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+        ) : (
+          <Sparkles className="mr-2 h-5 w-5" />
+        )}
+        {phase === 'loading' ? 'Generando resumen…' : 'Generar resumen'}
+      </Button>
+      {phase === 'error' && error && (
+        <div className="mt-3 flex items-start gap-2 rounded-lg border-3 border-destructive bg-destructive/5 p-3">
+          <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-destructive" />
+          <p className="text-sm text-destructive">{error}</p>
+        </div>
+      )}
     </div>
   );
 }

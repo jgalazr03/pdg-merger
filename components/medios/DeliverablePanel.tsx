@@ -71,21 +71,8 @@ export default function DeliverablePanel({ chunks, accent, baseName }: Props) {
   const fileBase = KINDS.find((k) => k.key === doneKind)?.file ?? 'documento';
 
   return (
-    <div className="mt-6 rounded-lg border-3 border-ink bg-card">
-      <div
-        className={cn(
-          'flex items-center gap-2 border-b-3 border-ink px-4 py-3',
-          accent.soft
-        )}
-      >
-        <FileText className={cn('h-5 w-5', accent.text)} strokeWidth={2.5} />
-        <h3 className="font-display text-base font-bold text-ink">
-          Generar documento
-        </h3>
-      </div>
-
-      <div className="p-4 sm:p-5">
-        <p className="mb-3 text-sm text-muted-foreground">
+    <div className="p-4 sm:p-5">
+      <p className="mb-3 text-sm text-muted-foreground">
           Convierte la grabación en un documento listo para usar.
         </p>
 
@@ -163,7 +150,6 @@ export default function DeliverablePanel({ chunks, accent, baseName }: Props) {
             </div>
           </div>
         )}
-      </div>
     </div>
   );
 }
