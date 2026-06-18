@@ -508,7 +508,7 @@ export default function RedactTool() {
                 <div className="mx-auto mt-4 max-w-md">
                   <div className="h-2 w-full overflow-hidden rounded-full border-2 border-ink bg-surface">
                     <div
-                      className={cn('h-full transition-all', accent.line)}
+                      className={cn('h-full transition-[width] duration-200 ease-out', accent.line)}
                       style={{ width: `${progress}%` }}
                     />
                   </div>

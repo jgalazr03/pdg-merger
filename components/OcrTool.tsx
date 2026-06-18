@@ -172,7 +172,7 @@ export default function OcrTool() {
                 </div>
                 <div className="h-2 overflow-hidden rounded-full border-2 border-ink bg-surface">
                   <div
-                    className={cn('h-full transition-all', accent.line)}
+                    className={cn('h-full transition-[width] duration-200 ease-out', accent.line)}
                     style={{ width: `${progress}%` }}
                   />
                 </div>
