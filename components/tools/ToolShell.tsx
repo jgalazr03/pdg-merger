@@ -13,25 +13,15 @@ export default function ToolShell({
   tool,
   step,
   children,
-  wide = false,
 }: {
   tool: ToolDef;
   step: 1 | 2 | 3;
   children: React.ReactNode;
-  /** Ensancha el contenedor (módulo Medios: el resultado usa 2 columnas y
-   *  aprovecha el ancho de escritorio). El resto de herramientas usa el ancho
-   *  estándar. */
-  wide?: boolean;
 }) {
   return (
     // Móvil: preludio comprimido (la tarea primero — el dropzone debe asomar
     // sin scroll al entrar); escritorio conserva el aire generoso.
-    <div
-      className={cn(
-        'container mx-auto py-5 pl-[max(20px,env(safe-area-inset-left))] pr-[max(20px,env(safe-area-inset-right))] sm:py-8 md:py-16',
-        wide ? 'max-w-6xl' : 'max-w-4xl'
-      )}
-    >
+    <div className="container mx-auto max-w-6xl py-5 pl-[max(20px,env(safe-area-inset-left))] pr-[max(20px,env(safe-area-inset-right))] sm:py-8 md:py-16">
       <nav aria-label="Ruta de navegación" className="mb-4 sm:mb-8">
         <ol className="flex items-center gap-1.5 text-sm text-muted-foreground">
           <li>

@@ -301,7 +301,7 @@ export default function Transcriber() {
   const loaderPct = phase === 'uploading' ? uploadPct : modelPct;
 
   return (
-    <ToolShell tool={tool} step={step} wide>
+    <ToolShell tool={tool} step={step}>
       <FileDropzone
         className="mb-4"
         accent={accent}
