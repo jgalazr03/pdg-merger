@@ -460,20 +460,18 @@ export default function Transcriber() {
                   </p>
                 </div>
 
-                <Button
-                  onClick={handleTranscribe}
-                  disabled={busy}
-                  size="lg"
-                  className={accent.solid}
-                  aria-busy={busy}
-                >
-                  {busy ? (
-                    <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                  ) : (
+                {/* El botón se oculta mientras procesa: el loader de abajo es
+                    el único indicador de "en curso" (evita doble spinner). */}
+                {!busy && (
+                  <Button
+                    onClick={handleTranscribe}
+                    size="lg"
+                    className={accent.solid}
+                  >
                     <AudioLines className="mr-2 h-5 w-5" />
-                  )}
-                  {busy ? 'Procesando…' : 'Transcribir'}
-                </Button>
+                    Transcribir
+                  </Button>
+                )}
 
                 {busy && (
                   <div className="mt-4 rounded-lg border-3 border-ink bg-surface p-4">
