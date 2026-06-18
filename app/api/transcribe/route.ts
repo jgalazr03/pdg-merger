@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { del } from '@vercel/blob';
+import { rejectCrossOrigin } from '@/lib/api-guard';
 
 export const runtime = 'nodejs';
 // Deepgram batch procesa ~30× tiempo real; 300 s cubre audios de varias horas.
@@ -30,6 +31,9 @@ interface Utterance {
  * (variable de entorno), nunca en el cliente.
  */
 export async function POST(request: Request) {
+  const blocked = rejectCrossOrigin(request);
+  if (blocked) return blocked;
+
   const apiKey = process.env.DEEPGRAM_API_KEY;
   if (!apiKey) {
     return NextResponse.json(

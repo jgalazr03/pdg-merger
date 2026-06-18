@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import type { Minuta } from '@/lib/summary';
+import { rejectCrossOrigin } from '@/lib/api-guard';
 
 export const runtime = 'nodejs';
 // Resumir una transcripción larga con Claude puede tomar decenas de segundos.
@@ -64,6 +65,9 @@ const TOOL = {
  * (no audio), así que sirve para ambos modos. La API key vive solo aquí.
  */
 export async function POST(request: Request) {
+  const blocked = rejectCrossOrigin(request);
+  if (blocked) return blocked;
+
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) {
     return NextResponse.json(

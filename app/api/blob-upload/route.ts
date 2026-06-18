@@ -1,5 +1,6 @@
 import { handleUpload, type HandleUploadBody } from '@vercel/blob/client';
 import { NextResponse } from 'next/server';
+import { rejectCrossOrigin } from '@/lib/api-guard';
 
 export const runtime = 'nodejs';
 
@@ -11,6 +12,13 @@ export const runtime = 'nodejs';
  */
 export async function POST(request: Request): Promise<NextResponse> {
   const body = (await request.json()) as HandleUploadBody;
+  // Exigir origen propio solo en la generación de token (la pide el navegador).
+  // El webhook 'blob.upload-completed' lo llama Vercel (sin nuestro Origin) y va
+  // firmado: bloquearlo por origen lo rompería.
+  if (body.type === 'blob.generate-client-token') {
+    const blocked = rejectCrossOrigin(request);
+    if (blocked) return blocked;
+  }
   try {
     const jsonResponse = await handleUpload({
       body,

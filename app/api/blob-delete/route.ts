@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { del } from '@vercel/blob';
+import { rejectCrossOrigin } from '@/lib/api-guard';
 
 export const runtime = 'nodejs';
 
@@ -10,6 +11,9 @@ export const runtime = 'nodejs';
  * con nombre aleatorio, públicos y efímeros), no lista ni expone nada.
  */
 export async function POST(request: Request) {
+  const blocked = rejectCrossOrigin(request);
+  if (blocked) return blocked;
+
   let url: string | undefined;
   try {
     ({ url } = await request.json());
