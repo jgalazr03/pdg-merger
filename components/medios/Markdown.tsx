@@ -38,17 +38,26 @@ function renderInline(text: string): React.ReactNode[] {
 
 type Block =
   | { type: 'p'; text: string }
+  | { type: 'h'; level: number; text: string }
   | { type: 'ol' | 'ul'; items: string[] };
+
+const OL = /^\s*\d+\.\s+(.*)$/;
+const UL = /^\s*[-*]\s+(.*)$/;
+const H = /^(#{1,6})\s+(.*)$/;
 
 function parse(src: string): Block[] {
   const lines = src.replace(/\r\n/g, '\n').split('\n');
   const blocks: Block[] = [];
   let i = 0;
-  const OL = /^\s*\d+\.\s+(.*)$/;
-  const UL = /^\s*[-*]\s+(.*)$/;
   while (i < lines.length) {
     const line = lines[i];
     if (!line.trim()) {
+      i++;
+      continue;
+    }
+    const hm = line.match(H);
+    if (hm) {
+      blocks.push({ type: 'h', level: hm[1].length, text: hm[2] });
       i++;
       continue;
     }
@@ -74,7 +83,8 @@ function parse(src: string): Block[] {
         i < lines.length &&
         lines[i].trim() &&
         !OL.test(lines[i]) &&
-        !UL.test(lines[i])
+        !UL.test(lines[i]) &&
+        !H.test(lines[i])
       ) {
         parts.push(lines[i].trim());
         i++;
@@ -96,6 +106,19 @@ export default function Markdown({
   return (
     <div className={cn('space-y-2', className)}>
       {blocks.map((b, i) => {
+        if (b.type === 'h') {
+          const Tag = `h${Math.min(b.level, 6)}` as keyof JSX.IntrinsicElements;
+          const size =
+            b.level <= 1 ? 'text-lg' : b.level === 2 ? 'text-base' : 'text-sm';
+          return (
+            <Tag
+              key={i}
+              className={cn('font-bold leading-tight text-ink', size)}
+            >
+              {renderInline(b.text)}
+            </Tag>
+          );
+        }
         if (b.type === 'p')
           return (
             <p key={i} className="leading-relaxed">

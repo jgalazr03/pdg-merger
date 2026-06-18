@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import type { Chapter } from '@/lib/chapters';
 import { rejectCrossOrigin } from '@/lib/api-guard';
+import { upstreamError, serviceError } from '@/lib/upstream';
 
 export const runtime = 'nodejs';
 export const maxDuration = 60;
@@ -93,11 +94,7 @@ export async function POST(request: Request) {
     });
 
     if (!res.ok) {
-      const detail = (await res.text()).slice(0, 300);
-      return NextResponse.json(
-        { error: `El servicio respondió ${res.status}.`, detail },
-        { status: 502 }
-      );
+      return upstreamError(res.status, await res.text().catch(() => ''));
     }
 
     const data = await res.json();
@@ -118,9 +115,6 @@ export async function POST(request: Request) {
     const chapters = (block.input.chapters ?? []) as Chapter[];
     return NextResponse.json({ chapters });
   } catch (err) {
-    return NextResponse.json(
-      { error: (err as Error).message || 'Error al generar capítulos.' },
-      { status: 500 }
-    );
+    return serviceError(err);
   }
 }

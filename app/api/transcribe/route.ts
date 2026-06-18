@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { del } from '@vercel/blob';
 import { rejectCrossOrigin } from '@/lib/api-guard';
+import { upstreamError, serviceError } from '@/lib/upstream';
 
 export const runtime = 'nodejs';
 // Deepgram batch procesa ~30× tiempo real; 300 s cubre audios de varias horas.
@@ -63,11 +64,7 @@ export async function POST(request: Request) {
     });
 
     if (!dg.ok) {
-      const detail = (await dg.text()).slice(0, 300);
-      return NextResponse.json(
-        { error: `Deepgram respondió ${dg.status}.`, detail },
-        { status: 502 }
-      );
+      return upstreamError(dg.status, await dg.text().catch(() => ''));
     }
 
     const data = await dg.json();
@@ -82,10 +79,7 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ text, chunks });
   } catch (err) {
-    return NextResponse.json(
-      { error: (err as Error).message || 'Error al transcribir.' },
-      { status: 500 }
-    );
+    return serviceError(err);
   } finally {
     // Limpieza del blob temporal (no rompe la respuesta si falla).
     await del(url).catch(() => {});

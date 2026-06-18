@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   MessageCircleQuestion,
   Play,
@@ -46,6 +46,13 @@ export default function AskPanel({ chunks, accent, onSeek }: Props) {
   const [busy, setBusy] = useState(false);
   const threadRef = useRef<HTMLDivElement>(null);
 
+  // Auto-scroll al final del hilo en cada cambio (pregunta enviada, respuesta
+  // recibida), como un chat: el último mensaje siempre queda a la vista.
+  useEffect(() => {
+    const el = threadRef.current;
+    if (el) el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' });
+  }, [turns]);
+
   const ask = async (questionRaw: string) => {
     const question = questionRaw.trim();
     if (!question || busy) return;
@@ -53,11 +60,6 @@ export default function AskPanel({ chunks, accent, onSeek }: Props) {
     setBusy(true);
     const index = turns.length;
     setTurns((t) => [...t, { question, loading: true }]);
-    // Lleva el hilo al final tras pintar la pregunta.
-    setTimeout(
-      () => threadRef.current?.scrollTo({ top: threadRef.current.scrollHeight }),
-      50
-    );
 
     try {
       const res = await fetch('/api/ask', {

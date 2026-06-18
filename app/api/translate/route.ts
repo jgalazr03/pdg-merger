@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { rejectCrossOrigin } from '@/lib/api-guard';
+import { upstreamError, serviceError } from '@/lib/upstream';
 
 export const runtime = 'nodejs';
 export const maxDuration = 120;
@@ -105,11 +106,7 @@ export async function POST(request: Request) {
     });
 
     if (!res.ok) {
-      const detail = (await res.text()).slice(0, 300);
-      return NextResponse.json(
-        { error: `El servicio respondió ${res.status}.`, detail },
-        { status: 502 }
-      );
+      return upstreamError(res.status, await res.text().catch(() => ''));
     }
 
     const data = await res.json();
@@ -132,9 +129,6 @@ export async function POST(request: Request) {
       truncated,
     });
   } catch (err) {
-    return NextResponse.json(
-      { error: (err as Error).message || 'Error al traducir.' },
-      { status: 500 }
-    );
+    return serviceError(err);
   }
 }
