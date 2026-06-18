@@ -316,7 +316,7 @@ export default function Transcriber() {
 
       <ToolConstraints items={tool.constraints} />
 
-      {selectedFile && (
+      {selectedFile && phase !== 'done' && (
         <Card className="mb-8 motion-safe:animate-slide-up" ref={fileInfoRef}>
           <CardContent className="p-4 sm:p-6">
             <div className="mb-6 flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -351,12 +351,13 @@ export default function Transcriber() {
               </div>
             </div>
 
-            {phase !== 'done' && previewUrl && (
+            {previewUrl && (
               <div className="mt-4">
                 {isVideo ? (
                   <video
                     src={previewUrl}
                     controls
+                    playsInline
                     className="w-full rounded-lg border-3 border-ink"
                   />
                 ) : (
@@ -365,8 +366,7 @@ export default function Transcriber() {
               </div>
             )}
 
-            {phase !== 'done' && (
-              <div className="mt-6">
+            <div className="mt-6">
                 {/* Modo: privado (navegador) vs servidor (Nova-3). */}
                 <div
                   className="mb-5"
@@ -480,8 +480,7 @@ export default function Transcriber() {
                     <p className="text-sm text-destructive">{errorMsg}</p>
                   </div>
                 )}
-              </div>
-            )}
+            </div>
           </CardContent>
         </Card>
       )}
@@ -504,9 +503,9 @@ export default function Transcriber() {
             </Button>
           </div>
 
-          <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)]">
+          <div className="grid grid-cols-1 items-start gap-5 lg:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)]">
             {/* Izquierda: reproductor + transcripción + exportar */}
-            <div className="space-y-4">
+            <div className="min-w-0 space-y-4">
               {chunks.length > 0 && previewUrl ? (
                 <TranscriptPlayer
                   key={runId}
@@ -582,7 +581,7 @@ export default function Transcriber() {
 
             {/* Derecha: workspace de herramientas AI (pestañas, no pila de cards) */}
             {chunks.length > 0 && previewUrl && (
-              <div className="lg:sticky lg:top-24 lg:self-start">
+              <div className="min-w-0 lg:sticky lg:top-24 lg:self-start">
                 <AiWorkspace
                   key={runId}
                   chunks={chunks}

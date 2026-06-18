@@ -61,7 +61,7 @@ export default function DownloadMenu({
       {open && (
         <div
           role="menu"
-          className="absolute left-0 z-20 mt-2 min-w-[15rem] overflow-hidden rounded-lg border-3 border-ink bg-card sm:left-auto sm:right-0"
+          className="absolute left-0 z-20 mt-2 min-w-[15rem] overflow-hidden rounded-lg border-3 border-ink bg-card sm:bottom-full sm:left-auto sm:right-0 sm:mb-2 sm:mt-0"
         >
           {items.map((it, i) => (
             <button
