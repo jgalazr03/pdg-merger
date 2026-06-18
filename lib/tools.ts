@@ -29,6 +29,7 @@ import {
   ScanText,
   FormInput,
   EyeOff,
+  AudioLines,
   type LucideIcon,
 } from 'lucide-react';
 
@@ -64,7 +65,8 @@ export type ToolSlug =
   | 'censurar-pdf'
   | 'unir-excel'
   | 'dividir-excel'
-  | 'ocr';
+  | 'ocr'
+  | 'transcribir';
 
 /**
  * Módulos de primer nivel: el eje superior del catálogo. Cada herramienta vive
@@ -897,6 +899,24 @@ export const TOOLS: ToolDef[] = [
     ],
     accent: TONES.fuchsia,
   },
+  {
+    slug: 'transcribir',
+    href: '/transcribir',
+    category: 'transcribir',
+    name: 'Transcribir',
+    title: 'Transcribir audio y video a texto',
+    tagline: 'Convierte una grabación en texto, directo en tu navegador.',
+    description:
+      'Transcribe audio y video a texto en español. Procesa la grabación en tu navegador (privado) y te entrega el texto editable y subtítulos .srt. Para grabaciones largas, un modo rápido opcional procesa en el servidor.',
+    Icon: AudioLines,
+    constraints: [
+      'Entrada: audio o video (MP3, WAV, M4A, OGG, MP4)',
+      'Salida: texto editable y subtítulos .srt',
+      'Transcripción en español',
+      'Por defecto, todo ocurre en tu navegador; nada se sube',
+    ],
+    accent: TONES.violet,
+  },
 ];
 
 export const getTool = (slug: ToolSlug): ToolDef =>
@@ -944,6 +964,15 @@ export const MODULE_LABELS: Record<ToolModule, string> = {
 
 /** Orden en que se presentan los módulos. */
 export const MODULE_ORDER: ToolModule[] = ['documentos', 'medios'];
+
+/**
+ * Ruta del sub-hub de cada módulo. "Documentos" vive en la home (`/`), que es
+ * además la portada del sitio; los demás módulos tienen su propia ruta.
+ */
+export const MODULE_HREF: Record<ToolModule, string> = {
+  documentos: '/',
+  medios: '/medios',
+};
 
 /** Módulo al que pertenece una herramienta (vía su categoría). */
 export const moduleOf = (tool: ToolDef): ToolModule =>

@@ -5,7 +5,13 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { usePathname } from 'next/navigation';
 import { Menu, ChevronDown, LayoutGrid, Search } from 'lucide-react';
-import { TOOLS, toolsByCategory, type ToolDef } from '@/lib/tools';
+import {
+  TOOLS,
+  toolsByCategory,
+  toolsByModule,
+  type ToolDef,
+  type CategoryGroup,
+} from '@/lib/tools';
 import { cn } from '@/lib/utils';
 import {
   Sheet,
@@ -23,6 +29,112 @@ import {
  *    Radix extra; junto a un chip con la herramienta activa.
  *  - Móvil/tablet (<lg): el Sheet de marca, con las herramientas por categoría.
  */
+// Distribución del mega-menú en 3 columnas verticales INDEPENDIENTES (no una
+// rejilla que alinea filas y deja huecos): como la columna "Editar" es larga,
+// "Optimizar" se acomoda bajo "Organizar" (col 0) y "Seguridad y privacidad"
+// bajo "Convertir" (col 2). Las categorías nuevas no mapeadas caen en la
+// columna más corta, así el menú sigue siendo data-driven.
+const PREFERRED_COLUMN: Record<string, number> = {
+  organizar: 0,
+  optimizar: 0,
+  editar: 1,
+  convertir: 2,
+  seguridad: 2,
+};
+
+function splitIntoColumns(groups: CategoryGroup[]): CategoryGroup[][] {
+  const columns: CategoryGroup[][] = [[], [], []];
+  for (const group of groups) {
+    let col = PREFERRED_COLUMN[group.category];
+    if (col === undefined) {
+      const counts = columns.map((c) =>
+        c.reduce((n, g) => n + g.tools.length, 0)
+      );
+      col = counts.indexOf(Math.min(...counts));
+    }
+    columns[col].push(group);
+  }
+  return columns;
+}
+
+/** Bloque de una categoría en el mega-menú: pestaña + lista de herramientas. */
+function MegaCategory({
+  group,
+  isActive,
+}: {
+  group: CategoryGroup;
+  isActive: (href: string) => boolean;
+}) {
+  return (
+    <div>
+      <div className="mb-3">
+        {/* Pestaña con borde apoyada sobre una regla navy. */}
+        <div className="flex">
+          <p className="rounded-t-lg border-3 border-b-0 border-ink bg-surface px-3 py-1.5 text-xs font-bold uppercase leading-none tracking-[0.2em] text-ink">
+            {group.label}
+          </p>
+        </div>
+        <div aria-hidden="true" className="h-[3px] w-full bg-ink" />
+      </div>
+      <ul className="space-y-0.5">
+        {group.tools.map((tool) => {
+          const active = isActive(tool.href);
+          return (
+            <li key={tool.slug}>
+              <Link
+                href={tool.href}
+                role="menuitem"
+                aria-current={active ? 'page' : undefined}
+                className={cn(
+                  'group flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm font-bold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink focus-visible:ring-offset-2',
+                  active
+                    ? 'bg-card text-ink'
+                    : 'text-muted-foreground hover-fine:text-ink'
+                )}
+              >
+                {/* Hover estilo footer: el ícono toma su color y la frase se
+                    subraya (sin relleno de fondo). */}
+                <tool.Icon
+                  className={cn(
+                    'h-4 w-4 shrink-0 transition-colors',
+                    active
+                      ? tool.accent.text
+                      : cn('text-current', tool.accent.iconHover)
+                  )}
+                />
+                <span className="decoration-2 underline-offset-4 group-hover-fine:underline">
+                  {tool.name}
+                </span>
+              </Link>
+            </li>
+          );
+        })}
+      </ul>
+    </div>
+  );
+}
+
+/** Categorías repartidas en 3 columnas verticales independientes. */
+function MegaColumns({
+  groups,
+  isActive,
+}: {
+  groups: CategoryGroup[];
+  isActive: (href: string) => boolean;
+}) {
+  return (
+    <div className="grid grid-cols-3 gap-x-8">
+      {splitIntoColumns(groups).map((column, i) => (
+        <div key={i} className="space-y-6">
+          {column.map((group) => (
+            <MegaCategory key={group.category} group={group} isActive={isActive} />
+          ))}
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export default function SiteHeader() {
   const pathname = usePathname();
   const isActive = (href: string) =>
@@ -30,29 +142,10 @@ export default function SiteHeader() {
   const activeTool = TOOLS.find((tool) => isActive(tool.href));
   const groups = toolsByCategory();
 
-  // Distribución del mega-menú en 3 columnas verticales INDEPENDIENTES (no una
-  // rejilla que alinea filas y deja huecos): como la columna "Editar" es larga,
-  // "Optimizar" se acomoda bajo "Organizar" (col 0) y "Seguridad y privacidad"
-  // bajo "Convertir" (col 2). Las categorías nuevas no mapeadas caen en la
-  // columna más corta, así el menú sigue siendo data-driven.
-  const PREFERRED_COLUMN: Record<string, number> = {
-    organizar: 0,
-    optimizar: 0,
-    editar: 1,
-    convertir: 2,
-    seguridad: 2,
-  };
-  const menuColumns: (typeof groups)[] = [[], [], []];
-  for (const group of groups) {
-    let col = PREFERRED_COLUMN[group.category];
-    if (col === undefined) {
-      const counts = menuColumns.map((c) =>
-        c.reduce((n, g) => n + g.tools.length, 0)
-      );
-      col = counts.indexOf(Math.min(...counts));
-    }
-    menuColumns[col].push(group);
-  }
+  // Eje de módulos sobre las categorías: si hay 2+ módulos con herramientas, el
+  // mega-menú y el panel móvil anteponen el módulo; con uno solo, se ven igual.
+  const modules = toolsByModule();
+  const byModule = modules.length > 1;
 
   const [megaOpen, setMegaOpen] = useState(false);
   const megaRef = useRef<HTMLDivElement>(null);
@@ -220,6 +313,51 @@ export default function SiteHeader() {
     );
   };
 
+  // Categoría colapsable del panel móvil (reutilizada plana o anidada bajo un
+  // encabezado de módulo).
+  const renderCollapsibleCategory = (group: CategoryGroup) => {
+    const open = openCats.has(group.category);
+    return (
+      <div key={group.category}>
+        {/* Encabezado-disparador: fila uniforme sobre regla navy. Filas de igual
+            alto, etiqueta a la izquierda y chevron a la derecha. */}
+        <button
+          type="button"
+          onClick={() => toggleCat(group.category)}
+          aria-expanded={open}
+          className="flex w-full items-center gap-3 rounded-t border-b-[3px] border-ink py-2.5 text-left transition-colors duration-150 ease-out hover-fine:bg-muted active:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink focus-visible:ring-offset-2"
+        >
+          <span className="flex-1 whitespace-nowrap text-xs font-bold uppercase tracking-[0.15em] text-ink">
+            {group.label}
+          </span>
+          <ChevronDown
+            aria-hidden="true"
+            className={cn(
+              'h-4 w-4 shrink-0 text-muted-foreground transition-transform duration-150 ease-out motion-reduce:transition-none',
+              open && 'rotate-180'
+            )}
+          />
+        </button>
+        {/* Reveal SOLO por opacidad (filosofía de Emil / Raycast: no animar la
+            altura). El alto colapsa/expande al instante vía grid-rows 0fr/1fr SIN
+            transición —un único reflow—; los íconos funden en 150ms. El contenido
+            sigue montado para conservar el gating de tabIndex y aria-hidden. */}
+        <div className={cn('grid', open ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]')}>
+          <div className="overflow-hidden" aria-hidden={!open}>
+            <div
+              className={cn(
+                'mt-2 flex flex-col gap-1 transition-opacity duration-150 ease-out motion-reduce:transition-none',
+                open ? 'opacity-100' : 'opacity-0'
+              )}
+            >
+              {group.tools.map((tool) => renderToolLink(tool, open))}
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   return (
     <header className="sticky top-0 z-40 w-full border-b-4 border-ink bg-surface">
       <div className="container mx-auto flex h-16 max-w-6xl items-center justify-between pl-[max(20px,env(safe-area-inset-left))] pr-[max(20px,env(safe-area-inset-right))]">
@@ -299,59 +437,24 @@ export default function SiteHeader() {
                   : 'pointer-events-none -translate-y-1 scale-95 opacity-0'
               )}
             >
-              <div className="grid grid-cols-3 gap-x-8">
-                {menuColumns.map((column, i) => (
-                  <div key={i} className="space-y-6">
-                    {column.map((group) => (
-                      <div key={group.category}>
-                        <div className="mb-3">
-                          {/* Pestaña con borde apoyada sobre una regla navy. */}
-                          <div className="flex">
-                            <p className="rounded-t-lg border-3 border-b-0 border-ink bg-surface px-3 py-1.5 text-xs font-bold uppercase leading-none tracking-[0.2em] text-ink">
-                              {group.label}
-                            </p>
-                          </div>
-                          <div aria-hidden="true" className="h-[3px] w-full bg-ink" />
-                        </div>
-                        <ul className="space-y-0.5">
-                          {group.tools.map((tool) => {
-                            const active = isActive(tool.href);
-                            return (
-                              <li key={tool.slug}>
-                                <Link
-                                  href={tool.href}
-                                  role="menuitem"
-                                  aria-current={active ? 'page' : undefined}
-                                  className={cn(
-                                    'group flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm font-bold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink focus-visible:ring-offset-2',
-                                    active
-                                      ? 'bg-card text-ink'
-                                      : 'text-muted-foreground hover-fine:text-ink'
-                                  )}
-                                >
-                                  {/* Hover estilo footer: el ícono toma su color
-                                      y la frase se subraya (sin relleno de fondo). */}
-                                  <tool.Icon
-                                    className={cn(
-                                      'h-4 w-4 shrink-0 transition-colors',
-                                      active
-                                        ? tool.accent.text
-                                        : cn('text-current', tool.accent.iconHover)
-                                    )}
-                                  />
-                                  <span className="decoration-2 underline-offset-4 group-hover-fine:underline">
-                                    {tool.name}
-                                  </span>
-                                </Link>
-                              </li>
-                            );
-                          })}
-                        </ul>
+              {byModule ? (
+                <div className="space-y-7">
+                  {modules.map((m) => (
+                    <section key={m.module} aria-label={m.label}>
+                      {/* Encabezado de módulo: relleno navy = nivel superior a
+                          las pestañas de categoría (coherente con el switcher). */}
+                      <div className="mb-4 flex">
+                        <p className="rounded-lg bg-ink px-3 py-1.5 text-xs font-bold uppercase tracking-[0.2em] text-white">
+                          {m.label}
+                        </p>
                       </div>
-                    ))}
-                  </div>
-                ))}
-              </div>
+                      <MegaColumns groups={m.categories} isActive={isActive} />
+                    </section>
+                  ))}
+                </div>
+              ) : (
+                <MegaColumns groups={groups} isActive={isActive} />
+              )}
             </div>
           )}
         </div>
@@ -426,71 +529,27 @@ export default function SiteHeader() {
                     </p>
                   )
                 ) : (
-                  /* Categorías colapsables (abre solo 5 encabezados) */
-                  <div className="flex flex-col gap-3">
-                    {groups.map((group) => {
-                      const open = openCats.has(group.category);
-                      return (
-                        <div key={group.category}>
-                          {/* Encabezado-disparador: fila uniforme sobre regla
-                              navy. Filas de igual alto, etiqueta a la izquierda y
-                              conteo + chevron alineados a la derecha (sin
-                              pestañas de ancho variable ni números flotantes). */}
-                          <button
-                            type="button"
-                            onClick={() => toggleCat(group.category)}
-                            aria-expanded={open}
-                            className="flex w-full items-center gap-3 rounded-t border-b-[3px] border-ink py-2.5 text-left transition-colors duration-150 ease-out hover-fine:bg-muted active:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink focus-visible:ring-offset-2"
-                          >
-                            <span className="flex-1 whitespace-nowrap text-xs font-bold uppercase tracking-[0.15em] text-ink">
-                              {group.label}
-                            </span>
-                            <ChevronDown
-                              aria-hidden="true"
-                              className={cn(
-                                'h-4 w-4 shrink-0 text-muted-foreground transition-transform duration-150 ease-out motion-reduce:transition-none',
-                                open && 'rotate-180'
-                              )}
-                            />
-                          </button>
-                          {/* Reveal SOLO por opacidad (filosofía de Emil / Raycast:
-                              no animar la altura). El alto colapsa/expande al
-                              instante vía grid-rows 0fr/1fr SIN transición —un único
-                              reflow, no por-frame, así que cumple la regla de oro de
-                              animar solo transform/opacity—; los íconos funden juntos
-                              en 150ms, concurrentes con el chevron.
-
-                              Por qué se quitó el "crecer": animar grid-template-rows
-                              destapaba los ítems con una ventana de recorte cuya
-                              velocidad = altura/duración, de modo que en una sección
-                              corta los revelaba "uno por uno" y en una larga "de
-                              golpe". Sin animar la altura desaparece el recorte
-                              progresivo (y con él toda la maquinaria de dos fases /
-                              duración proporcional). El contenido sigue montado para
-                              conservar el gating de tabIndex y el aria-hidden. */}
-                          <div
-                            className={cn(
-                              'grid',
-                              open ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'
-                            )}
-                          >
-                            <div className="overflow-hidden" aria-hidden={!open}>
-                              <div
-                                className={cn(
-                                  'mt-2 flex flex-col gap-1 transition-opacity duration-150 ease-out motion-reduce:transition-none',
-                                  open ? 'opacity-100' : 'opacity-0'
-                                )}
-                              >
-                                {group.tools.map((tool) =>
-                                  renderToolLink(tool, open)
-                                )}
-                              </div>
-                            </div>
+                  /* Categorías colapsables, agrupadas por módulo si hay 2+ */
+                  byModule ? (
+                    <div className="flex flex-col gap-6">
+                      {modules.map((m) => (
+                        <div key={m.module}>
+                          <div className="mb-3 flex">
+                            <p className="rounded-lg bg-ink px-3 py-1.5 text-xs font-bold uppercase tracking-[0.2em] text-white">
+                              {m.label}
+                            </p>
+                          </div>
+                          <div className="flex flex-col gap-3">
+                            {m.categories.map(renderCollapsibleCategory)}
                           </div>
                         </div>
-                      );
-                    })}
-                  </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="flex flex-col gap-3">
+                      {groups.map(renderCollapsibleCategory)}
+                    </div>
+                  )
                 )}
                 </div>
               </nav>

@@ -1,4 +1,5 @@
 import ToolCatalog from '@/components/landing/ToolCatalog';
+import ModuleSwitcher from '@/components/landing/ModuleSwitcher';
 
 export default function Home() {
   return (
@@ -19,6 +20,7 @@ export default function Home() {
       </section>
 
       <section>
+        <ModuleSwitcher current="documentos" />
         <ToolCatalog module="documentos" />
       </section>
 
