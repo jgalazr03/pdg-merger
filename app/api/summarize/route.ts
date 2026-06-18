@@ -5,7 +5,9 @@ export const runtime = 'nodejs';
 // Resumir una transcripción larga con Claude puede tomar decenas de segundos.
 export const maxDuration = 120;
 
-const MODEL = 'claude-sonnet-4-6';
+// Haiku 4.5: el más rápido de la familia; de sobra para resumir/minutar una
+// transcripción, con mucha menor latencia que Sonnet/Opus.
+const MODEL = 'claude-haiku-4-5-20251001';
 // Cota defensiva: ~200k caracteres (~50k tokens) cubre audios de varias horas y
 // deja margen de contexto. Por encima, se recorta y se avisa.
 const MAX_CHARS = 200_000;
