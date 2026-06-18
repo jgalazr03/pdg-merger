@@ -11,6 +11,7 @@ import {
   Loader2,
   Check,
   AlertCircle,
+  Sparkles,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { getTool } from '@/lib/tools';
@@ -24,6 +25,7 @@ import { Progress } from '@/components/ui/progress';
 import { Textarea } from '@/components/ui/textarea';
 import { upload } from '@vercel/blob/client';
 import TranscriptPlayer from '@/components/medios/TranscriptPlayer';
+import SummaryPanel from '@/components/medios/SummaryPanel';
 import {
   type Chunk,
   plainText,
@@ -31,6 +33,7 @@ import {
   toSrt,
   toVtt,
 } from '@/lib/transcript';
+import type { Minuta } from '@/lib/summary';
 
 const tool = getTool('transcribir');
 const accent = tool.accent;
@@ -113,6 +116,13 @@ export default function Transcriber() {
   // Cambia con cada transcripción terminada: fuerza el remonte de
   // TranscriptPlayer para reinicializar el texto editable.
   const [runId, setRunId] = useState(0);
+  // Resumen / minuta automática (Claude).
+  const [summaryPhase, setSummaryPhase] = useState<
+    'idle' | 'loading' | 'done' | 'error'
+  >('idle');
+  const [minuta, setMinuta] = useState<Minuta | null>(null);
+  const [summaryError, setSummaryError] = useState('');
+  const [summaryTruncated, setSummaryTruncated] = useState(false);
 
   const workerRef = useRef<Worker | null>(null);
   const progressRef = useRef<Map<string, { loaded: number; total: number }>>(
@@ -161,6 +171,7 @@ export default function Transcriber() {
     setText('');
     setChunks([]);
     setErrorMsg('');
+    clearSummary();
   };
 
   const reset = () => {
@@ -170,6 +181,7 @@ export default function Transcriber() {
     setChunks([]);
     setErrorMsg('');
     setModelPct(0);
+    clearSummary();
   };
 
   // El usuario corrigió el texto de un segmento en el reproductor: re-derivamos
@@ -177,6 +189,35 @@ export default function Transcriber() {
   const handleEdit = (ch: Chunk[]) => {
     setChunks(ch);
     setText(plainText(ch));
+  };
+
+  const clearSummary = () => {
+    setSummaryPhase('idle');
+    setMinuta(null);
+    setSummaryError('');
+    setSummaryTruncated(false);
+  };
+
+  // Resumen / minuta con Claude. Envía solo el texto (sirve para ambos modos).
+  const generateSummary = async () => {
+    if (!text.trim()) return;
+    setSummaryError('');
+    setSummaryPhase('loading');
+    try {
+      const res = await fetch('/api/summarize', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data?.error || 'No se pudo generar el resumen.');
+      setMinuta(data.minuta as Minuta);
+      setSummaryTruncated(!!data.truncated);
+      setSummaryPhase('done');
+    } catch (e) {
+      setSummaryError((e as Error).message || 'No se pudo generar el resumen.');
+      setSummaryPhase('error');
+    }
   };
 
   const handleWorkerMessage = (e: MessageEvent) => {
@@ -219,6 +260,7 @@ export default function Transcriber() {
     setErrorMsg('');
     setText('');
     setChunks([]);
+    clearSummary();
     if (mode === 'server') void transcribeServer();
     else void transcribeLocal();
   };
@@ -565,6 +607,54 @@ export default function Transcriber() {
               <Button variant="outline" onClick={reset}>
                 Transcribir otro
               </Button>
+            </div>
+
+            {/* Resumen / minuta automática (Claude) */}
+            <div className="mt-6 border-t-3 border-ink/10 pt-5">
+              {summaryPhase === 'done' && minuta ? (
+                <>
+                  <SummaryPanel
+                    minuta={minuta}
+                    baseName={baseName}
+                    accent={accent}
+                  />
+                  {summaryTruncated && (
+                    <p className="mt-2 text-xs text-muted-foreground">
+                      La transcripción era muy larga; el resumen se basó en la
+                      primera parte.
+                    </p>
+                  )}
+                </>
+              ) : (
+                <>
+                  <Button
+                    onClick={generateSummary}
+                    disabled={summaryPhase === 'loading'}
+                    className={accent.solid}
+                    aria-busy={summaryPhase === 'loading'}
+                  >
+                    {summaryPhase === 'loading' ? (
+                      <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                    ) : (
+                      <Sparkles className="mr-2 h-5 w-5" />
+                    )}
+                    {summaryPhase === 'loading'
+                      ? 'Generando resumen…'
+                      : 'Generar resumen'}
+                  </Button>
+                  <p className="mt-2 text-xs text-muted-foreground">
+                    Crea una minuta con los puntos clave (y acuerdos y tareas si
+                    es una reunión). El texto de la transcripción se envía para
+                    resumirlo.
+                  </p>
+                  {summaryPhase === 'error' && summaryError && (
+                    <div className="mt-3 flex items-start gap-2 rounded-lg border-3 border-destructive bg-destructive/5 p-3">
+                      <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-destructive" />
+                      <p className="text-sm text-destructive">{summaryError}</p>
+                    </div>
+                  )}
+                </>
+              )}
             </div>
           </CardContent>
         </Card>
