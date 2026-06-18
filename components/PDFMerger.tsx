@@ -25,6 +25,7 @@ import { getTool } from '@/lib/tools';
 import ToolShell from '@/components/tools/ToolShell';
 import FileDropzone from '@/components/tools/FileDropzone';
 import ToolConstraints from '@/components/tools/ToolConstraints';
+import { useFlip } from '@/components/tools/useFlip';
 import ImageCropModal, { CropResult } from '@/components/ImageCropModal';
 
 const tool = getTool('unir');
@@ -168,23 +169,27 @@ export default function PDFMerger() {
 
   const fileToCrop = files.find((f) => f.id === cropFileId);
 
-  // Reordenamiento por arrastre
+  // FLIP: desliza las filas a su nueva posición al reordenar (arrastre o flechas).
+  const listRef = useFlip<HTMLUListElement>(files.map((f) => f.id).join('|'));
+
+  // Reordenamiento por arrastre. Reordenamos EN VIVO al pasar sobre otra fila
+  // (no solo al soltar): así el resto de filas se hace a un lado mostrando dónde
+  // va a caer, y el FLIP (useFlip) las desliza con suavidad.
   const handleDragStart = (e: React.DragEvent, index: number) => {
     setDraggedIndex(index);
     e.dataTransfer.effectAllowed = 'move';
   };
 
-  const handleDragOver = (e: React.DragEvent) => {
+  const handleDragOver = (e: React.DragEvent, index: number) => {
     e.preventDefault();
     e.dataTransfer.dropEffect = 'move';
+    if (draggedIndex === null || draggedIndex === index) return;
+    moveFile(draggedIndex, index);
+    setDraggedIndex(index);
   };
 
-  const handleDrop = (e: React.DragEvent, dropIndex: number) => {
-    e.preventDefault();
-    if (draggedIndex === null) return;
-    moveFile(draggedIndex, dropIndex);
-    setDraggedIndex(null);
-  };
+  // Al soltar el orden ya es el correcto (se reordenó en vivo); solo limpiamos.
+  const endDrag = () => setDraggedIndex(null);
 
   // Reordenamiento accesible por teclado
   const moveFile = (from: number, to: number) => {
@@ -340,19 +345,23 @@ export default function PDFMerger() {
               </Button>
             </div>
 
-            <ul className="space-y-3">
+            <ul ref={listRef} className="space-y-3">
               {files.map((file, index) => (
                 <li
                   key={file.id}
+                  data-flip-id={file.id}
                   draggable
                   onDragStart={(e) => handleDragStart(e, index)}
-                  onDragOver={handleDragOver}
-                  onDrop={(e) => handleDrop(e, index)}
+                  onDragOver={(e) => handleDragOver(e, index)}
+                  onDrop={(e) => e.preventDefault()}
+                  onDragEnd={endDrag}
                   className={cn(
                     // flex-wrap: en móvil las acciones de imagen (recortar/quitar)
                     // bajan a una segunda línea con sitio, en vez de desbordar.
                     'flex flex-wrap items-center gap-2.5 rounded-lg border-3 border-ink bg-surface p-3 transition-colors duration-150 ease-out hover-fine:bg-muted active:bg-muted sm:gap-3 sm:p-4',
-                    draggedIndex === index && 'opacity-50 motion-safe:scale-95'
+                    // La fila tomada se atenúa (el "fantasma" nativo sigue al cursor);
+                    // NO le ponemos transform aquí para no chocar con el FLIP.
+                    draggedIndex === index && 'opacity-50'
                   )}
                 >
                   <GripVertical

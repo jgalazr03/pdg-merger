@@ -26,6 +26,7 @@ import { getTool } from '@/lib/tools';
 import ToolShell from '@/components/tools/ToolShell';
 import FileDropzone from '@/components/tools/FileDropzone';
 import ToolConstraints from '@/components/tools/ToolConstraints';
+import { useFlip } from '@/components/tools/useFlip';
 
 const tool = getTool('organizar');
 const accent = tool.accent;
@@ -345,6 +346,9 @@ export default function PDFOrganizer() {
     setPages(initialRef.current.map((p) => ({ ...p, rotation: 0 })));
   };
 
+  // FLIP: desliza las miniaturas a su nueva celda al reordenar (arrastre o flechas).
+  const gridRef = useFlip<HTMLUListElement>(pages.map((p) => p.id).join('|'));
+
   // ¿Hay cambios respecto a los documentos cargados? (orden, giros o eliminaciones)
   const dirty =
     pages.length !== initialRef.current.length ||
@@ -582,10 +586,11 @@ export default function PDFOrganizer() {
 
             {/* Rejilla de páginas: 2 cols móvil → 4 escritorio. Cada tarjeta es
                 arrastrable (escritorio); los botones cubren táctil y teclado. */}
-            <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4 lg:grid-cols-4">
+            <ul ref={gridRef} className="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4 lg:grid-cols-4">
               {pages.map((p, i) => (
                 <li
                   key={p.id}
+                  data-flip-id={p.id}
                   draggable={!isProcessing}
                   onDragStart={() => setDragIndex(i)}
                   onDragOver={(e) => {
