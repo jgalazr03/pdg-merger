@@ -31,6 +31,8 @@ import SummaryPanel from '@/components/medios/SummaryPanel';
 import AskPanel from '@/components/medios/AskPanel';
 import ChaptersPanel from '@/components/medios/ChaptersPanel';
 import DownloadMenu from '@/components/medios/DownloadMenu';
+import TranslatePanel from '@/components/medios/TranslatePanel';
+import DeliverablePanel from '@/components/medios/DeliverablePanel';
 import {
   type Chunk,
   plainText,
@@ -813,6 +815,24 @@ export default function Transcriber() {
                 </>
               )}
             </div>
+
+            {/* Generar documento (acta / correo / publicación) */}
+            {chunks.length > 0 && (
+              <DeliverablePanel
+                chunks={chunks}
+                accent={accent}
+                baseName={baseName}
+              />
+            )}
+
+            {/* Traducir transcripción / subtítulos */}
+            {chunks.length > 0 && (
+              <TranslatePanel
+                chunks={chunks}
+                accent={accent}
+                baseName={baseName}
+              />
+            )}
           </CardContent>
         </Card>
       )}
