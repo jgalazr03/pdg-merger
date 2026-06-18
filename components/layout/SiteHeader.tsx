@@ -431,7 +431,7 @@ export default function SiteHeader() {
               role="menu"
               aria-label="Herramientas"
               className={cn(
-                'absolute right-0 top-full z-50 mt-2 w-[min(56rem,90vw)] origin-top-right rounded-lg border-4 border-ink bg-surface p-6 transition duration-150 ease-out motion-reduce:transition-none',
+                'absolute right-0 top-full z-50 mt-2 max-h-[min(85vh,42rem)] w-[min(56rem,90vw)] origin-top-right overflow-y-auto overscroll-contain rounded-lg border-4 border-ink bg-surface p-6 transition duration-150 ease-out motion-reduce:transition-none',
                 megaVisible
                   ? 'translate-y-0 scale-100 opacity-100'
                   : 'pointer-events-none -translate-y-1 scale-95 opacity-0'
