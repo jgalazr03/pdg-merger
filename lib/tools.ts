@@ -66,13 +66,22 @@ export type ToolSlug =
   | 'dividir-excel'
   | 'ocr';
 
-/** Categorías del catálogo (agrupan herramientas en nav, landing y footer). */
+/**
+ * Módulos de primer nivel: el eje superior del catálogo. Cada herramienta vive
+ * en un módulo (por el tipo de contenido con el que trabaja), y dentro de él se
+ * agrupa por `ToolCategory`. "Documentos" es el módulo histórico (PDF/Excel);
+ * "Medios" agrupa audio y video (transcribir, etc.).
+ */
+export type ToolModule = 'documentos' | 'medios';
+
+/** Categorías del catálogo (agrupan herramientas dentro de cada módulo). */
 export type ToolCategory =
   | 'organizar'
   | 'editar'
   | 'optimizar'
   | 'convertir'
-  | 'seguridad';
+  | 'seguridad'
+  | 'transcribir';
 
 /**
  * Sistema de acento.
@@ -900,6 +909,7 @@ export const CATEGORY_LABELS: Record<ToolCategory, string> = {
   convertir: 'Convertir',
   optimizar: 'Optimizar',
   seguridad: 'Privacidad',
+  transcribir: 'Transcribir',
 };
 
 /** Orden en que se muestran las categorías en nav, landing y footer. */
@@ -909,16 +919,75 @@ export const CATEGORY_ORDER: ToolCategory[] = [
   'convertir',
   'optimizar',
   'seguridad',
+  'transcribir',
 ];
 
-/** Herramientas agrupadas por categoría, en el orden de `CATEGORY_ORDER`. */
-export const toolsByCategory = (): {
+/**
+ * A qué módulo pertenece cada categoría. El módulo de una herramienta se deriva
+ * de su categoría (no se repite en cada entrada de `TOOLS`): así el eje de
+ * módulos es data-driven y una categoría vive en un único módulo.
+ */
+export const CATEGORY_MODULE: Record<ToolCategory, ToolModule> = {
+  organizar: 'documentos',
+  editar: 'documentos',
+  convertir: 'documentos',
+  optimizar: 'documentos',
+  seguridad: 'documentos',
+  transcribir: 'medios',
+};
+
+/** Etiqueta visible de cada módulo. */
+export const MODULE_LABELS: Record<ToolModule, string> = {
+  documentos: 'Documentos',
+  medios: 'Medios',
+};
+
+/** Orden en que se presentan los módulos. */
+export const MODULE_ORDER: ToolModule[] = ['documentos', 'medios'];
+
+/** Módulo al que pertenece una herramienta (vía su categoría). */
+export const moduleOf = (tool: ToolDef): ToolModule =>
+  CATEGORY_MODULE[tool.category];
+
+export interface CategoryGroup {
   category: ToolCategory;
   label: string;
   tools: ToolDef[];
-}[] =>
-  CATEGORY_ORDER.map((category) => ({
-    category,
-    label: CATEGORY_LABELS[category],
-    tools: TOOLS.filter((t) => t.category === category),
-  })).filter((group) => group.tools.length > 0);
+}
+
+export interface ModuleGroup {
+  module: ToolModule;
+  label: string;
+  categories: CategoryGroup[];
+}
+
+/**
+ * Herramientas agrupadas por categoría, en el orden de `CATEGORY_ORDER`. Si se
+ * pasa `module`, se acota a las categorías de ese módulo; sin argumento abarca
+ * todas (comportamiento histórico). Las categorías vacías se omiten.
+ */
+export const toolsByCategory = (module?: ToolModule): CategoryGroup[] =>
+  CATEGORY_ORDER.filter(
+    (category) => !module || CATEGORY_MODULE[category] === module
+  )
+    .map((category) => ({
+      category,
+      label: CATEGORY_LABELS[category],
+      tools: TOOLS.filter((t) => t.category === category),
+    }))
+    .filter((group) => group.tools.length > 0);
+
+/**
+ * Herramientas agrupadas por módulo y, dentro, por categoría, en el orden de
+ * `MODULE_ORDER`. Los módulos sin herramientas se omiten.
+ */
+export const toolsByModule = (): ModuleGroup[] =>
+  MODULE_ORDER.map((module) => ({
+    module,
+    label: MODULE_LABELS[module],
+    categories: toolsByCategory(module),
+  })).filter((m) => m.categories.length > 0);
+
+/** Módulos que hoy tienen al menos una herramienta, en orden. */
+export const modulesWithTools = (): ToolModule[] =>
+  toolsByModule().map((m) => m.module);

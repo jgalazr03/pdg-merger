@@ -19,7 +19,7 @@ export default function Home() {
       </section>
 
       <section>
-        <ToolCatalog />
+        <ToolCatalog module="documentos" />
       </section>
 
       {/*

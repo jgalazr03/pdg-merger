@@ -6,7 +6,9 @@ import { Search, X } from 'lucide-react';
 import {
   TOOLS,
   toolsByCategory,
+  moduleOf,
   type ToolCategory,
+  type ToolModule,
 } from '@/lib/tools';
 import { useRecentTools } from '@/lib/recent-tools';
 import { cn } from '@/lib/utils';
@@ -38,9 +40,12 @@ const revealDelay = (order: number) =>
 const norm = (s: string) =>
   s.normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase();
 
-export default function ToolCatalog() {
-  const groups = toolsByCategory();
-  const recents = useRecentTools(5);
+export default function ToolCatalog({ module }: { module?: ToolModule } = {}) {
+  const groups = toolsByCategory(module);
+  // Los recientes son globales; en un sub-hub de módulo se acotan a él.
+  const recents = useRecentTools(5).filter(
+    (t) => !module || moduleOf(t) === module
+  );
   const [query, setQuery] = useState('');
   const [cat, setCat] = useState<ToolCategory | 'all'>('all');
   const [animateInitial, setAnimateInitial] = useState(true);
@@ -76,10 +81,11 @@ export default function ToolCatalog() {
     ...groups.map((g) => ({ key: g.category, label: g.label })),
   ];
 
-  // Resultados de búsqueda (planos), respetando la categoría activa.
+  // Resultados de búsqueda (planos), respetando el módulo y la categoría activa.
   const results = isSearching
     ? TOOLS.filter(
         (t) =>
+          (!module || moduleOf(t) === module) &&
           (cat === 'all' || t.category === cat) &&
           norm(`${t.name} ${t.tagline}`).includes(norm(q))
       )
