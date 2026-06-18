@@ -307,6 +307,7 @@ export default function PDFMerger() {
       <FileDropzone
         className="mb-4"
         accent={accent}
+        loaded={step > 1}
         multiple
         accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png"
         idleTitle="Selecciona archivos PDF o imágenes"

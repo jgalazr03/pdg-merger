@@ -528,6 +528,7 @@ export default function FileConverter() {
       <FileDropzone
         className="mb-4"
         accent={accent}
+        loaded={step > 1}
         multiple
         accept={inputFormat === 'auto' ? ALL_ACCEPT : INPUT_ACCEPT[inputFormat]}
         idleTitle={

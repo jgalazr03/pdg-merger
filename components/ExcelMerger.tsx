@@ -127,6 +127,7 @@ export default function ExcelMerger() {
       <FileDropzone
         className="mb-4"
         accent={accent}
+        loaded={step > 1}
         accept={EXCEL_ACCEPT}
         multiple
         idleTitle="Selecciona archivos Excel"

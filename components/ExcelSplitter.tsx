@@ -146,6 +146,7 @@ export default function ExcelSplitter() {
       <FileDropzone
         className="mb-4"
         accent={accent}
+        loaded={step > 1}
         accept={EXCEL_ACCEPT}
         idleTitle="Selecciona un archivo Excel"
         idleSubtitle="Haz clic o arrastra un .xlsx para separar sus hojas"

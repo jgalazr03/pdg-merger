@@ -629,6 +629,7 @@ export default function PDFCompressor() {
       <FileDropzone
         className="mb-4"
         accent={accent}
+        loaded={step > 1}
         multiple
         accept=".pdf,.xlsx,.xls,application/pdf,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel"
         idleTitle="Selecciona archivos PDF o Excel"

@@ -71,6 +71,7 @@ export default function PageNumberer() {
       <FileDropzone
         className="mb-4"
         accent={accent}
+        loaded={step > 1}
         accept=".pdf,application/pdf"
         multiple
         idleTitle="Selecciona archivos PDF"

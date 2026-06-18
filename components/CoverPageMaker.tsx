@@ -305,6 +305,7 @@ export default function CoverPageMaker() {
       <FileDropzone
         className="mb-4"
         accent={accent}
+        loaded={step > 1}
         accept=".pdf,application/pdf"
         idleTitle="Selecciona un archivo PDF"
         idleSubtitle="Haz clic aquí o arrastra y suelta tu archivo PDF"

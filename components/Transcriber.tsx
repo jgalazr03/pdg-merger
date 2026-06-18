@@ -305,6 +305,7 @@ export default function Transcriber() {
       <FileDropzone
         className="mb-4"
         accent={accent}
+        loaded={step > 1}
         accept={ACCEPT}
         idleTitle="Selecciona un audio o video"
         idleSubtitle="Haz clic aquí o arrastra y suelta tu grabación (MP3, WAV, M4A, OGG, MP4)"

@@ -316,6 +316,7 @@ export default function CsvToPDF() {
       <FileDropzone
         className="mb-4"
         accent={accent}
+        loaded={step > 1}
         accept=".csv,text/csv"
         idleTitle="Selecciona un archivo CSV"
         idleSubtitle="Haz clic aquí o arrastra y suelta tu archivo .csv (o pega los datos abajo)"

@@ -480,6 +480,7 @@ export default function PDFOrganizer() {
           <FileDropzone
             className="mb-4"
             accent={accent}
+            loaded={step > 1}
             accept={ACCEPT}
             multiple
             idleTitle="Selecciona PDF o imágenes"

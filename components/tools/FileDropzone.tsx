@@ -22,6 +22,12 @@ interface FileDropzoneProps {
   ariaLabel: string;
   onFiles: (files: FileList) => void;
   className?: string;
+  /**
+   * Ya hay recurso(s) cargado(s): el dropzone grande se hace a un lado. En
+   * archivo único se oculta (la tarjeta del recurso ofrece "Cambiar archivo");
+   * en varios archivos colapsa a una barra delgada para seguir agregando.
+   */
+  loaded?: boolean;
 }
 
 /**
@@ -40,6 +46,7 @@ export default function FileDropzone({
   ariaLabel,
   onFiles,
   className,
+  loaded = false,
 }: FileDropzoneProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [isDragOver, setIsDragOver] = useState(false);
@@ -81,6 +88,45 @@ export default function FileDropzone({
       onFiles(e.dataTransfer.files);
     }
   };
+
+  // Recurso(s) ya cargado(s). En archivo único el dropzone grande sobra; en
+  // varios archivos lo reducimos a una barra delgada para seguir agregando.
+  if (loaded) {
+    if (!multiple) return null;
+    return (
+      <div
+        role="button"
+        tabIndex={0}
+        aria-label={ariaLabel}
+        onClick={open}
+        onKeyDown={handleKeyDown}
+        onDragEnter={handleDragEnter}
+        onDragLeave={handleDragLeave}
+        onDragOver={handleDragOver}
+        onDrop={handleDrop}
+        className={cn(
+          'group flex cursor-pointer items-center justify-center gap-2 rounded-lg border-[3px] border-dashed border-ink px-4 py-3 text-sm font-bold text-ink transition-colors duration-150 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink focus-visible:ring-offset-2',
+          isDragOver ? 'bg-highlight-soft' : 'bg-surface hover-fine:bg-muted',
+          className
+        )}
+      >
+        <Upload className="h-4 w-4 shrink-0" strokeWidth={2} />
+        <span>{isDragOver ? dragTitle : 'Agregar más archivos'}</span>
+        <input
+          ref={inputRef}
+          type="file"
+          multiple={multiple}
+          accept={accept}
+          className="hidden"
+          onChange={(e) => {
+            if (e.target.files && e.target.files.length > 0) {
+              onFiles(e.target.files);
+            }
+          }}
+        />
+      </div>
+    );
+  }
 
   return (
     <div

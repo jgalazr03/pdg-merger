@@ -113,6 +113,7 @@ export default function OcrTool() {
       <FileDropzone
         className="mb-4"
         accent={accent}
+        loaded={step > 1}
         accept=".pdf,image/*"
         idleTitle="Selecciona un PDF o imagen"
         idleSubtitle="Haz clic o arrastra un PDF escaneado o una imagen (JPG, PNG)"

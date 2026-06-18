@@ -412,6 +412,7 @@ export default function RedactTool() {
       <FileDropzone
         className="mb-4"
         accent={accent}
+        loaded={step > 1}
         accept=".pdf,application/pdf"
         idleTitle="Selecciona un archivo PDF"
         idleSubtitle="Haz clic aquí o arrastra y suelta el PDF a censurar"
