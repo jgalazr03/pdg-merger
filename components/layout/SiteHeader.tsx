@@ -9,6 +9,7 @@ import {
   TOOLS,
   toolsByCategory,
   toolsByModule,
+  MODULE_HREF,
   type ToolDef,
   type CategoryGroup,
 } from '@/lib/tools';
@@ -29,112 +30,6 @@ import {
  *    Radix extra; junto a un chip con la herramienta activa.
  *  - Móvil/tablet (<lg): el Sheet de marca, con las herramientas por categoría.
  */
-// Distribución del mega-menú en 3 columnas verticales INDEPENDIENTES (no una
-// rejilla que alinea filas y deja huecos): como la columna "Editar" es larga,
-// "Optimizar" se acomoda bajo "Organizar" (col 0) y "Seguridad y privacidad"
-// bajo "Convertir" (col 2). Las categorías nuevas no mapeadas caen en la
-// columna más corta, así el menú sigue siendo data-driven.
-const PREFERRED_COLUMN: Record<string, number> = {
-  organizar: 0,
-  optimizar: 0,
-  editar: 1,
-  convertir: 2,
-  seguridad: 2,
-};
-
-function splitIntoColumns(groups: CategoryGroup[]): CategoryGroup[][] {
-  const columns: CategoryGroup[][] = [[], [], []];
-  for (const group of groups) {
-    let col = PREFERRED_COLUMN[group.category];
-    if (col === undefined) {
-      const counts = columns.map((c) =>
-        c.reduce((n, g) => n + g.tools.length, 0)
-      );
-      col = counts.indexOf(Math.min(...counts));
-    }
-    columns[col].push(group);
-  }
-  return columns;
-}
-
-/** Bloque de una categoría en el mega-menú: pestaña + lista de herramientas. */
-function MegaCategory({
-  group,
-  isActive,
-}: {
-  group: CategoryGroup;
-  isActive: (href: string) => boolean;
-}) {
-  return (
-    <div>
-      <div className="mb-3">
-        {/* Pestaña con borde apoyada sobre una regla navy. */}
-        <div className="flex">
-          <p className="rounded-t-lg border-3 border-b-0 border-ink bg-surface px-3 py-1.5 text-xs font-bold uppercase leading-none tracking-[0.2em] text-ink">
-            {group.label}
-          </p>
-        </div>
-        <div aria-hidden="true" className="h-[3px] w-full bg-ink" />
-      </div>
-      <ul className="space-y-0.5">
-        {group.tools.map((tool) => {
-          const active = isActive(tool.href);
-          return (
-            <li key={tool.slug}>
-              <Link
-                href={tool.href}
-                role="menuitem"
-                aria-current={active ? 'page' : undefined}
-                className={cn(
-                  'group flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm font-bold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink focus-visible:ring-offset-2',
-                  active
-                    ? 'bg-card text-ink'
-                    : 'text-muted-foreground hover-fine:text-ink'
-                )}
-              >
-                {/* Hover estilo footer: el ícono toma su color y la frase se
-                    subraya (sin relleno de fondo). */}
-                <tool.Icon
-                  className={cn(
-                    'h-4 w-4 shrink-0 transition-colors',
-                    active
-                      ? tool.accent.text
-                      : cn('text-current', tool.accent.iconHover)
-                  )}
-                />
-                <span className="decoration-2 underline-offset-4 group-hover-fine:underline">
-                  {tool.name}
-                </span>
-              </Link>
-            </li>
-          );
-        })}
-      </ul>
-    </div>
-  );
-}
-
-/** Categorías repartidas en 3 columnas verticales independientes. */
-function MegaColumns({
-  groups,
-  isActive,
-}: {
-  groups: CategoryGroup[];
-  isActive: (href: string) => boolean;
-}) {
-  return (
-    <div className="grid grid-cols-3 gap-x-8">
-      {splitIntoColumns(groups).map((column, i) => (
-        <div key={i} className="space-y-6">
-          {column.map((group) => (
-            <MegaCategory key={group.category} group={group} isActive={isActive} />
-          ))}
-        </div>
-      ))}
-    </div>
-  );
-}
-
 export default function SiteHeader() {
   const pathname = usePathname();
   const isActive = (href: string) =>
@@ -431,30 +326,64 @@ export default function SiteHeader() {
               role="menu"
               aria-label="Herramientas"
               className={cn(
-                'absolute right-0 top-full z-50 mt-2 max-h-[min(85vh,42rem)] w-[min(56rem,90vw)] origin-top-right overflow-y-auto overscroll-contain rounded-lg border-4 border-ink bg-surface p-6 transition duration-150 ease-out motion-reduce:transition-none',
+                'absolute right-0 top-full z-50 mt-2 w-[min(24rem,90vw)] origin-top-right rounded-lg border-4 border-ink bg-surface p-3 transition duration-150 ease-out motion-reduce:transition-none',
                 megaVisible
                   ? 'translate-y-0 scale-100 opacity-100'
                   : 'pointer-events-none -translate-y-1 scale-95 opacity-0'
               )}
             >
-              {byModule ? (
-                <div className="space-y-7">
-                  {modules.map((m) => (
-                    <section key={m.module} aria-label={m.label}>
-                      {/* Encabezado de módulo: relleno navy = nivel superior a
-                          las pestañas de categoría (coherente con el switcher). */}
-                      <div className="mb-4 flex">
-                        <p className="rounded-lg bg-ink px-3 py-1.5 text-xs font-bold uppercase tracking-[0.2em] text-white">
-                          {m.label}
-                        </p>
-                      </div>
-                      <MegaColumns groups={m.categories} isActive={isActive} />
-                    </section>
-                  ))}
-                </div>
-              ) : (
-                <MegaColumns groups={groups} isActive={isActive} />
-              )}
+              {/* Búsqueda como vía principal de descubrimiento (⌘K). */}
+              <button
+                type="button"
+                role="menuitem"
+                onClick={() => {
+                  setMegaOpen(false);
+                  window.dispatchEvent(
+                    new Event('gainco:open-command-palette')
+                  );
+                }}
+                className="flex w-full items-center gap-3 rounded-lg border-3 border-ink bg-ink px-3 py-2.5 text-left text-white transition-opacity duration-150 hover-fine:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink focus-visible:ring-offset-2"
+              >
+                <Search className="h-5 w-5 shrink-0" />
+                <span className="min-w-0 flex-1">
+                  <span className="block text-sm font-bold">
+                    Buscar herramienta
+                  </span>
+                  <span className="block text-xs text-white/70">
+                    Encuentra cualquiera al instante
+                  </span>
+                </span>
+                <kbd className="shrink-0 select-none rounded border-2 border-white/30 px-1.5 py-0.5 text-[0.7rem] font-bold leading-none">
+                  {modKey === '⌘' ? '⌘K' : 'Ctrl K'}
+                </kbd>
+              </button>
+
+              {/* Módulos (nivel superior); el detalle se explora dentro de cada
+                  uno o por ⌘K. Escala al crecer el catálogo. */}
+              <div className="mt-2 grid gap-1.5">
+                {modules.map((m) => {
+                  const count = m.categories.reduce(
+                    (n, c) => n + c.tools.length,
+                    0
+                  );
+                  return (
+                    <Link
+                      key={m.module}
+                      href={MODULE_HREF[m.module]}
+                      onClick={() => setMegaOpen(false)}
+                      className="flex items-center justify-between gap-3 rounded-lg border-3 border-ink/15 px-3 py-2.5 transition-colors duration-150 hover-fine:border-ink hover-fine:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink"
+                    >
+                      <span className="text-sm font-bold text-ink">
+                        {m.label}
+                      </span>
+                      <span className="text-xs text-muted-foreground">
+                        {count}{' '}
+                        {count === 1 ? 'herramienta' : 'herramientas'}
+                      </span>
+                    </Link>
+                  );
+                })}
+              </div>
             </div>
           )}
         </div>
