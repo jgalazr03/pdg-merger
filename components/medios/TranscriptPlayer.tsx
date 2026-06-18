@@ -192,13 +192,13 @@ function TranscriptPlayer(
                   </span>
                 </div>
               )}
-              <div className="flex items-stretch gap-2 sm:gap-3">
+              <div className="flex items-start gap-2 sm:gap-3">
                 <button
                   type="button"
                   onClick={() => seek(start, i)}
                   aria-label={`Reproducir desde ${clock(start)}`}
                   className={cn(
-                    'flex w-[4.5rem] shrink-0 items-center justify-center gap-1 rounded border-2 py-1 font-mono text-xs tabular-nums transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink focus-visible:ring-offset-1',
+                    'mt-0.5 flex h-7 w-[4.5rem] shrink-0 items-center justify-center gap-1 rounded border-2 font-mono text-xs tabular-nums transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink focus-visible:ring-offset-1',
                     isActive
                       ? cn(accent.solid, 'border-ink')
                       : cn(

@@ -93,7 +93,7 @@ export default function SummaryPanel({ text, baseName, accent }: Props) {
   if (phase === 'done' && minuta) {
     const md = minutaToText(minuta);
     return (
-      <div className="motion-safe:animate-fade-in">
+      <div className="p-4 motion-safe:animate-fade-in sm:p-5">
         <h2 className="text-lg font-bold leading-tight text-ink">
           {minuta.titulo}
         </h2>
@@ -176,7 +176,7 @@ export default function SummaryPanel({ text, baseName, accent }: Props) {
   }
 
   return (
-    <div>
+    <div className="p-4 sm:p-5">
       <p className="mb-3 text-sm text-muted-foreground">
         Una minuta con los puntos clave, y los acuerdos y tareas si es una
         reunión.

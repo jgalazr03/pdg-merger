@@ -4,7 +4,12 @@ import { useEffect, useRef, useState } from 'react';
 import { Play, Loader2, CornerDownLeft, AlertCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { ToolAccent } from '@/lib/tools';
-import { type Chunk, clock, transcriptWithSeconds } from '@/lib/transcript';
+import {
+  type Chunk,
+  clock,
+  plainText,
+  transcriptWithSeconds,
+} from '@/lib/transcript';
 import type { Answer } from '@/lib/ask';
 import { Button } from '@/components/ui/button';
 import Markdown from '@/components/medios/Markdown';
@@ -23,7 +28,8 @@ type Turn = {
   loading: boolean;
 };
 
-const SUGGESTIONS = [
+// Fallback mientras llegan (o si fallan) las sugerencias generadas del contenido.
+const FALLBACK_SUGGESTIONS = [
   '¿Cuáles fueron los acuerdos?',
   '¿Qué tareas quedaron y de quién?',
   'Resume en una frase',
@@ -38,6 +44,7 @@ export default function AskPanel({ chunks, accent, onSeek }: Props) {
   const [input, setInput] = useState('');
   const [turns, setTurns] = useState<Turn[]>([]);
   const [busy, setBusy] = useState(false);
+  const [suggestions, setSuggestions] = useState<string[]>(FALLBACK_SUGGESTIONS);
   const threadRef = useRef<HTMLDivElement>(null);
 
   // Auto-scroll al final del hilo en cada cambio (pregunta enviada, respuesta
@@ -46,6 +53,29 @@ export default function AskPanel({ chunks, accent, onSeek }: Props) {
     const el = threadRef.current;
     if (el) el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' });
   }, [turns]);
+
+  // Sugerencias generadas del contenido de la grabación (no fijas). Con fallback.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch('/api/suggestions', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ transcript: plainText(chunks) }),
+        });
+        const data = await res.json();
+        if (!cancelled && res.ok && Array.isArray(data.questions) && data.questions.length) {
+          setSuggestions(data.questions.slice(0, 3));
+        }
+      } catch {
+        // Se quedan las sugerencias de fallback.
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [chunks]);
 
   const ask = async (questionRaw: string) => {
     const question = questionRaw.trim();
@@ -108,7 +138,7 @@ export default function AskPanel({ chunks, accent, onSeek }: Props) {
               {turn.loading ? (
                 <p className="flex items-center gap-2 text-[13px] text-muted-foreground sm:text-sm">
                   <Loader2 className={cn('h-4 w-4 animate-spin', accent.text)} />
-                  Buscando en la grabación…
+                  Pensando…
                 </p>
               ) : turn.error ? (
                 <div className="flex items-start gap-2 rounded-lg border-2 border-destructive bg-destructive/5 p-2.5">
@@ -152,7 +182,7 @@ export default function AskPanel({ chunks, accent, onSeek }: Props) {
 
       {turns.length === 0 && (
         <div className="mt-3 flex flex-wrap gap-1.5">
-          {SUGGESTIONS.map((s) => (
+          {suggestions.map((s) => (
             <button
               key={s}
               type="button"
