@@ -19,6 +19,8 @@ import { useLayoutEffect, useRef } from 'react';
 export function useFlip<T extends HTMLElement>(orderKey: string) {
   const ref = useRef<T>(null);
   const prev = useRef<Map<string, { left: number; top: number }>>(new Map());
+  // Animación viva por elemento, para cancelarla antes de lanzar otra.
+  const anims = useRef<Map<string, Animation>>(new Map());
 
   useLayoutEffect(() => {
     const container = ref.current;
@@ -38,25 +40,32 @@ export function useFlip<T extends HTMLElement>(orderKey: string) {
     for (const node of nodes) {
       const id = node.dataset.flipId;
       if (!id) continue;
-      const rect = node.getBoundingClientRect();
+      // CLAVE: medir con offsetLeft/offsetTop (posición de LAYOUT), NO con
+      // getBoundingClientRect (que incluye el transform en vuelo). Si los
+      // reordenamientos se encadenan más rápido que la animación, medir el
+      // rect contaminaría el FLIP con el desplazamiento aún en curso y los
+      // elementos "saltarían" en bucle. offset* ignora los transforms.
+      const pos = { left: node.offsetLeft, top: node.offsetTop };
       const before = prev.current.get(id);
 
       // Invert + Play: parte del desfase anterior y resuelve a 0.
       if (!reduce && before) {
-        const dx = before.left - rect.left;
-        const dy = before.top - rect.top;
+        const dx = before.left - pos.left;
+        const dy = before.top - pos.top;
         if (dx || dy) {
-          node.animate(
+          anims.current.get(id)?.cancel();
+          const anim = node.animate(
             [
               { transform: `translate(${dx}px, ${dy}px)` },
               { transform: 'translate(0, 0)' },
             ],
             { duration: 220, easing: 'cubic-bezier(0.86, 0, 0.07, 1)' }
           );
+          anims.current.set(id, anim);
         }
       }
 
-      next.set(id, { left: rect.left, top: rect.top });
+      next.set(id, pos);
     }
 
     prev.current = next;

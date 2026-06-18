@@ -45,6 +45,7 @@ export default function PDFMerger() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [downloadUrl, setDownloadUrl] = useState<string | null>(null);
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
+  const [overIndex, setOverIndex] = useState<number | null>(null);
   const [fileName, setFileName] = useState('');
   const [fileNameError, setFileNameError] = useState('');
   const [cropFileId, setCropFileId] = useState<string | null>(null);
@@ -172,9 +173,15 @@ export default function PDFMerger() {
   // FLIP: desliza las filas a su nueva posición al reordenar (arrastre o flechas).
   const listRef = useFlip<HTMLUListElement>(files.map((f) => f.id).join('|'));
 
-  // Reordenamiento por arrastre. Reordenamos EN VIVO al pasar sobre otra fila
-  // (no solo al soltar): así el resto de filas se hace a un lado mostrando dónde
-  // va a caer, y el FLIP (useFlip) las desliza con suavidad.
+  // Reordenamiento por arrastre. Marcamos el DESTINO mientras se arrastra y
+  // reordenamos AL SOLTAR; el FLIP (useFlip) desliza las filas a su nuevo sitio.
+  // No reordenamos en vivo a propósito: con arrastre nativo eso entra en bucle
+  // (las filas se deslizan bajo el cursor y vuelven a disparar dragover).
+  const endDrag = () => {
+    setDraggedIndex(null);
+    setOverIndex(null);
+  };
+
   const handleDragStart = (e: React.DragEvent, index: number) => {
     setDraggedIndex(index);
     e.dataTransfer.effectAllowed = 'move';
@@ -183,13 +190,14 @@ export default function PDFMerger() {
   const handleDragOver = (e: React.DragEvent, index: number) => {
     e.preventDefault();
     e.dataTransfer.dropEffect = 'move';
-    if (draggedIndex === null || draggedIndex === index) return;
-    moveFile(draggedIndex, index);
-    setDraggedIndex(index);
+    if (overIndex !== index) setOverIndex(index);
   };
 
-  // Al soltar el orden ya es el correcto (se reordenó en vivo); solo limpiamos.
-  const endDrag = () => setDraggedIndex(null);
+  const handleDrop = (e: React.DragEvent, dropIndex: number) => {
+    e.preventDefault();
+    if (draggedIndex !== null) moveFile(draggedIndex, dropIndex);
+    endDrag();
+  };
 
   // Reordenamiento accesible por teclado
   const moveFile = (from: number, to: number) => {
@@ -353,15 +361,20 @@ export default function PDFMerger() {
                   draggable
                   onDragStart={(e) => handleDragStart(e, index)}
                   onDragOver={(e) => handleDragOver(e, index)}
-                  onDrop={(e) => e.preventDefault()}
+                  onDrop={(e) => handleDrop(e, index)}
                   onDragEnd={endDrag}
                   className={cn(
                     // flex-wrap: en móvil las acciones de imagen (recortar/quitar)
                     // bajan a una segunda línea con sitio, en vez de desbordar.
-                    'flex flex-wrap items-center gap-2.5 rounded-lg border-3 border-ink bg-surface p-3 transition-colors duration-150 ease-out hover-fine:bg-muted active:bg-muted sm:gap-3 sm:p-4',
+                    'flex flex-wrap items-center gap-2.5 rounded-lg border-3 border-ink bg-surface p-3 transition-[opacity,box-shadow,background-color] duration-150 ease-out hover-fine:bg-muted active:bg-muted sm:gap-3 sm:p-4',
                     // La fila tomada se atenúa (el "fantasma" nativo sigue al cursor);
                     // NO le ponemos transform aquí para no chocar con el FLIP.
-                    draggedIndex === index && 'opacity-50'
+                    draggedIndex === index && 'opacity-50',
+                    // Destino del soltado: anillo navy (igual que PDFOrganizer).
+                    overIndex === index &&
+                      draggedIndex !== null &&
+                      draggedIndex !== index &&
+                      'ring-2 ring-ink ring-offset-2'
                   )}
                 >
                   <GripVertical
