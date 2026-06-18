@@ -269,3 +269,4 @@ arrastrar. Es el corazón de cada herramienta.
   `right` >1px como franja de color de acento.
 - **Don't** meter texto con gradiente (`background-clip: text`) ni glassmorphism
   decorativo; ni resolver con modal lo que se puede hacer inline.
+
