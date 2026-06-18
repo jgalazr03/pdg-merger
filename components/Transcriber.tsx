@@ -34,6 +34,7 @@ import {
   toVtt,
 } from '@/lib/transcript';
 import type { Minuta } from '@/lib/summary';
+import { decodeAudioTo16kMono, prepareForUpload } from '@/lib/audio';
 
 const tool = getTool('transcribir');
 const accent = tool.accent;
@@ -59,36 +60,6 @@ function formatFileSize(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-}
-
-/** Decodifica un archivo de audio/video a PCM mono de 16 kHz (lo que espera
- *  Whisper), remuestreando con un OfflineAudioContext. */
-async function decodeAudioTo16kMono(file: File): Promise<Float32Array> {
-  const buf = await file.arrayBuffer();
-  const AC: typeof AudioContext =
-    window.AudioContext ||
-    (window as unknown as { webkitAudioContext: typeof AudioContext })
-      .webkitAudioContext;
-  const ctx = new AC();
-  let decoded: AudioBuffer;
-  try {
-    decoded = await ctx.decodeAudioData(buf);
-  } finally {
-    void ctx.close();
-  }
-  const target = 16000;
-  const offline = new OfflineAudioContext(
-    1,
-    Math.max(1, Math.ceil(decoded.duration * target)),
-    target
-  );
-  const src = offline.createBufferSource();
-  src.buffer = decoded;
-  src.connect(offline.destination);
-  src.start();
-  const rendered = await offline.startRendering();
-  // Copia con buffer propio para poder transferirlo al worker.
-  return rendered.getChannelData(0).slice();
 }
 
 function triggerDownload(content: string, filename: string) {
@@ -302,10 +273,14 @@ export default function Transcriber() {
   // Nova-3 lo transcribe por URL. Máxima precisión y velocidad.
   const transcribeServer = async () => {
     if (!selectedFile) return;
-    setUploadPct(0);
-    setPhase('uploading');
     try {
-      const blob = await upload(selectedFile.name, selectedFile, {
+      // Reduce a 16 kHz mono antes de subir (misma precisión, mucho menos que
+      // transferir dos veces: navegador→Blob y Blob→Deepgram).
+      setPhase('decoding');
+      const prepared = await prepareForUpload(selectedFile);
+      setUploadPct(0);
+      setPhase('uploading');
+      const blob = await upload(prepared.name, prepared.blob, {
         access: 'public',
         handleUploadUrl: '/api/blob-upload',
         onUploadProgress: (e) => setUploadPct(Math.round(e.percentage)),
@@ -342,7 +317,7 @@ export default function Transcriber() {
 
   const phaseLabel =
     phase === 'decoding'
-      ? 'Leyendo el audio…'
+      ? 'Preparando el audio…'
       : phase === 'uploading'
         ? `Subiendo el audio… ${uploadPct}%`
         : phase === 'loading'
@@ -354,6 +329,11 @@ export default function Transcriber() {
               ? 'Transcribiendo en el servidor (Nova-3)…'
               : 'Transcribiendo… (puede tardar según la duración)'
             : '';
+  // El loader es uno solo y abarca todas las fases: barra con porcentaje cuando
+  // lo conocemos (subida, descarga del modelo) e indeterminada cuando no
+  // (preparando, transcribiendo). Solo cambia el texto.
+  const hasPct = phase === 'uploading' || (phase === 'loading' && modelPct > 0);
+  const loaderPct = phase === 'uploading' ? uploadPct : modelPct;
 
   return (
     <ToolShell tool={tool} step={step}>
@@ -496,13 +476,33 @@ export default function Transcriber() {
                 </Button>
 
                 {busy && (
-                  <div className="mt-4">
-                    <p className="mb-2 text-sm font-medium text-ink">{phaseLabel}</p>
-                    {phase === 'uploading' && <Progress value={uploadPct} />}
-                    {phase === 'loading' && modelPct > 0 && (
-                      <Progress value={modelPct} />
-                    )}
-                    {mode === 'local' && (
+                  <div className="mt-4 rounded-lg border-3 border-ink bg-surface p-4">
+                    <div className="flex items-center gap-3">
+                      <Loader2
+                        className={cn('h-5 w-5 shrink-0 animate-spin', accent.text)}
+                      />
+                      <p
+                        className="text-sm font-medium text-ink"
+                        aria-live="polite"
+                      >
+                        {phaseLabel}
+                      </p>
+                    </div>
+                    <div className="mt-3">
+                      {hasPct ? (
+                        <Progress value={loaderPct} />
+                      ) : (
+                        // Barra indeterminada: el proceso sigue, sin porcentaje.
+                        <div
+                          role="progressbar"
+                          aria-label={phaseLabel}
+                          className="relative h-4 w-full overflow-hidden rounded-lg border-3 border-ink bg-surface"
+                        >
+                          <div className="absolute inset-y-0 left-0 w-1/3 bg-highlight motion-safe:animate-indeterminate" />
+                        </div>
+                      )}
+                    </div>
+                    {mode === 'local' && phase === 'loading' && (
                       <p className="mt-2 text-xs text-muted-foreground">
                         La primera vez se descarga el modelo (~150 MB) y queda
                         guardado en tu navegador. Tu grabación no sale de tu equipo.

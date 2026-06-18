@@ -196,6 +196,12 @@ const config: Config = {
           from: { opacity: '0', transform: 'translateY(8px)' },
           to: { opacity: '1', transform: 'translateY(0)' },
         },
+        // Segmento que recorre el track: progreso sin porcentaje (proceso en
+        // curso cuya duración no conocemos, p. ej. transcribiendo en servidor).
+        indeterminate: {
+          '0%': { transform: 'translateX(-100%)' },
+          '100%': { transform: 'translateX(300%)' },
+        },
       },
       animation: {
         'accordion-down': 'accordion-down 0.2s ease-out',
@@ -204,6 +210,8 @@ const config: Config = {
         // easing premium tipo "ease-out-quint".
         'fade-in': 'fade-in 0.25s cubic-bezier(0.22, 1, 0.36, 1) both',
         'slide-up': 'slide-up 0.3s cubic-bezier(0.22, 1, 0.36, 1) both',
+        indeterminate:
+          'indeterminate 1.2s cubic-bezier(0.65, 0, 0.35, 1) infinite',
       },
     },
   },
