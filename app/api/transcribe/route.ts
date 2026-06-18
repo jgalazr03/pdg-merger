@@ -11,12 +11,16 @@ const DG_PARAMS = new URLSearchParams({
   smart_format: 'true',
   punctuate: 'true',
   utterances: 'true',
+  // Diarización: separa por hablante (útil para reuniones/entrevistas). Cada
+  // utterance trae su `speaker` (entero) que el cliente pinta como «Hablante N».
+  diarize: 'true',
 }).toString();
 
 interface Utterance {
   start: number;
   end: number;
   transcript: string;
+  speaker?: number;
 }
 
 /**
@@ -69,6 +73,7 @@ export async function POST(request: Request) {
     const chunks = utterances.map((u) => ({
       timestamp: [u.start, u.end] as [number, number],
       text: (u.transcript ?? '').trim(),
+      ...(typeof u.speaker === 'number' ? { speaker: u.speaker } : {}),
     }));
 
     return NextResponse.json({ text, chunks });
