@@ -129,7 +129,7 @@ export default function AskPanel({ chunks, accent, onSeek }: Props) {
           className="max-h-[18rem] space-y-3 overflow-y-auto pr-1 sm:max-h-[26rem]"
         >
           {turns.map((turn, i) => (
-            <div key={i} className="space-y-1.5">
+            <div key={i} className="space-y-1.5 motion-safe:animate-slide-up">
               <div className="flex justify-end">
                 <p className="max-w-[85%] rounded-lg border-2 border-ink bg-ink px-2.5 py-1.5 text-[13px] leading-snug text-white sm:text-sm">
                   {turn.question}
@@ -149,7 +149,7 @@ export default function AskPanel({ chunks, accent, onSeek }: Props) {
                 </div>
               ) : (
                 turn.answer && (
-                  <div className="max-w-[92%] rounded-lg border-2 border-ink/15 bg-surface px-2.5 py-2">
+                  <div className="max-w-[92%] rounded-lg border-2 border-ink/15 bg-surface px-2.5 py-2 motion-safe:animate-fade-in">
                     <Markdown className="text-[13px] text-ink sm:text-sm">
                       {turn.answer.answer}
                     </Markdown>
