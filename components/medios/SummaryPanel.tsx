@@ -6,6 +6,7 @@ import { cn } from '@/lib/utils';
 import type { ToolAccent } from '@/lib/tools';
 import { type Minuta, minutaToText } from '@/lib/summary';
 import { Button } from '@/components/ui/button';
+import Markdown from '@/components/medios/Markdown';
 
 type Props = {
   minuta: Minuta;
@@ -61,7 +62,7 @@ export default function SummaryPanel({ minuta, baseName, accent }: Props) {
 
       <div className="p-4 sm:p-5">
         <h2 className="text-lg font-bold leading-tight text-ink">{minuta.titulo}</h2>
-        <p className="mt-2 text-sm leading-relaxed text-ink">{minuta.resumen}</p>
+        <Markdown className="mt-2 text-sm text-ink">{minuta.resumen}</Markdown>
 
         {minuta.puntosClave.length > 0 && (
           <Section icon={<ListChecks className="h-4 w-4" />} title="Puntos clave" accent={accent}>

@@ -13,6 +13,7 @@ import type { ToolAccent } from '@/lib/tools';
 import { type Chunk, clock, transcriptWithSeconds } from '@/lib/transcript';
 import type { Answer } from '@/lib/ask';
 import { Button } from '@/components/ui/button';
+import Markdown from '@/components/medios/Markdown';
 
 type Props = {
   chunks: Chunk[];
@@ -137,9 +138,9 @@ export default function AskPanel({ chunks, accent, onSeek }: Props) {
                 ) : (
                   turn.answer && (
                     <div className="max-w-[92%] rounded-lg border-2 border-ink/15 bg-surface px-3 py-2">
-                      <p className="text-sm leading-relaxed text-ink">
+                      <Markdown className="text-sm text-ink">
                         {turn.answer.answer}
-                      </p>
+                      </Markdown>
                       {turn.answer.citations.length > 0 && (
                         <div className="mt-2 flex flex-wrap gap-1.5">
                           {turn.answer.citations.map((c, j) => (
