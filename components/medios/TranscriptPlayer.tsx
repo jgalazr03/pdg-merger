@@ -1,6 +1,13 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import {
+  forwardRef,
+  useCallback,
+  useEffect,
+  useImperativeHandle,
+  useRef,
+  useState,
+} from 'react';
 import { Play } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { ToolAccent } from '@/lib/tools';
@@ -14,6 +21,10 @@ type Props = {
   /** Notifica al padre el texto editado (en `onBlur`) para copiar/exportar. */
   onChange: (chunks: Chunk[]) => void;
 };
+
+/** API imperativa para que otras partes (p. ej. el panel de preguntas) salten
+ *  el reproductor a un momento concreto. */
+export type TranscriptPlayerHandle = { seekTo: (time: number) => void };
 
 // Color por hablante (clases LITERALES para el JIT de Tailwind). Solo se usan
 // cuando hubo diarización; se ciclan si hay más hablantes que colores.
@@ -33,13 +44,10 @@ const SPEAKER_DOT = [
  * controlado: React no pisa el contenido en cada repintado, así que el cursor
  * sobrevive al resaltado durante la reproducción).
  */
-export default function TranscriptPlayer({
-  chunks,
-  mediaUrl,
-  isVideo,
-  accent,
-  onChange,
-}: Props) {
+function TranscriptPlayer(
+  { chunks, mediaUrl, isVideo, accent, onChange }: Props,
+  ref: React.Ref<TranscriptPlayerHandle>
+) {
   const mediaRef = useRef<HTMLMediaElement | null>(null);
   const listRef = useRef<HTMLDivElement | null>(null);
   const rowRefs = useRef<(HTMLDivElement | null)[]>([]);
@@ -94,6 +102,23 @@ export default function TranscriptPlayer({
     setActiveIndex(index);
     void m.play();
   }, []);
+
+  // Salto desde fuera (panel de preguntas): mueve el audio al momento citado,
+  // resalta la línea y trae el reproductor a la vista.
+  useImperativeHandle(
+    ref,
+    () => ({
+      seekTo(time: number) {
+        const m = mediaRef.current;
+        if (!m) return;
+        m.currentTime = time;
+        setActiveIndex(activeIndexAt(chunks, time));
+        void m.play();
+        m.scrollIntoView?.({ behavior: 'smooth', block: 'center' });
+      },
+    }),
+    [chunks]
+  );
 
   const commit = useCallback(() => {
     editingRef.current = false;
@@ -219,3 +244,5 @@ export default function TranscriptPlayer({
     </div>
   );
 }
+
+export default forwardRef(TranscriptPlayer);

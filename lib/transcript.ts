@@ -89,6 +89,18 @@ export function plainText(chunks: Chunk[]): string {
   return lines.join('\n\n');
 }
 
+/** Transcripción para enviar a un LLM: cada línea con su inicio en SEGUNDOS
+ *  entre corchetes (`[45] …`), para que pueda citar tiempos exactos. */
+export function transcriptWithSeconds(chunks: Chunk[]): string {
+  return chunks
+    .map((c) => {
+      const t = Math.round(c.timestamp[0] ?? 0);
+      const who = c.speaker != null ? ` ${speakerLabel(c.speaker)}:` : '';
+      return `[${t}]${who} ${c.text.trim()}`;
+    })
+    .join('\n');
+}
+
 /** Texto con marcas de tiempo por línea: `[m:ss] …`. */
 export function timedText(chunks: Chunk[]): string {
   return chunks

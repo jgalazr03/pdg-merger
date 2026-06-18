@@ -24,8 +24,11 @@ import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { Textarea } from '@/components/ui/textarea';
 import { upload } from '@vercel/blob/client';
-import TranscriptPlayer from '@/components/medios/TranscriptPlayer';
+import TranscriptPlayer, {
+  type TranscriptPlayerHandle,
+} from '@/components/medios/TranscriptPlayer';
 import SummaryPanel from '@/components/medios/SummaryPanel';
+import AskPanel from '@/components/medios/AskPanel';
 import {
   type Chunk,
   plainText,
@@ -108,6 +111,9 @@ export default function Transcriber() {
   );
   const fileInfoRef = useRef<HTMLDivElement>(null);
   const resultRef = useRef<HTMLDivElement>(null);
+  // Control imperativo del reproductor (para que el panel de preguntas salte a
+  // un momento citado).
+  const playerRef = useRef<TranscriptPlayerHandle>(null);
   // Subida adelantada en curso (o terminada): empieza al elegir "servidor" para
   // que, al pulsar Transcribir, el blob ya esté listo. Se descarta si el usuario
   // cambia a local o de archivo.
@@ -669,6 +675,7 @@ export default function Transcriber() {
             {chunks.length > 0 && previewUrl ? (
               <TranscriptPlayer
                 key={runId}
+                ref={playerRef}
                 chunks={chunks}
                 mediaUrl={previewUrl}
                 isVideo={!!isVideo}
@@ -739,6 +746,15 @@ export default function Transcriber() {
                 Transcribir otro
               </Button>
             </div>
+
+            {/* Pregúntale a tu grabación (Claude + citas clicables) */}
+            {chunks.length > 0 && previewUrl && (
+              <AskPanel
+                chunks={chunks}
+                accent={accent}
+                onSeek={(t) => playerRef.current?.seekTo(t)}
+              />
+            )}
 
             {/* Resumen / minuta automática (Claude) */}
             <div className="mt-6 border-t-3 border-ink/10 pt-5">
