@@ -134,6 +134,7 @@ export default function PDFOrganizer() {
   // Estado de arrastre (solo escritorio; en táctil se usan los botones de mover).
   const [dragIndex, setDragIndex] = useState<number | null>(null);
   const [overIndex, setOverIndex] = useState<number | null>(null);
+  const [removingIds, setRemovingIds] = useState<Set<string>>(new Set());
   // Foto del documento "como se cargó" para "Restablecer"; crece al agregar archivos.
   const initialRef = useRef<PageItem[]>([]);
   const addInputRef = useRef<HTMLInputElement>(null);
@@ -318,28 +319,37 @@ export default function PDFOrganizer() {
   };
 
   const deletePage = (id: string) => {
-    setPages((prev) => {
-      if (prev.length <= 1) {
-        toast.error('No puedes eliminar la última página', {
-          description: 'Un PDF debe tener al menos una página.',
-        });
-        return prev;
-      }
-      const idx = prev.findIndex((p) => p.id === id);
-      if (idx < 0) return prev;
-      const removed = prev[idx];
-      const next = prev.filter((p) => p.id !== id);
-      toastUndo('Página eliminada', {
-        description: `Quitaste «${cardLabel(removed)}».`,
-        onUndo: () =>
-          setPages((cur) => {
-            const restored = [...cur];
-            restored.splice(Math.min(idx, restored.length), 0, removed);
-            return restored;
-          }),
+    if (pages.length <= 1) {
+      toast.error('No puedes eliminar la última página', {
+        description: 'Un PDF debe tener al menos una página.',
       });
-      return next;
-    });
+      return;
+    }
+    // Salida: desvanecer la miniatura y luego quitarla (el FLIP cierra el hueco).
+    setRemovingIds((prev) => new Set(prev).add(id));
+    window.setTimeout(() => {
+      setPages((prev) => {
+        const idx = prev.findIndex((p) => p.id === id);
+        if (idx < 0) return prev;
+        const removed = prev[idx];
+        const next = prev.filter((p) => p.id !== id);
+        toastUndo('Página eliminada', {
+          description: `Quitaste «${cardLabel(removed)}».`,
+          onUndo: () =>
+            setPages((cur) => {
+              const restored = [...cur];
+              restored.splice(Math.min(idx, restored.length), 0, removed);
+              return restored;
+            }),
+        });
+        return next;
+      });
+      setRemovingIds((prev) => {
+        const next = new Set(prev);
+        next.delete(id);
+        return next;
+      });
+    }, 160);
   };
 
   const resetChanges = () => {
@@ -606,10 +616,12 @@ export default function PDFOrganizer() {
                     setOverIndex(null);
                   }}
                   className={cn(
-                    'group relative flex flex-col overflow-hidden rounded-lg border-3 border-ink bg-surface transition-[opacity,box-shadow] duration-150 ease-out sm:cursor-grab sm:active:cursor-grabbing',
+                    'group relative flex flex-col overflow-hidden rounded-lg border-3 border-ink bg-surface transition-[opacity,box-shadow,transform] duration-150 ease-out sm:cursor-grab sm:active:cursor-grabbing',
                     dragIndex === i && 'opacity-50',
                     overIndex === i && dragIndex !== null && dragIndex !== i &&
-                      'ring-2 ring-ink ring-offset-2'
+                      'ring-2 ring-ink ring-offset-2',
+                    removingIds.has(p.id) &&
+                      'pointer-events-none opacity-0 motion-safe:scale-[0.97]'
                   )}
                 >
                   {/* Insignia de posición en el nuevo orden. */}

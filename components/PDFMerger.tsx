@@ -46,6 +46,7 @@ export default function PDFMerger() {
   const [downloadUrl, setDownloadUrl] = useState<string | null>(null);
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
   const [overIndex, setOverIndex] = useState<number | null>(null);
+  const [removingIds, setRemovingIds] = useState<Set<string>>(new Set());
   const [fileName, setFileName] = useState('');
   const [fileNameError, setFileNameError] = useState('');
   const [cropFileId, setCropFileId] = useState<string | null>(null);
@@ -146,8 +147,19 @@ export default function PDFMerger() {
     }
   };
 
+  // Eliminar con SALIDA: la fila se desvanece (opacidad + escala, GPU) y al
+  // terminar se quita del estado; entonces el FLIP cierra el hueco deslizando
+  // las demás. Así la lista se siente "viva" igual que al reordenar.
   const removeFile = (id: string) => {
-    setFiles((prev) => prev.filter((file) => file.id !== id));
+    setRemovingIds((prev) => new Set(prev).add(id));
+    window.setTimeout(() => {
+      setFiles((prev) => prev.filter((file) => file.id !== id));
+      setRemovingIds((prev) => {
+        const next = new Set(prev);
+        next.delete(id);
+        return next;
+      });
+    }, 160);
   };
 
   // Convierte un data URL (base64) en bytes para embeber en el PDF
@@ -366,10 +378,13 @@ export default function PDFMerger() {
                   className={cn(
                     // flex-wrap: en móvil las acciones de imagen (recortar/quitar)
                     // bajan a una segunda línea con sitio, en vez de desbordar.
-                    'flex flex-wrap items-center gap-2.5 rounded-lg border-3 border-ink bg-surface p-3 transition-[opacity,box-shadow,background-color] duration-150 ease-out hover-fine:bg-muted active:bg-muted sm:gap-3 sm:p-4',
+                    'flex flex-wrap items-center gap-2.5 rounded-lg border-3 border-ink bg-surface p-3 transition-[opacity,box-shadow,background-color,transform] duration-150 ease-out hover-fine:bg-muted active:bg-muted sm:gap-3 sm:p-4',
                     // La fila tomada se atenúa (el "fantasma" nativo sigue al cursor);
                     // NO le ponemos transform aquí para no chocar con el FLIP.
                     draggedIndex === index && 'opacity-50',
+                    // Salida al eliminar: se desvanece y encoge antes de quitarse.
+                    removingIds.has(file.id) &&
+                      'pointer-events-none opacity-0 motion-safe:scale-[0.97]',
                     // Destino del soltado: anillo navy (igual que PDFOrganizer).
                     overIndex === index &&
                       draggedIndex !== null &&

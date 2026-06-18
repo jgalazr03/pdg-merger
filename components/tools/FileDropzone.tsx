@@ -105,7 +105,7 @@ export default function FileDropzone({
         onDragOver={handleDragOver}
         onDrop={handleDrop}
         className={cn(
-          'group flex cursor-pointer items-center justify-center gap-2 rounded-lg border-[3px] border-dashed border-ink px-4 py-3 text-sm font-bold text-ink transition-colors duration-150 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink focus-visible:ring-offset-2',
+          'group flex cursor-pointer items-center justify-center gap-2 rounded-lg border-[3px] border-dashed border-ink px-4 py-3 text-sm font-bold text-ink transition-colors duration-150 ease-out motion-safe:animate-fade-in focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink focus-visible:ring-offset-2',
           isDragOver ? 'bg-highlight-soft' : 'bg-surface hover-fine:bg-muted',
           className
         )}
