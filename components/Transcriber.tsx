@@ -56,6 +56,10 @@ const isMedia = (f: File) =>
   f.type.startsWith('video/') ||
   /\.(mp3|wav|m4a|ogg|mp4|webm|aac|flac|mov)$/i.test(f.name);
 
+// Identidad estable de un archivo, para no relanzar la subida adelantada del
+// mismo archivo ni confundirla con otra.
+const fileKeyOf = (f: File) => `${f.name}:${f.size}:${f.lastModified}`;
+
 function formatFileSize(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
@@ -94,6 +98,9 @@ export default function Transcriber() {
   const [minuta, setMinuta] = useState<Minuta | null>(null);
   const [summaryError, setSummaryError] = useState('');
   const [summaryTruncated, setSummaryTruncated] = useState(false);
+  // Subida adelantada (especulativa) del modo servidor.
+  const [speculating, setSpeculating] = useState(false);
+  const [specReady, setSpecReady] = useState(false);
 
   const workerRef = useRef<Worker | null>(null);
   const progressRef = useRef<Map<string, { loaded: number; total: number }>>(
@@ -101,6 +108,15 @@ export default function Transcriber() {
   );
   const fileInfoRef = useRef<HTMLDivElement>(null);
   const resultRef = useRef<HTMLDivElement>(null);
+  // Subida adelantada en curso (o terminada): empieza al elegir "servidor" para
+  // que, al pulsar Transcribir, el blob ya esté listo. Se descarta si el usuario
+  // cambia a local o de archivo.
+  const specRef = useRef<{
+    fileKey: string;
+    abort: AbortController;
+    promise: Promise<string>;
+  } | null>(null);
+  const specUrlRef = useRef<string | null>(null);
 
   // Preview reproducible; libera el objectURL al cambiar/limpiar.
   useEffect(() => {
@@ -113,9 +129,14 @@ export default function Transcriber() {
     return () => URL.revokeObjectURL(url);
   }, [selectedFile]);
 
-  // Termina el worker al desmontar (libera el modelo en memoria).
+  // Termina el worker al desmontar (libera el modelo en memoria) y descarta
+  // cualquier subida adelantada pendiente.
   useEffect(() => {
-    return () => workerRef.current?.terminate();
+    return () => {
+      workerRef.current?.terminate();
+      cancelSpeculation();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
@@ -143,6 +164,9 @@ export default function Transcriber() {
     setChunks([]);
     setErrorMsg('');
     clearSummary();
+    // Si el usuario ya estaba en "servidor", adelanta la subida del nuevo archivo.
+    cancelSpeculation();
+    if (mode === 'server') startSpeculation(file);
   };
 
   const reset = () => {
@@ -153,6 +177,7 @@ export default function Transcriber() {
     setErrorMsg('');
     setModelPct(0);
     clearSummary();
+    cancelSpeculation();
   };
 
   // El usuario corrigió el texto de un segmento en el reproductor: re-derivamos
@@ -269,27 +294,104 @@ export default function Transcriber() {
     workerRef.current.postMessage({ type: 'transcribe', audio }, [audio.buffer]);
   };
 
-  // Modo servidor: el audio se sube a Vercel Blob (cualquier tamaño) y Deepgram
-  // Nova-3 lo transcribe por URL. Máxima precisión y velocidad.
+  // Prepara (16 kHz mono) y sube a Vercel Blob, devolviendo la URL. `signal`
+  // permite cancelar una subida adelantada. `onPct` reporta el progreso.
+  const uploadToBlob = async (
+    file: File,
+    onPct: (n: number) => void,
+    signal?: AbortSignal
+  ): Promise<string> => {
+    const prepared = await prepareForUpload(file);
+    const blob = await upload(prepared.name, prepared.blob, {
+      access: 'public',
+      handleUploadUrl: '/api/blob-upload',
+      onUploadProgress: (e) => onPct(Math.round(e.percentage)),
+      abortSignal: signal,
+    });
+    return blob.url;
+  };
+
+  // Inicia la subida adelantada del archivo (al elegir "servidor"). Idempotente
+  // por archivo. El audio solo sale del equipo aquí, cuando el usuario ya optó
+  // por el servidor (el modo local nunca dispara esto).
+  const startSpeculation = (file: File) => {
+    const key = fileKeyOf(file);
+    if (specRef.current?.fileKey === key) return;
+    cancelSpeculation();
+    const abort = new AbortController();
+    setSpeculating(true);
+    setSpecReady(false);
+    setUploadPct(0);
+    const promise = uploadToBlob(file, (n) => setUploadPct(n), abort.signal)
+      .then((url) => {
+        specUrlRef.current = url;
+        setSpeculating(false);
+        setSpecReady(true);
+        return url;
+      })
+      .catch((err) => {
+        setSpeculating(false);
+        throw err;
+      });
+    specRef.current = { fileKey: key, abort, promise };
+  };
+
+  // Descarta la subida adelantada: aborta la que esté en curso y borra el blob
+  // ya subido (para no dejar basura en Blob).
+  const cancelSpeculation = () => {
+    const spec = specRef.current;
+    specRef.current = null;
+    setSpeculating(false);
+    setSpecReady(false);
+    const url = specUrlRef.current;
+    specUrlRef.current = null;
+    if (spec) spec.abort.abort();
+    if (url) {
+      void fetch('/api/blob-delete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url }),
+      }).catch(() => {});
+    }
+  };
+
+  // Modo servidor: aprovecha la subida adelantada si existe; si no (o si falló),
+  // sube ahora. Deepgram Nova-3 transcribe el blob por URL.
   const transcribeServer = async () => {
     if (!selectedFile) return;
+    const file = selectedFile;
     try {
-      // Reduce a 16 kHz mono antes de subir (misma precisión, mucho menos que
-      // transferir dos veces: navegador→Blob y Blob→Deepgram).
-      setPhase('decoding');
-      const prepared = await prepareForUpload(selectedFile);
-      setUploadPct(0);
-      setPhase('uploading');
-      const blob = await upload(prepared.name, prepared.blob, {
-        access: 'public',
-        handleUploadUrl: '/api/blob-upload',
-        onUploadProgress: (e) => setUploadPct(Math.round(e.percentage)),
-      });
+      let url: string;
+      const spec = specRef.current;
+      if (spec && spec.fileKey === fileKeyOf(file)) {
+        // Consumimos la subida adelantada (cancelSpeculation ya no la tocará).
+        specRef.current = null;
+        setPhase('uploading');
+        try {
+          url = await spec.promise;
+        } catch {
+          // La subida adelantada falló: reintenta desde cero.
+          setPhase('decoding');
+          setUploadPct(0);
+          setPhase('uploading');
+          url = await uploadToBlob(file, (n) => setUploadPct(n));
+        }
+      } else {
+        // Reduce a 16 kHz mono antes de subir (misma precisión, mucho menos que
+        // transferir dos veces: navegador→Blob y Blob→Deepgram).
+        setPhase('decoding');
+        setUploadPct(0);
+        setPhase('uploading');
+        url = await uploadToBlob(file, (n) => setUploadPct(n));
+      }
+      // El blob ya es nuestro y /api/transcribe lo borrará: no re-borrar.
+      specUrlRef.current = null;
+      setSpecReady(false);
       setPhase('transcribing');
       const res = await fetch('/api/transcribe', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ url: blob.url }),
+        body: JSON.stringify({ url }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data?.error || 'Error del servidor');
@@ -428,7 +530,16 @@ export default function Transcriber() {
                         <button
                           key={opt.key}
                           type="button"
-                          onClick={() => setMode(opt.key)}
+                          onClick={() => {
+                            setMode(opt.key);
+                            // Al elegir servidor, adelanta la subida; al volver a
+                            // local, descártala (el modo privado no sube nada).
+                            if (opt.key === 'server') {
+                              if (selectedFile) startSpeculation(selectedFile);
+                            } else {
+                              cancelSpeculation();
+                            }
+                          }}
                           disabled={busy}
                           aria-pressed={active}
                           className={cn(
@@ -458,6 +569,28 @@ export default function Transcriber() {
                       ? 'Tu grabación se procesa en el navegador; nada se sube. Ideal para audios cortos.'
                       : 'Tu grabación se sube para transcribirse con Deepgram Nova-3 (máxima precisión, cualquier tamaño, identifica a cada hablante) y se borra al terminar.'}
                   </p>
+                  {/* Adelanto: la subida ya va en marcha mientras el usuario
+                      decide; al pulsar Transcribir, será inmediata. */}
+                  {mode === 'server' && (speculating || specReady) && (
+                    <p
+                      className={cn(
+                        'mt-1.5 flex items-center gap-1.5 text-xs font-medium',
+                        accent.text
+                      )}
+                    >
+                      {specReady ? (
+                        <>
+                          <Check className="h-3.5 w-3.5" strokeWidth={3} />
+                          Audio adelantado · la transcripción empezará al instante
+                        </>
+                      ) : (
+                        <>
+                          <span className="inline-block h-2 w-2 animate-pulse rounded-full bg-current" />
+                          Adelantando la subida… {uploadPct}%
+                        </>
+                      )}
+                    </p>
+                  )}
                 </div>
 
                 {/* El botón se oculta mientras procesa: el loader de abajo es
