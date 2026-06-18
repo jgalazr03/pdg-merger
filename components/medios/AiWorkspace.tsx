@@ -7,6 +7,7 @@ import {
   MessageCircleQuestion,
   FileText,
   Languages,
+  BarChart3,
   type LucideIcon,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -14,11 +15,18 @@ import type { ToolAccent } from '@/lib/tools';
 import type { Chunk } from '@/lib/transcript';
 import AskPanel from './AskPanel';
 import SummaryPanel from './SummaryPanel';
+import AnalysisPanel from './AnalysisPanel';
 import ChaptersPanel from './ChaptersPanel';
 import DeliverablePanel from './DeliverablePanel';
 import TranslatePanel from './TranslatePanel';
 
-type ToolKey = 'preguntar' | 'resumen' | 'capitulos' | 'documento' | 'traducir';
+export type WorkspaceTab =
+  | 'preguntar'
+  | 'resumen'
+  | 'analisis'
+  | 'capitulos'
+  | 'documento'
+  | 'traducir';
 
 type Props = {
   chunks: Chunk[];
@@ -26,11 +34,14 @@ type Props = {
   accent: ToolAccent;
   baseName: string;
   onSeek: (time: number) => void;
+  /** Pestaña activa al montar (la herramienta "Analizar" abre en "analisis"). */
+  defaultTab?: WorkspaceTab;
 };
 
-const TABS: { key: ToolKey; label: string; icon: LucideIcon }[] = [
+const TABS: { key: WorkspaceTab; label: string; icon: LucideIcon }[] = [
   { key: 'preguntar', label: 'Preguntar', icon: MessageCircleQuestion },
   { key: 'resumen', label: 'Resumen', icon: Sparkles },
+  { key: 'analisis', label: 'Análisis', icon: BarChart3 },
   { key: 'capitulos', label: 'Capítulos', icon: ListTree },
   { key: 'documento', label: 'Documento', icon: FileText },
   { key: 'traducir', label: 'Traducir', icon: Languages },
@@ -48,8 +59,9 @@ export default function AiWorkspace({
   accent,
   baseName,
   onSeek,
+  defaultTab = 'preguntar',
 }: Props) {
-  const [active, setActive] = useState<ToolKey>('preguntar');
+  const [active, setActive] = useState<WorkspaceTab>(defaultTab);
 
   return (
     <div className="overflow-hidden rounded-lg border-3 border-ink bg-card">
@@ -87,6 +99,9 @@ export default function AiWorkspace({
       </div>
       <div className={cn(active !== 'resumen' && 'hidden')}>
         <SummaryPanel text={text} accent={accent} baseName={baseName} />
+      </div>
+      <div className={cn(active !== 'analisis' && 'hidden')}>
+        <AnalysisPanel chunks={chunks} text={text} accent={accent} baseName={baseName} />
       </div>
       <div className={cn(active !== 'capitulos' && 'hidden')}>
         <ChaptersPanel chunks={chunks} accent={accent} onSeek={onSeek} />

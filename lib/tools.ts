@@ -30,6 +30,7 @@ import {
   FormInput,
   EyeOff,
   AudioLines,
+  BarChart3,
   type LucideIcon,
 } from 'lucide-react';
 
@@ -66,7 +67,8 @@ export type ToolSlug =
   | 'unir-excel'
   | 'dividir-excel'
   | 'ocr'
-  | 'transcribir';
+  | 'transcribir'
+  | 'analizar-reunion';
 
 /**
  * Módulos de primer nivel: el eje superior del catálogo. Cada herramienta vive
@@ -83,7 +85,8 @@ export type ToolCategory =
   | 'optimizar'
   | 'convertir'
   | 'seguridad'
-  | 'transcribir';
+  | 'transcribir'
+  | 'analizar';
 
 /**
  * Sistema de acento.
@@ -917,6 +920,24 @@ export const TOOLS: ToolDef[] = [
     ],
     accent: TONES.violet,
   },
+  {
+    slug: 'analizar-reunion',
+    href: '/analizar-reunion',
+    category: 'analizar',
+    name: 'Analizar reunión',
+    title: 'Analiza una reunión o llamada',
+    tagline: 'Convierte una grabación en compromisos, decisiones y métricas.',
+    description:
+      'Sube la grabación de una reunión o llamada y obtén un análisis accionable: compromisos con responsable y plazo, decisiones, temas, pendientes y el reparto de participación por persona. Todo a partir de la transcripción, en español.',
+    Icon: BarChart3,
+    constraints: [
+      'Entrada: audio o video (MP3, WAV, M4A, OGG, MP4)',
+      'Salida: compromisos, decisiones, temas y métricas de participación',
+      'El reparto por persona requiere el modo servidor (identifica hablantes)',
+      'Análisis en español',
+    ],
+    accent: TONES.cyan,
+  },
 ];
 
 export const getTool = (slug: ToolSlug): ToolDef =>
@@ -930,6 +951,7 @@ export const CATEGORY_LABELS: Record<ToolCategory, string> = {
   optimizar: 'Optimizar',
   seguridad: 'Privacidad',
   transcribir: 'Transcribir',
+  analizar: 'Analizar',
 };
 
 /** Orden en que se muestran las categorías en nav, landing y footer. */
@@ -940,6 +962,7 @@ export const CATEGORY_ORDER: ToolCategory[] = [
   'optimizar',
   'seguridad',
   'transcribir',
+  'analizar',
 ];
 
 /**
@@ -954,6 +977,7 @@ export const CATEGORY_MODULE: Record<ToolCategory, ToolModule> = {
   optimizar: 'documentos',
   seguridad: 'documentos',
   transcribir: 'medios',
+  analizar: 'medios',
 };
 
 /** Etiqueta visible de cada módulo. */

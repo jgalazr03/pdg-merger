@@ -13,7 +13,7 @@ import {
   RotateCcw,
 } from 'lucide-react';
 import { toast } from 'sonner';
-import { getTool } from '@/lib/tools';
+import { getTool, type ToolDef } from '@/lib/tools';
 import { cn, scrollIntoViewSafe } from '@/lib/utils';
 import ToolShell from '@/components/tools/ToolShell';
 import FileDropzone from '@/components/tools/FileDropzone';
@@ -27,7 +27,7 @@ import TranscriptPlayer, {
   type TranscriptPlayerHandle,
 } from '@/components/medios/TranscriptPlayer';
 import DownloadMenu from '@/components/medios/DownloadMenu';
-import AiWorkspace from '@/components/medios/AiWorkspace';
+import AiWorkspace, { type WorkspaceTab } from '@/components/medios/AiWorkspace';
 import {
   type Chunk,
   plainText,
@@ -37,8 +37,6 @@ import {
 } from '@/lib/transcript';
 import { decodeAudioTo16kMono, prepareForUpload } from '@/lib/audio';
 
-const tool = getTool('transcribir');
-const accent = tool.accent;
 
 const ACCEPT = '.mp3,.wav,.m4a,.ogg,.mp4,.webm,audio/*,video/*';
 
@@ -76,7 +74,16 @@ function triggerDownload(content: string, filename: string) {
   URL.revokeObjectURL(url);
 }
 
-export default function Transcriber() {
+export default function Transcriber({
+  tool = getTool('transcribir'),
+  defaultPanel = 'preguntar',
+}: {
+  /** Permite reusar el pipeline en otras herramientas de Medios (p. ej. Analizar). */
+  tool?: ToolDef;
+  /** Pestaña del workspace abierta por defecto al terminar. */
+  defaultPanel?: WorkspaceTab;
+} = {}) {
+  const accent = tool.accent;
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [phase, setPhase] = useState<Phase>('idle');
@@ -589,6 +596,7 @@ export default function Transcriber() {
                   text={text}
                   accent={accent}
                   baseName={baseName}
+                  defaultTab={defaultPanel}
                   onSeek={(t) => playerRef.current?.seekTo(t)}
                 />
               </div>
