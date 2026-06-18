@@ -13,7 +13,8 @@ const tool = getTool('transcribir');
 const Transcriber = dynamic(() => import('@/components/Transcriber'), {
   ssr: false,
   loading: () => (
-    <ToolShell tool={tool} step={1}>
+    // `wide` igual que el Transcriber real, para no parpadear de ancho al cargar.
+    <ToolShell tool={tool} step={1} wide>
       <div className="flex flex-col items-center py-16 text-center">
         <Loader2 className={cn('h-8 w-8 animate-spin', tool.accent.text)} />
         <p className="mt-4 text-muted-foreground">
