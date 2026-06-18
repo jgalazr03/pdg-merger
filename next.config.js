@@ -1,4 +1,6 @@
 /** @type {import('next').NextConfig} */
+const path = require('path');
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   // Only use static export when specifically building for static hosting
@@ -44,12 +46,13 @@ const nextConfig = {
         path: false,
         crypto: false,
       };
-      // En el navegador, @vercel/blob `upload()` usa el fetch nativo; evitamos que
-      // arrastre `undici` al bundle de cliente (sus campos privados no parsean en
-      // el webpack de Next 13.5.1).
+      // @vercel/blob `upload()` (cliente) importa `undici` para hacer fetch. No se
+      // puede bundlear (campos privados que no parsean en Next 13.5.1) ni anular a
+      // `false` (rompería `undici.fetch`): lo redirigimos a un shim sobre las APIs
+      // nativas del navegador.
       config.resolve.alias = {
         ...(config.resolve.alias || {}),
-        undici: false,
+        undici: path.join(__dirname, 'lib/undici-browser-shim.js'),
       };
     }
 
