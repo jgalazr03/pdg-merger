@@ -29,6 +29,8 @@ import TranscriptPlayer, {
 } from '@/components/medios/TranscriptPlayer';
 import SummaryPanel from '@/components/medios/SummaryPanel';
 import AskPanel from '@/components/medios/AskPanel';
+import ChaptersPanel from '@/components/medios/ChaptersPanel';
+import DownloadMenu from '@/components/medios/DownloadMenu';
 import {
   type Chunk,
   plainText,
@@ -692,7 +694,7 @@ export default function Transcriber() {
               />
             )}
 
-            <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+            <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-start">
               <Button
                 onClick={() => {
                   void navigator.clipboard
@@ -717,35 +719,43 @@ export default function Transcriber() {
                   Copiar con tiempos
                 </Button>
               )}
-              <Button
-                onClick={() => triggerDownload(text, `${baseName}.txt`)}
+              {/* Todas las descargas en un solo botón con menú (libera el flujo). */}
+              <DownloadMenu
                 className={accent.solid}
-              >
-                <Download className="mr-2 h-4 w-4" />
-                Descargar .txt
-              </Button>
-              {chunks.length > 0 && (
-                <>
-                  <Button
-                    onClick={() => triggerDownload(toSrt(chunks), `${baseName}.srt`)}
-                    variant="outline"
-                  >
-                    <Download className="mr-2 h-4 w-4" />
-                    Subtítulos .srt
-                  </Button>
-                  <Button
-                    onClick={() => triggerDownload(toVtt(chunks), `${baseName}.vtt`)}
-                    variant="outline"
-                  >
-                    <Download className="mr-2 h-4 w-4" />
-                    Subtítulos .vtt
-                  </Button>
-                </>
-              )}
+                items={[
+                  {
+                    label: 'Texto (.txt)',
+                    onSelect: () => triggerDownload(text, `${baseName}.txt`),
+                  },
+                  ...(chunks.length > 0
+                    ? [
+                        {
+                          label: 'Subtítulos (.srt)',
+                          onSelect: () =>
+                            triggerDownload(toSrt(chunks), `${baseName}.srt`),
+                        },
+                        {
+                          label: 'Subtítulos (.vtt)',
+                          onSelect: () =>
+                            triggerDownload(toVtt(chunks), `${baseName}.vtt`),
+                        },
+                      ]
+                    : []),
+                ]}
+              />
               <Button variant="outline" onClick={reset}>
                 Transcribir otro
               </Button>
             </div>
+
+            {/* Capítulos/temas automáticos (Claude + saltos al reproductor) */}
+            {chunks.length > 0 && previewUrl && (
+              <ChaptersPanel
+                chunks={chunks}
+                accent={accent}
+                onSeek={(t) => playerRef.current?.seekTo(t)}
+              />
+            )}
 
             {/* Pregúntale a tu grabación (Claude + citas clicables) */}
             {chunks.length > 0 && previewUrl && (
