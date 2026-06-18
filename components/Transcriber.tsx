@@ -23,13 +23,20 @@ import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { Textarea } from '@/components/ui/textarea';
 import { upload } from '@vercel/blob/client';
+import TranscriptPlayer from '@/components/medios/TranscriptPlayer';
+import {
+  type Chunk,
+  plainText,
+  timedText,
+  toSrt,
+  toVtt,
+} from '@/lib/transcript';
 
 const tool = getTool('transcribir');
 const accent = tool.accent;
 
 const ACCEPT = '.mp3,.wav,.m4a,.ogg,.mp4,.webm,audio/*,video/*';
 
-type Chunk = { timestamp: [number, number | null]; text: string };
 type Phase =
   | 'idle'
   | 'decoding'
@@ -81,28 +88,6 @@ async function decodeAudioTo16kMono(file: File): Promise<Float32Array> {
   return rendered.getChannelData(0).slice();
 }
 
-function pad(n: number, len = 2): string {
-  return String(n).padStart(len, '0');
-}
-
-function srtTime(t: number): string {
-  const ms = Math.floor((t - Math.floor(t)) * 1000);
-  const s = Math.floor(t) % 60;
-  const m = Math.floor(t / 60) % 60;
-  const h = Math.floor(t / 3600);
-  return `${pad(h)}:${pad(m)}:${pad(s)},${pad(ms, 3)}`;
-}
-
-function toSrt(chunks: Chunk[]): string {
-  return chunks
-    .map((c, i) => {
-      const start = c.timestamp[0] ?? 0;
-      const end = c.timestamp[1] ?? start + 2;
-      return `${i + 1}\n${srtTime(start)} --> ${srtTime(end)}\n${c.text.trim()}`;
-    })
-    .join('\n\n');
-}
-
 function triggerDownload(content: string, filename: string) {
   const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
   const url = URL.createObjectURL(blob);
@@ -125,6 +110,9 @@ export default function Transcriber() {
   const [errorMsg, setErrorMsg] = useState('');
   const [mode, setMode] = useState<Mode>('local');
   const [uploadPct, setUploadPct] = useState(0);
+  // Cambia con cada transcripción terminada: fuerza el remonte de
+  // TranscriptPlayer para reinicializar el texto editable.
+  const [runId, setRunId] = useState(0);
 
   const workerRef = useRef<Worker | null>(null);
   const progressRef = useRef<Map<string, { loaded: number; total: number }>>(
@@ -184,6 +172,13 @@ export default function Transcriber() {
     setModelPct(0);
   };
 
+  // El usuario corrigió el texto de un segmento en el reproductor: re-derivamos
+  // el texto plano para copiar/descargar.
+  const handleEdit = (ch: Chunk[]) => {
+    setChunks(ch);
+    setText(plainText(ch));
+  };
+
   const handleWorkerMessage = (e: MessageEvent) => {
     const d = e.data;
     switch (d.status) {
@@ -204,11 +199,14 @@ export default function Transcriber() {
       case 'transcribing':
         setPhase('transcribing');
         break;
-      case 'complete':
-        setText(d.text);
-        setChunks(d.chunks);
+      case 'complete': {
+        const ch: Chunk[] = Array.isArray(d.chunks) ? d.chunks : [];
+        setChunks(ch);
+        setText(ch.length ? plainText(ch) : (d.text || '').trim());
+        setRunId((n) => n + 1);
         setPhase('done');
         break;
+      }
       case 'error':
         setErrorMsg(d.message || 'Error al transcribir');
         setPhase('error');
@@ -278,8 +276,10 @@ export default function Transcriber() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data?.error || 'Error del servidor');
-      setText((data.text || '').trim());
-      setChunks(Array.isArray(data.chunks) ? data.chunks : []);
+      const ch: Chunk[] = Array.isArray(data.chunks) ? data.chunks : [];
+      setChunks(ch);
+      setText(ch.length ? plainText(ch) : (data.text || '').trim());
+      setRunId((n) => n + 1);
       setPhase('done');
     } catch (e) {
       setErrorMsg(
@@ -364,7 +364,7 @@ export default function Transcriber() {
               </div>
             </div>
 
-            {previewUrl && (
+            {phase !== 'done' && previewUrl && (
               <div className="mt-4">
                 {isVideo ? (
                   <video
@@ -397,7 +397,7 @@ export default function Transcriber() {
                         {
                           key: 'server',
                           title: 'Rápido · servidor (Nova-3)',
-                          desc: 'Máxima precisión, cualquier tamaño',
+                          desc: 'Máxima precisión · identifica hablantes',
                         },
                       ] as const
                     ).map((opt) => {
@@ -434,7 +434,7 @@ export default function Transcriber() {
                   <p className="mt-2 text-xs text-muted-foreground">
                     {mode === 'local'
                       ? 'Tu grabación se procesa en el navegador; nada se sube. Ideal para audios cortos.'
-                      : 'Tu grabación se sube para transcribirse con Deepgram Nova-3 (máxima precisión, cualquier tamaño) y se borra al terminar.'}
+                      : 'Tu grabación se sube para transcribirse con Deepgram Nova-3 (máxima precisión, cualquier tamaño, identifica a cada hablante) y se borra al terminar.'}
                   </p>
                 </div>
 
@@ -493,13 +493,24 @@ export default function Transcriber() {
               </h2>
             </div>
 
-            <Textarea
-              value={text}
-              onChange={(e) => setText(e.target.value)}
-              rows={12}
-              aria-label="Texto de la transcripción (editable)"
-              className="font-mono"
-            />
+            {chunks.length > 0 && previewUrl ? (
+              <TranscriptPlayer
+                key={runId}
+                chunks={chunks}
+                mediaUrl={previewUrl}
+                isVideo={!!isVideo}
+                accent={accent}
+                onChange={handleEdit}
+              />
+            ) : (
+              <Textarea
+                value={text}
+                onChange={(e) => setText(e.target.value)}
+                rows={12}
+                aria-label="Texto de la transcripción (editable)"
+                className="font-mono"
+              />
+            )}
 
             <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:flex-wrap">
               <Button
@@ -513,6 +524,19 @@ export default function Transcriber() {
                 <Copy className="mr-2 h-4 w-4" />
                 Copiar
               </Button>
+              {chunks.length > 0 && (
+                <Button
+                  onClick={() => {
+                    void navigator.clipboard
+                      .writeText(timedText(chunks))
+                      .then(() => toast.success('Copiado con marcas de tiempo'));
+                  }}
+                  variant="outline"
+                >
+                  <Copy className="mr-2 h-4 w-4" />
+                  Copiar con tiempos
+                </Button>
+              )}
               <Button
                 onClick={() => triggerDownload(text, `${baseName}.txt`)}
                 className={accent.solid}
@@ -521,13 +545,22 @@ export default function Transcriber() {
                 Descargar .txt
               </Button>
               {chunks.length > 0 && (
-                <Button
-                  onClick={() => triggerDownload(toSrt(chunks), `${baseName}.srt`)}
-                  variant="outline"
-                >
-                  <Download className="mr-2 h-4 w-4" />
-                  Subtítulos .srt
-                </Button>
+                <>
+                  <Button
+                    onClick={() => triggerDownload(toSrt(chunks), `${baseName}.srt`)}
+                    variant="outline"
+                  >
+                    <Download className="mr-2 h-4 w-4" />
+                    Subtítulos .srt
+                  </Button>
+                  <Button
+                    onClick={() => triggerDownload(toVtt(chunks), `${baseName}.vtt`)}
+                    variant="outline"
+                  >
+                    <Download className="mr-2 h-4 w-4" />
+                    Subtítulos .vtt
+                  </Button>
+                </>
               )}
               <Button variant="outline" onClick={reset}>
                 Transcribir otro
