@@ -12,9 +12,20 @@ const nextConfig = {
   // Webpack configuration for ExcelJS and other dependencies
   webpack: (config, { isServer }) => {
     // Handle ExcelJS dependencies
-    config.externals = config.externals || {};
+    // Externals del servidor: webpack no los bundlea; Node los resuelve en
+    // runtime. En el build de servidor `config.externals` es un ARRAY, así que
+    // asignarle propiedades no surte efecto: anteponemos un mapa de externals.
     if (isServer) {
-      config.externals['exceljs'] = 'commonjs exceljs';
+      const serverExternals = {
+        exceljs: 'commonjs exceljs',
+        // @vercel/blob (API routes de transcripción) arrastra `undici`, cuyos
+        // campos privados (`#x in obj`) no parsea el webpack de Next 13.5.1. Node
+        // ya resuelve `undici` en runtime.
+        undici: 'commonjs undici',
+      };
+      config.externals = Array.isArray(config.externals)
+        ? [serverExternals, ...config.externals]
+        : [serverExternals, config.externals].filter(Boolean);
     }
 
     // tesseract.js arrastra node-fetch -> 'encoding' (dep opcional) por su ruta
@@ -32,6 +43,13 @@ const nextConfig = {
         fs: false,
         path: false,
         crypto: false,
+      };
+      // En el navegador, @vercel/blob `upload()` usa el fetch nativo; evitamos que
+      // arrastre `undici` al bundle de cliente (sus campos privados no parsean en
+      // el webpack de Next 13.5.1).
+      config.resolve.alias = {
+        ...(config.resolve.alias || {}),
+        undici: false,
       };
     }
 

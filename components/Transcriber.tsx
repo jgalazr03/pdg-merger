@@ -22,6 +22,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { Textarea } from '@/components/ui/textarea';
+import { upload } from '@vercel/blob/client';
 
 const tool = getTool('transcribir');
 const accent = tool.accent;
@@ -29,7 +30,15 @@ const accent = tool.accent;
 const ACCEPT = '.mp3,.wav,.m4a,.ogg,.mp4,.webm,audio/*,video/*';
 
 type Chunk = { timestamp: [number, number | null]; text: string };
-type Phase = 'idle' | 'decoding' | 'loading' | 'transcribing' | 'done' | 'error';
+type Phase =
+  | 'idle'
+  | 'decoding'
+  | 'loading'
+  | 'uploading'
+  | 'transcribing'
+  | 'done'
+  | 'error';
+type Mode = 'local' | 'server';
 
 const isMedia = (f: File) =>
   f.type.startsWith('audio/') ||
@@ -114,6 +123,8 @@ export default function Transcriber() {
   const [text, setText] = useState('');
   const [chunks, setChunks] = useState<Chunk[]>([]);
   const [errorMsg, setErrorMsg] = useState('');
+  const [mode, setMode] = useState<Mode>('local');
+  const [uploadPct, setUploadPct] = useState(0);
 
   const workerRef = useRef<Worker | null>(null);
   const progressRef = useRef<Map<string, { loaded: number; total: number }>>(
@@ -205,11 +216,18 @@ export default function Transcriber() {
     }
   };
 
-  const handleTranscribe = async () => {
+  const handleTranscribe = () => {
     if (!selectedFile) return;
     setErrorMsg('');
     setText('');
     setChunks([]);
+    if (mode === 'server') void transcribeServer();
+    else void transcribeLocal();
+  };
+
+  // Modo privado: Whisper en el navegador (el audio no sale del equipo).
+  const transcribeLocal = async () => {
+    if (!selectedFile) return;
     setPhase('decoding');
 
     let audio: Float32Array;
@@ -240,21 +258,60 @@ export default function Transcriber() {
     workerRef.current.postMessage({ type: 'transcribe', audio }, [audio.buffer]);
   };
 
+  // Modo servidor: el audio se sube a Vercel Blob (cualquier tamaño) y Deepgram
+  // Nova-3 lo transcribe por URL. Máxima precisión y velocidad.
+  const transcribeServer = async () => {
+    if (!selectedFile) return;
+    setUploadPct(0);
+    setPhase('uploading');
+    try {
+      const blob = await upload(selectedFile.name, selectedFile, {
+        access: 'public',
+        handleUploadUrl: '/api/blob-upload',
+        onUploadProgress: (e) => setUploadPct(Math.round(e.percentage)),
+      });
+      setPhase('transcribing');
+      const res = await fetch('/api/transcribe', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url: blob.url }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data?.error || 'Error del servidor');
+      setText((data.text || '').trim());
+      setChunks(Array.isArray(data.chunks) ? data.chunks : []);
+      setPhase('done');
+    } catch (e) {
+      setErrorMsg(
+        (e as Error).message || 'No se pudo transcribir en el servidor.'
+      );
+      setPhase('error');
+    }
+  };
+
   const isVideo = selectedFile?.type.startsWith('video/');
-  const busy = phase === 'decoding' || phase === 'loading' || phase === 'transcribing';
+  const busy =
+    phase === 'decoding' ||
+    phase === 'loading' ||
+    phase === 'uploading' ||
+    phase === 'transcribing';
   const step: 1 | 2 | 3 = !selectedFile ? 1 : phase === 'done' ? 3 : 2;
   const baseName = selectedFile?.name.replace(/\.[^.]+$/, '') || 'transcripcion';
 
   const phaseLabel =
     phase === 'decoding'
       ? 'Leyendo el audio…'
-      : phase === 'loading'
-        ? modelPct > 0
-          ? `Descargando el modelo… ${modelPct}%`
-          : 'Preparando el modelo…'
-        : phase === 'transcribing'
-          ? 'Transcribiendo… (puede tardar según la duración)'
-          : '';
+      : phase === 'uploading'
+        ? `Subiendo el audio… ${uploadPct}%`
+        : phase === 'loading'
+          ? modelPct > 0
+            ? `Descargando el modelo… ${modelPct}%`
+            : 'Preparando el modelo…'
+          : phase === 'transcribing'
+            ? mode === 'server'
+              ? 'Transcribiendo en el servidor (Nova-3)…'
+              : 'Transcribiendo… (puede tardar según la duración)'
+            : '';
 
   return (
     <ToolShell tool={tool} step={step}>
@@ -323,6 +380,64 @@ export default function Transcriber() {
 
             {phase !== 'done' && (
               <div className="mt-6">
+                {/* Modo: privado (navegador) vs servidor (Nova-3). */}
+                <div
+                  className="mb-5"
+                  role="group"
+                  aria-label="Modo de transcripción"
+                >
+                  <div className="grid gap-2 sm:grid-cols-2">
+                    {(
+                      [
+                        {
+                          key: 'local',
+                          title: 'Privado · en tu navegador',
+                          desc: 'No sale de tu equipo',
+                        },
+                        {
+                          key: 'server',
+                          title: 'Rápido · servidor (Nova-3)',
+                          desc: 'Máxima precisión, cualquier tamaño',
+                        },
+                      ] as const
+                    ).map((opt) => {
+                      const active = mode === opt.key;
+                      return (
+                        <button
+                          key={opt.key}
+                          type="button"
+                          onClick={() => setMode(opt.key)}
+                          disabled={busy}
+                          aria-pressed={active}
+                          className={cn(
+                            'rounded-lg border-3 border-ink px-4 py-3 text-left transition-colors duration-150 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink focus-visible:ring-offset-2 disabled:opacity-50',
+                            active
+                              ? 'bg-ink text-white'
+                              : 'bg-surface text-ink hover-fine:bg-muted'
+                          )}
+                        >
+                          <span className="block text-sm font-bold">
+                            {opt.title}
+                          </span>
+                          <span
+                            className={cn(
+                              'block text-xs',
+                              active ? 'text-white/70' : 'text-muted-foreground'
+                            )}
+                          >
+                            {opt.desc}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                  <p className="mt-2 text-xs text-muted-foreground">
+                    {mode === 'local'
+                      ? 'Tu grabación se procesa en el navegador; nada se sube. Ideal para audios cortos.'
+                      : 'Tu grabación se sube para transcribirse con Deepgram Nova-3 (máxima precisión, cualquier tamaño) y se borra al terminar.'}
+                  </p>
+                </div>
+
                 <Button
                   onClick={handleTranscribe}
                   disabled={busy}
@@ -341,13 +456,16 @@ export default function Transcriber() {
                 {busy && (
                   <div className="mt-4">
                     <p className="mb-2 text-sm font-medium text-ink">{phaseLabel}</p>
+                    {phase === 'uploading' && <Progress value={uploadPct} />}
                     {phase === 'loading' && modelPct > 0 && (
                       <Progress value={modelPct} />
                     )}
-                    <p className="mt-2 text-xs text-muted-foreground">
-                      La primera vez se descarga el modelo (~150 MB) y queda
-                      guardado en tu navegador. Tu grabación no sale de tu equipo.
-                    </p>
+                    {mode === 'local' && (
+                      <p className="mt-2 text-xs text-muted-foreground">
+                        La primera vez se descarga el modelo (~150 MB) y queda
+                        guardado en tu navegador. Tu grabación no sale de tu equipo.
+                      </p>
+                    )}
                   </div>
                 )}
 
