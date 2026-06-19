@@ -30,6 +30,7 @@ import DownloadMenu from '@/components/medios/DownloadMenu';
 import AiWorkspace, { type WorkspaceTab } from '@/components/medios/AiWorkspace';
 import SpeakerNamer from '@/components/medios/SpeakerNamer';
 import VocabEditor from '@/components/medios/VocabEditor';
+import ConsentKit from '@/components/medios/ConsentKit';
 import { loadVocab, saveVocab } from '@/lib/customVocab';
 import {
   type Chunk,
@@ -349,6 +350,8 @@ export default function Transcriber({
       />
 
       <ToolConstraints items={tool.constraints} />
+
+      <ConsentKit accent={accent} />
 
       {selectedFile && phase !== 'done' && (
         <Card className="mb-8 motion-safe:animate-slide-up" ref={fileInfoRef}>
