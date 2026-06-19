@@ -7,6 +7,7 @@ import {
   Gavel,
   ListTodo,
   Copy,
+  Download,
   AlertCircle,
 } from 'lucide-react';
 import ResolveSpinner from '@/components/ResolveSpinner';
@@ -15,6 +16,7 @@ import { cn } from '@/lib/utils';
 import type { ToolAccent } from '@/lib/tools';
 import { type Minuta, minutaToText } from '@/lib/summary';
 import { downloadMarkdownAsDocx } from '@/lib/docx';
+import { actionItemsToChecklist, actionItemsToCsv, downloadCsv } from '@/lib/tasks';
 import { Button } from '@/components/ui/button';
 import Markdown from '@/components/medios/Markdown';
 import DownloadMenu from '@/components/medios/DownloadMenu';
@@ -158,6 +160,33 @@ export default function SummaryPanel({ text, baseName, accent }: Props) {
                 </li>
               ))}
             </ul>
+            <div className="mt-2.5 flex flex-wrap gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  void navigator.clipboard
+                    .writeText(actionItemsToChecklist(minuta.tareas))
+                    .then(() => toast.success('Pendientes copiados'));
+                }}
+              >
+                <Copy className="mr-2 h-4 w-4" />
+                Copiar pendientes
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() =>
+                  downloadCsv(
+                    actionItemsToCsv(minuta.tareas),
+                    `${baseName}-tareas.csv`
+                  )
+                }
+              >
+                <Download className="mr-2 h-4 w-4" />
+                CSV
+              </Button>
+            </div>
           </Section>
         )}
 
