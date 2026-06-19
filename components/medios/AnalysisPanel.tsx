@@ -12,6 +12,8 @@ import {
   Activity,
   Copy,
   Download,
+  Coins,
+  Play,
   AlertCircle,
 } from 'lucide-react';
 import ResolveSpinner from '@/components/ResolveSpinner';
@@ -23,6 +25,7 @@ import { type MeetingAnalysis, analysisToText, talkTime } from '@/lib/analysis';
 import { speakerColor } from '@/lib/speakers';
 import { downloadMarkdownAsDocx } from '@/lib/docx';
 import { actionItemsToChecklist, actionItemsToCsv, downloadCsv } from '@/lib/tasks';
+import { extractFigures } from '@/lib/figures';
 import { Button } from '@/components/ui/button';
 import Markdown from '@/components/medios/Markdown';
 import DownloadMenu from '@/components/medios/DownloadMenu';
@@ -34,6 +37,8 @@ type Props = {
   accent: ToolAccent;
   /** Nombres de los hablantes, para el reparto de participación. */
   names?: SpeakerNames;
+  /** Salta el reproductor al momento de una cifra (para verificarla). */
+  onSeek?: (time: number) => void;
 };
 
 function downloadText(content: string, filename: string) {
@@ -96,8 +101,9 @@ function Bullets({ items, accent }: { items: string[]; accent: ToolAccent }) {
  *  - Análisis cualitativo (temas, decisiones, compromisos, pendientes, tono):
  *    lo emite Claude bajo demanda. Sin marco de card propio: vive en el workspace.
  */
-export default function AnalysisPanel({ chunks, text, baseName, accent, names }: Props) {
+export default function AnalysisPanel({ chunks, text, baseName, accent, names, onSeek }: Props) {
   const stats = useMemo(() => talkTime(chunks, names), [chunks, names]);
+  const figures = useMemo(() => extractFigures(chunks), [chunks]);
   const [phase, setPhase] = useState<'idle' | 'loading' | 'done' | 'error'>('idle');
   const [analysis, setAnalysis] = useState<MeetingAnalysis | null>(null);
   const [truncated, setTruncated] = useState(false);
@@ -187,6 +193,38 @@ export default function AnalysisPanel({ chunks, text, baseName, accent, names }:
           </p>
         )}
       </div>
+
+      {/* Cifras mencionadas: detección local (montos/porcentajes) para verificar
+          contra el audio. Read-only, no reescribe la transcripción. */}
+      {figures.length > 0 && (
+        <div className="mt-4 rounded-lg border-2 border-ink/15 p-3 sm:p-4">
+          <div className="mb-1 flex items-center gap-2">
+            <Coins className={cn('h-4 w-4', accent.text)} strokeWidth={2.5} />
+            <h3 className="text-sm font-bold text-ink">Cifras mencionadas</h3>
+          </div>
+          <p className="mb-2.5 text-xs leading-relaxed text-muted-foreground">
+            Detección automática de montos y porcentajes. Toca cada uno para
+            escucharlo y verificarlo contra el audio.
+          </p>
+          <div className="flex flex-wrap gap-1.5">
+            {figures.map((f, i) => (
+              <button
+                key={i}
+                type="button"
+                onClick={() => onSeek?.(f.time)}
+                title={`Escuchar en ${clock(f.time)}`}
+                className="inline-flex items-center gap-1.5 rounded-lg border-2 border-ink/20 px-2 py-1 text-xs text-ink transition-colors duration-150 hover-fine:border-ink hover-fine:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink"
+              >
+                <span className="font-medium">{f.text}</span>
+                <span className={cn('inline-flex items-center gap-0.5 font-mono tabular-nums', accent.text)}>
+                  <Play className="h-3 w-3" strokeWidth={2.5} />
+                  {clock(f.time)}
+                </span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Análisis cualitativo (IA). */}
       {phase === 'done' && analysis ? (

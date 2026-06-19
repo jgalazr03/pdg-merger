@@ -104,7 +104,7 @@ export default function AiWorkspace({
         <SummaryPanel text={text} accent={accent} baseName={baseName} />
       </div>
       <div className={cn(active !== 'analisis' && 'hidden')}>
-        <AnalysisPanel chunks={chunks} text={text} accent={accent} baseName={baseName} names={names} />
+        <AnalysisPanel chunks={chunks} text={text} accent={accent} baseName={baseName} names={names} onSeek={onSeek} />
       </div>
       <div className={cn(active !== 'capitulos' && 'hidden')}>
         <ChaptersPanel chunks={chunks} accent={accent} names={names} onSeek={onSeek} />
