@@ -25,5 +25,5 @@ const Transcriber = dynamic(() => import('@/components/Transcriber'), {
 });
 
 export default function AnalizarReunionLoader() {
-  return <Transcriber tool={tool} defaultPanel="analisis" />;
+  return <Transcriber tool={tool} defaultPanel="analisis" variant="contable" />;
 }

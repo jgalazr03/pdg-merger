@@ -82,13 +82,19 @@ function triggerDownload(content: string, filename: string) {
 export default function Transcriber({
   tool = getTool('transcribir'),
   defaultPanel = 'preguntar',
+  variant = 'general',
 }: {
   /** Permite reusar el pipeline en otras herramientas de Medios (p. ej. Analizar). */
   tool?: ToolDef;
   /** Pestaña del workspace abierta por defecto al terminar. */
   defaultPanel?: WorkspaceTab;
+  /** 'contable' activa las features verticales (consentimiento LFPDPPP,
+   *  vocabulario del despacho, precisión fiscal, plantillas contables). La
+   *  herramienta "Transcribir" genérica usa 'general' y queda limpia. */
+  variant?: 'general' | 'contable';
 } = {}) {
   const accent = tool.accent;
+  const contable = variant === 'contable';
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [phase, setPhase] = useState<Phase>('idle');
@@ -288,7 +294,11 @@ export default function Transcriber({
       const res = await fetch('/api/transcribe', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ url: blob.url, keyterms: vocab }),
+        body: JSON.stringify({
+          url: blob.url,
+          keyterms: contable ? vocab : [],
+          domain: variant,
+        }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data?.error || 'Error del servidor');
@@ -351,7 +361,7 @@ export default function Transcriber({
 
       <ToolConstraints items={tool.constraints} />
 
-      <ConsentKit accent={accent} />
+      {contable && <ConsentKit accent={accent} />}
 
       {selectedFile && phase !== 'done' && (
         <Card className="mb-8 motion-safe:animate-slide-up" ref={fileInfoRef}>
@@ -458,10 +468,14 @@ export default function Transcriber({
                   <p className="mt-2 text-xs text-muted-foreground">
                     {mode === 'local'
                       ? 'Tu grabación se procesa en el navegador; nada se sube. Ideal para audios cortos.'
-                      : 'Tu grabación se sube para transcribirse con Deepgram Nova-3 (máxima precisión, cualquier tamaño, identifica a cada hablante) y se borra al terminar. Afinado para vocabulario fiscal y contable mexicano (SAT, CFDI, IVA…).'}
+                      : `Tu grabación se sube para transcribirse con Deepgram Nova-3 (máxima precisión, cualquier tamaño, identifica a cada hablante) y se borra al terminar.${
+                          contable
+                            ? ' Afinado para vocabulario fiscal y contable mexicano (SAT, CFDI, IVA…).'
+                            : ''
+                        }`}
                   </p>
 
-                  {mode === 'server' && (
+                  {mode === 'server' && contable && (
                     <VocabEditor
                       terms={vocab}
                       onChange={updateVocab}
@@ -644,6 +658,7 @@ export default function Transcriber({
                   baseName={baseName}
                   names={speakerNames}
                   defaultTab={defaultPanel}
+                  variant={variant}
                   onSeek={(t) => playerRef.current?.seekTo(t)}
                 />
               </div>

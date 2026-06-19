@@ -38,6 +38,8 @@ type Props = {
   onSeek: (time: number) => void;
   /** Pestaña activa al montar (la herramienta "Analizar" abre en "analisis"). */
   defaultTab?: WorkspaceTab;
+  /** 'contable' habilita las plantillas verticales del despacho en Documento. */
+  variant?: 'general' | 'contable';
 };
 
 const TABS: { key: WorkspaceTab; label: string; icon: LucideIcon }[] = [
@@ -63,6 +65,7 @@ export default function AiWorkspace({
   names,
   onSeek,
   defaultTab = 'preguntar',
+  variant = 'general',
 }: Props) {
   const [active, setActive] = useState<WorkspaceTab>(defaultTab);
 
@@ -110,7 +113,7 @@ export default function AiWorkspace({
         <ChaptersPanel chunks={chunks} accent={accent} names={names} onSeek={onSeek} />
       </div>
       <div className={cn(active !== 'documento' && 'hidden')}>
-        <DeliverablePanel chunks={chunks} accent={accent} baseName={baseName} names={names} />
+        <DeliverablePanel chunks={chunks} accent={accent} baseName={baseName} names={names} variant={variant} />
       </div>
       <div className={cn(active !== 'traducir' && 'hidden')}>
         <TranslatePanel chunks={chunks} accent={accent} baseName={baseName} />

@@ -18,6 +18,9 @@ type Props = {
   baseName: string;
   /** Nombres de los hablantes (para que el documento los use). */
   names?: SpeakerNames;
+  /** 'contable' muestra las plantillas verticales del despacho; 'general' solo
+   *  las generales (acta/correo/publicación). */
+  variant?: 'general' | 'contable';
 };
 
 type Kind =
@@ -82,9 +85,20 @@ function suggestKind(text: string): Kind {
  * Genera un entregable a partir de la grabación: acta de reunión, correo de
  * seguimiento o publicación. Claude redacta el documento en Markdown.
  */
-export default function DeliverablePanel({ chunks, accent, baseName, names }: Props) {
-  // Preselecciona la plantilla según el contenido (gratis, al montar).
-  const suggested = useMemo(() => suggestKind(plainText(chunks, names)), [chunks, names]);
+export default function DeliverablePanel({
+  chunks,
+  accent,
+  baseName,
+  names,
+  variant = 'general',
+}: Props) {
+  const contable = variant === 'contable';
+  const groups = contable ? GROUPS : GROUPS.filter((g) => g.key === 'general');
+  // Autodetección solo en contexto contable (las plantillas verticales).
+  const suggested = useMemo(
+    () => (contable ? suggestKind(plainText(chunks, names)) : 'acta'),
+    [chunks, names, contable]
+  );
   const [kind, setKind] = useState<Kind>(suggested);
   const [phase, setPhase] = useState<'idle' | 'loading' | 'done' | 'error'>(
     'idle'
@@ -133,11 +147,13 @@ export default function DeliverablePanel({ chunks, accent, baseName, names }: Pr
 
         {/* Selector de tipo, agrupado: generales y específicos contable-fiscal */}
         <div className="mb-4 space-y-3">
-          {GROUPS.map((g) => (
+          {groups.map((g) => (
             <div key={g.key}>
-              <p className="mb-1.5 text-xs font-bold uppercase tracking-wide text-muted-foreground">
-                {g.label}
-              </p>
+              {groups.length > 1 && (
+                <p className="mb-1.5 text-xs font-bold uppercase tracking-wide text-muted-foreground">
+                  {g.label}
+                </p>
+              )}
               <div className="flex flex-wrap gap-1.5">
                 {KINDS.filter((k) => k.group === g.key).map((k) => {
                   const active = kind === k.key;

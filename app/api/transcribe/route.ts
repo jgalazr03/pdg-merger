@@ -8,12 +8,11 @@ export const runtime = 'nodejs';
 // Deepgram batch procesa ~30× tiempo real; 300 s cubre audios de varias horas.
 export const maxDuration = 300;
 
-// Parámetros de Deepgram + "keyterm prompting" con vocabulario fiscal-contable
-// MX (+ términos personalizados del usuario) para subir la precisión en jerga de
-// dominio y anglicismos (Spanglish). El keyterm es contextual (no fuerza),
-// seguro aunque el audio no sea contable. Límite Deepgram: ~500 tokens;
-// recortamos a 100 términos por seguridad.
-function buildDgParams(extraTerms: string[]): string {
+// Parámetros de Deepgram + "keyterm prompting". El diccionario fiscal-contable
+// MX solo se incluye en contexto contable (`includeFiscal`, herramienta Analizar
+// reunión) para no sesgar transcripciones genéricas; los términos personalizados
+// del usuario siempre se suman. Límite Deepgram: ~500 tokens; tope 100 términos.
+function buildDgParams(extraTerms: string[], includeFiscal: boolean): string {
   const p = new URLSearchParams({
     model: 'nova-3',
     language: 'es',
@@ -24,7 +23,8 @@ function buildDgParams(extraTerms: string[]): string {
     // utterance trae su `speaker` (entero) que el cliente pinta como «Hablante N».
     diarize: 'true',
   });
-  const all = Array.from(new Set([...DOMAIN_KEYTERMS, ...extraTerms])).slice(0, 100);
+  const base = includeFiscal ? DOMAIN_KEYTERMS : [];
+  const all = Array.from(new Set([...base, ...extraTerms])).slice(0, 100);
   for (const term of all) p.append('keyterm', term);
   return p.toString();
 }
@@ -67,10 +67,12 @@ export async function POST(request: Request) {
 
   let url: string | undefined;
   let keyterms: string[] = [];
+  let includeFiscal = false;
   try {
     const body = await request.json();
     url = body?.url;
     keyterms = sanitizeKeyterms(body?.keyterms);
+    includeFiscal = body?.domain === 'contable';
   } catch {
     return NextResponse.json({ error: 'Cuerpo inválido.' }, { status: 400 });
   }
@@ -79,7 +81,7 @@ export async function POST(request: Request) {
   }
 
   try {
-    const dg = await fetch(`https://api.deepgram.com/v1/listen?${buildDgParams(keyterms)}`, {
+    const dg = await fetch(`https://api.deepgram.com/v1/listen?${buildDgParams(keyterms, includeFiscal)}`, {
       method: 'POST',
       headers: {
         Authorization: `Token ${apiKey}`,
