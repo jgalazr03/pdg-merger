@@ -468,11 +468,7 @@ export default function Transcriber({
                   <p className="mt-2 text-xs text-muted-foreground">
                     {mode === 'local'
                       ? 'Tu grabación se procesa en el navegador; nada se sube. Ideal para audios cortos.'
-                      : `Tu grabación se sube para transcribirse con Deepgram Nova-3 (máxima precisión, cualquier tamaño, identifica a cada hablante) y se borra al terminar.${
-                          contable
-                            ? ' Afinado para vocabulario fiscal y contable mexicano (SAT, CFDI, IVA…).'
-                            : ''
-                        }`}
+                      : 'Tu grabación se sube para transcribirse con Deepgram Nova-3 (máxima precisión, cualquier tamaño, identifica a cada hablante) y se borra al terminar.'}
                   </p>
 
                   {mode === 'server' && contable && (
