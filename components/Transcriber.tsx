@@ -29,6 +29,8 @@ import TranscriptPlayer, {
 import DownloadMenu from '@/components/medios/DownloadMenu';
 import AiWorkspace, { type WorkspaceTab } from '@/components/medios/AiWorkspace';
 import SpeakerNamer from '@/components/medios/SpeakerNamer';
+import VocabEditor from '@/components/medios/VocabEditor';
+import { loadVocab, saveVocab } from '@/lib/customVocab';
 import {
   type Chunk,
   type SpeakerNames,
@@ -98,6 +100,10 @@ export default function Transcriber({
   const [errorMsg, setErrorMsg] = useState('');
   const [mode, setMode] = useState<Mode>('local');
   const [uploadPct, setUploadPct] = useState(0);
+  // Vocabulario del despacho (clientes/siglas) para el keyterm boosting del modo
+  // servidor; persiste en localStorage (se carga tras montar, no en SSR).
+  const [vocab, setVocab] = useState<string[]>([]);
+  const updateVocab = (next: string[]) => setVocab(saveVocab(next));
   // Cambia con cada transcripción terminada: fuerza el remonte de
   // TranscriptPlayer para reinicializar el texto editable.
   const [runId, setRunId] = useState(0);
@@ -126,6 +132,11 @@ export default function Transcriber({
   // Termina el worker al desmontar (libera el modelo en memoria).
   useEffect(() => {
     return () => workerRef.current?.terminate();
+  }, []);
+
+  // Carga el vocabulario guardado tras montar (localStorage no existe en SSR).
+  useEffect(() => {
+    setVocab(loadVocab());
   }, []);
 
   useEffect(() => {
@@ -276,7 +287,7 @@ export default function Transcriber({
       const res = await fetch('/api/transcribe', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ url: blob.url }),
+        body: JSON.stringify({ url: blob.url, keyterms: vocab }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data?.error || 'Error del servidor');
@@ -446,6 +457,14 @@ export default function Transcriber({
                       ? 'Tu grabación se procesa en el navegador; nada se sube. Ideal para audios cortos.'
                       : 'Tu grabación se sube para transcribirse con Deepgram Nova-3 (máxima precisión, cualquier tamaño, identifica a cada hablante) y se borra al terminar. Afinado para vocabulario fiscal y contable mexicano (SAT, CFDI, IVA…).'}
                   </p>
+
+                  {mode === 'server' && (
+                    <VocabEditor
+                      terms={vocab}
+                      onChange={updateVocab}
+                      accent={accent}
+                    />
+                  )}
                 </div>
 
                 {/* El botón se oculta mientras procesa: el loader de abajo es

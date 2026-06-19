@@ -9,10 +9,11 @@ export const runtime = 'nodejs';
 export const maxDuration = 300;
 
 // Parámetros de Deepgram + "keyterm prompting" con vocabulario fiscal-contable
-// MX para subir la precisión en jerga de dominio y anglicismos (Spanglish). El
-// keyterm es contextual (no fuerza), seguro aunque el audio no sea contable.
-// Límite Deepgram: ~500 tokens; recortamos a 100 términos por seguridad.
-function buildDgParams(): string {
+// MX (+ términos personalizados del usuario) para subir la precisión en jerga de
+// dominio y anglicismos (Spanglish). El keyterm es contextual (no fuerza),
+// seguro aunque el audio no sea contable. Límite Deepgram: ~500 tokens;
+// recortamos a 100 términos por seguridad.
+function buildDgParams(extraTerms: string[]): string {
   const p = new URLSearchParams({
     model: 'nova-3',
     language: 'es',
@@ -23,11 +24,21 @@ function buildDgParams(): string {
     // utterance trae su `speaker` (entero) que el cliente pinta como «Hablante N».
     diarize: 'true',
   });
-  for (const term of DOMAIN_KEYTERMS.slice(0, 100)) p.append('keyterm', term);
+  const all = Array.from(new Set([...DOMAIN_KEYTERMS, ...extraTerms])).slice(0, 100);
+  for (const term of all) p.append('keyterm', term);
   return p.toString();
 }
 
-const DG_PARAMS = buildDgParams();
+/** Saneo de los términos personalizados que manda el cliente (vocabulario del
+ *  despacho): strings no vacíos, recortados, máx 60 chars y hasta 50 términos. */
+function sanitizeKeyterms(raw: unknown): string[] {
+  if (!Array.isArray(raw)) return [];
+  return raw
+    .filter((t): t is string => typeof t === 'string')
+    .map((t) => t.trim().slice(0, 60))
+    .filter(Boolean)
+    .slice(0, 50);
+}
 
 interface Utterance {
   start: number;
@@ -55,8 +66,11 @@ export async function POST(request: Request) {
   }
 
   let url: string | undefined;
+  let keyterms: string[] = [];
   try {
-    ({ url } = await request.json());
+    const body = await request.json();
+    url = body?.url;
+    keyterms = sanitizeKeyterms(body?.keyterms);
   } catch {
     return NextResponse.json({ error: 'Cuerpo inválido.' }, { status: 400 });
   }
@@ -65,7 +79,7 @@ export async function POST(request: Request) {
   }
 
   try {
-    const dg = await fetch(`https://api.deepgram.com/v1/listen?${DG_PARAMS}`, {
+    const dg = await fetch(`https://api.deepgram.com/v1/listen?${buildDgParams(keyterms)}`, {
       method: 'POST',
       headers: {
         Authorization: `Token ${apiKey}`,
