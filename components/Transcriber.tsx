@@ -285,9 +285,15 @@ export default function Transcriber({
       const prepared = await prepareForUpload(selectedFile);
       setUploadPct(0);
       setPhase('uploading');
+      // Un archivo grande (video sin downsamplear) en una sola petición PUT se
+      // cuelga en redes normales (ERR_TIMED_OUT). multipart lo parte en trozos
+      // que suben en paralelo y con reintentos: robusto para grabaciones largas.
+      // Para archivos chicos no compensa el overhead de varias peticiones.
+      const useMultipart = prepared.blob.size > 25 * 1024 * 1024;
       const blob = await upload(prepared.name, prepared.blob, {
         access: 'public',
         handleUploadUrl: '/api/blob-upload',
+        multipart: useMultipart,
         onUploadProgress: (e) => setUploadPct(Math.round(e.percentage)),
       });
       setPhase('transcribing');
