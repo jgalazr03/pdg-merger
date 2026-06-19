@@ -60,8 +60,11 @@ export default function TranslatePanel({ chunks, accent, baseName }: Props) {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data?.error || 'No se pudo traducir.');
+      const translations = Array.isArray(data.translations)
+        ? (data.translations as Translation[])
+        : [];
       const map = new Map<number, string>(
-        (data.translations as Translation[]).map((t) => [t.i, t.text])
+        translations.map((t) => [t.i, t.text])
       );
       setTranslated(
         chunks.map((c, i) => ({ ...c, text: map.get(i) ?? c.text }))

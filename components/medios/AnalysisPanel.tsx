@@ -102,7 +102,19 @@ export default function AnalysisPanel({ chunks, text, baseName, accent }: Props)
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data?.error || 'No se pudo generar el análisis.');
-      setAnalysis(data.analysis as MeetingAnalysis);
+      // El modelo puede omitir algún campo pese al esquema: normalizamos para
+      // que el render (y el copiar/descargar) nunca toque undefined.
+      const a = (data.analysis ?? {}) as Partial<MeetingAnalysis>;
+      setAnalysis({
+        titulo: a.titulo ?? 'Análisis',
+        tipo: a.tipo ?? '',
+        resumen: a.resumen ?? '',
+        temas: Array.isArray(a.temas) ? a.temas : [],
+        decisiones: Array.isArray(a.decisiones) ? a.decisiones : [],
+        compromisos: Array.isArray(a.compromisos) ? a.compromisos : [],
+        pendientes: Array.isArray(a.pendientes) ? a.pendientes : [],
+        sentimiento: a.sentimiento ?? { etiqueta: '', nota: '' },
+      });
       setTruncated(!!data.truncated);
       setPhase('done');
     } catch (e) {

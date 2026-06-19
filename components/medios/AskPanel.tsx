@@ -96,11 +96,17 @@ export default function AskPanel({ chunks, accent, onSeek }: Props) {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data?.error || 'No se pudo responder.');
+      // Normaliza: el modelo puede omitir `citations` pese al esquema; sin esto
+      // el render de las citas reventaría con undefined.
+      const raw = (data.answer ?? {}) as Partial<Answer>;
+      const answer: Answer = {
+        found: !!raw.found,
+        answer: raw.answer ?? '',
+        citations: Array.isArray(raw.citations) ? raw.citations : [],
+      };
       setTurns((t) =>
         t.map((turn, i) =>
-          i === index
-            ? { ...turn, answer: data.answer as Answer, loading: false }
-            : turn
+          i === index ? { ...turn, answer, loading: false } : turn
         )
       );
     } catch (e) {

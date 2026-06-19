@@ -81,7 +81,16 @@ export default function SummaryPanel({ text, baseName, accent }: Props) {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data?.error || 'No se pudo generar el resumen.');
-      setMinuta(data.minuta as Minuta);
+      // El modelo puede omitir algún campo pese al esquema: normalizamos para
+      // que el render (y el copiar/descargar) nunca toque undefined.
+      const m = (data.minuta ?? {}) as Partial<Minuta>;
+      setMinuta({
+        titulo: m.titulo ?? 'Resumen',
+        resumen: m.resumen ?? '',
+        puntosClave: Array.isArray(m.puntosClave) ? m.puntosClave : [],
+        acuerdos: Array.isArray(m.acuerdos) ? m.acuerdos : [],
+        tareas: Array.isArray(m.tareas) ? m.tareas : [],
+      });
       setTruncated(!!data.truncated);
       setPhase('done');
     } catch (e) {
