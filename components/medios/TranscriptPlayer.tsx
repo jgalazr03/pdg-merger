@@ -41,6 +41,49 @@ function norm(s: string): string {
   return s.normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase();
 }
 
+/** Pliega acentos/mayúsculas CONSERVANDO la longitud carácter a carácter (1:1),
+ *  para que los índices de coincidencia mapeen al texto original y se pueda
+ *  envolver exactamente la palabra. (A diferencia de `norm`, que cambia el largo
+ *  al descomponer en NFD.) */
+function fold(s: string): string {
+  let out = '';
+  for (const ch of s) {
+    const base = ch.normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase();
+    out += base || ch;
+  }
+  return out;
+}
+
+function escapeHtml(s: string): string {
+  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+// Recuadro de coincidencia: caja con borde navy (firma del sistema) sobre relleno
+// ámbar y negrita; `box-decoration-clone` mantiene la caja al partirse en 2 líneas.
+const MARK_CLASS =
+  'rounded border-2 border-ink bg-amber-300 px-1 font-bold text-ink box-decoration-clone';
+
+/** HTML del texto del segmento con cada coincidencia envuelta en un recuadro.
+ *  `foldedRaw` es `fold(raw)` (mismo largo); si por algún caso raro no fuese 1:1,
+ *  no resalta (devuelve el texto escapado) para no descuadrar. */
+function highlightHTML(raw: string, foldedRaw: string, foldedQuery: string): string {
+  if (!foldedQuery || foldedRaw.length !== raw.length) return escapeHtml(raw);
+  const qlen = foldedQuery.length;
+  let result = '';
+  let i = 0;
+  while (i <= raw.length - qlen) {
+    const idx = foldedRaw.indexOf(foldedQuery, i);
+    if (idx === -1) break;
+    result += escapeHtml(raw.slice(i, idx));
+    result += `<mark class="${MARK_CLASS}">${escapeHtml(
+      raw.slice(idx, idx + qlen)
+    )}</mark>`;
+    i = idx + qlen;
+  }
+  result += escapeHtml(raw.slice(i));
+  return result;
+}
+
 /**
  * Transcripción viva: reproductor + segmentos sincronizados. Tocar una línea
  * salta el audio ahí; mientras suena, la línea activa se resalta y el panel se
@@ -55,6 +98,8 @@ function TranscriptPlayer(
   const mediaRef = useRef<HTMLMediaElement | null>(null);
   const listRef = useRef<HTMLDivElement | null>(null);
   const rowRefs = useRef<(HTMLDivElement | null)[]>([]);
+  // Elementos de texto editable por segmento (para decorar las coincidencias).
+  const textRefs = useRef<(HTMLDivElement | null)[]>([]);
   // Fuente de verdad del texto editado (en ref para no repintar al teclear).
   const editsRef = useRef<string[]>(chunks.map((c) => c.text));
   const editingRef = useRef(false);
@@ -92,12 +137,32 @@ function TranscriptPlayer(
   }, [normTexts, query]);
   const matchSet = useMemo(() => new Set(matches), [matches]);
   const currentMatch = matches.length ? matches[Math.min(cursor, matches.length - 1)] : -1;
+  // Texto plegado por segmento (mismo largo) para localizar y envolver la palabra.
+  const foldTexts = useMemo(() => chunks.map((c) => fold(c.text)), [chunks]);
 
   // Al cambiar la búsqueda: vuelve a la primera coincidencia y la trae a la vista.
   useEffect(() => {
     setCursor(0);
     if (matches.length) centerRow(matches[0]);
   }, [matches, centerRow]);
+
+  // ADITIVO al resaltado de fila: envuelve en un recuadro la(s) palabra(s) que
+  // coinciden, DENTRO de cada segmento. Trabaja sobre el DOM (no por React)
+  // porque el texto es contentEditable no controlado; salta el segmento que se
+  // esté editando para no mover el cursor, y reconstruye desde la fuente de
+  // verdad (`chunks[i].text`).
+  useEffect(() => {
+    const fq = fold(query.trim());
+    textRefs.current.forEach((el, i) => {
+      if (!el || el === document.activeElement) return;
+      const raw = chunks[i]?.text ?? '';
+      if (fq && foldTexts[i]?.includes(fq)) {
+        el.innerHTML = highlightHTML(raw, foldTexts[i], fq);
+      } else if (el.querySelector('mark')) {
+        el.textContent = raw; // tenía recuadros y ya no coincide: a texto plano
+      }
+    });
+  }, [query, chunks, foldTexts]);
 
   const goToMatch = useCallback(
     (dir: 1 | -1) => {
@@ -332,6 +397,7 @@ function TranscriptPlayer(
                 </button>
                 <div
                   ref={(el) => {
+                    textRefs.current[i] = el;
                     if (el && el.dataset.ready !== '1') {
                       el.textContent = editsRef.current[i] ?? '';
                       el.dataset.ready = '1';
@@ -342,6 +408,13 @@ function TranscriptPlayer(
                   role="textbox"
                   aria-label={`Texto del segmento en ${clock(start)}`}
                   spellCheck={false}
+                  onPointerDown={(e) => {
+                    // Antes de colocar el cursor: quita los recuadros de búsqueda
+                    // para editar sobre texto plano (sin perder la posición del clic).
+                    const el = e.currentTarget;
+                    if (el.querySelector('mark'))
+                      el.textContent = editsRef.current[i] ?? '';
+                  }}
                   onFocus={() => {
                     editingRef.current = true;
                   }}
