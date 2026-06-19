@@ -907,10 +907,11 @@ export const TOOLS: ToolDef[] = [
     href: '/transcribir',
     category: 'transcribir',
     name: 'Transcribir',
-    title: 'Transcribir audio y video a texto',
-    tagline: 'Convierte una grabación en texto, directo en tu navegador.',
+    title: 'Transcribe y aprovecha tu audio y video',
+    tagline:
+      'Texto editable con tiempos, resumen, preguntas, capítulos, traducción y subtítulos.',
     description:
-      'Transcribe audio y video a texto en español. Procesa la grabación en tu navegador (privado) y te entrega el texto editable y subtítulos .srt. Para grabaciones largas, un modo rápido opcional procesa en el servidor.',
+      'Convierte audio y video en texto editable y sincronizado, y trabájalo: búscalo, hazle preguntas, genera un resumen, divídelo en capítulos, tradúcelo y exporta subtítulos. Por defecto todo ocurre en tu navegador (privado); para grabaciones largas hay un modo servidor más rápido que identifica a cada hablante.',
     Icon: AudioLines,
     constraints: [
       'Entrada: audio o video (MP3, WAV, M4A, OGG, MP4)',
@@ -925,10 +926,11 @@ export const TOOLS: ToolDef[] = [
     href: '/analizar-reunion',
     category: 'analizar',
     name: 'Analizar reunión',
-    title: 'Analiza una reunión o llamada',
-    tagline: 'Convierte una grabación en compromisos, decisiones y métricas.',
+    title: 'Analiza reuniones y llamadas',
+    tagline:
+      'Minuta, compromisos con responsable y plazo, decisiones, participación y documentos.',
     description:
-      'Sube la grabación de una reunión o llamada y obtén un análisis accionable: compromisos con responsable y plazo, decisiones, temas, pendientes y el reparto de participación por persona. Todo a partir de la transcripción, en español.',
+      'Sube la grabación de una reunión o llamada y obtén resultados listos para usar: minuta, compromisos con responsable y plazo, decisiones, temas y pendientes, el reparto de participación por persona, y documentos como acta, minuta fiscal o memo de auditoría. Todo a partir de la transcripción, en español.',
     Icon: BarChart3,
     constraints: [
       'Entrada: audio o video (MP3, WAV, M4A, OGG, MP4)',

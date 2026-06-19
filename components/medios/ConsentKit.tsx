@@ -40,7 +40,7 @@ export default function ConsentKit({ accent }: { accent: ToolAccent }) {
       >
         <ShieldCheck className={cn('h-4 w-4 shrink-0', accent.text)} strokeWidth={2.5} />
         <span className="flex-1 text-sm font-bold text-ink">
-          Privacidad y consentimiento (LFPDPPP)
+          ¿A dónde va tu grabación?
         </span>
         <ChevronDown
           className={cn(
@@ -59,7 +59,7 @@ export default function ConsentKit({ accent }: { accent: ToolAccent }) {
                 En tu navegador
               </p>
               <p className="text-xs leading-relaxed text-muted-foreground">
-                El audio no sale de tu equipo. Sin transferencia a terceros.
+                Tu audio se queda en tu equipo. No se sube a internet.
               </p>
             </div>
             <div className="rounded-lg border-2 border-ink/15 p-2.5">
@@ -68,17 +68,20 @@ export default function ConsentKit({ accent }: { accent: ToolAccent }) {
                 En el servidor
               </p>
               <p className="text-xs leading-relaxed text-muted-foreground">
-                Se procesa en Deepgram (EE. UU.) y se borra: es transferencia
-                internacional.
+                Se envía a un servicio de transcripción (Deepgram), se procesa y
+                se borra al terminar.
               </p>
             </div>
           </div>
 
           <p className="mt-2.5 text-xs leading-relaxed text-muted-foreground">
-            Los datos financieros son sensibles: la LFPDPPP exige{' '}
-            <span className="font-medium text-ink">consentimiento expreso</span>.
-            Usa esta plantilla con los participantes (adáptala con tu área legal;
-            no es asesoría jurídica).
+            Si en la grabación participan otras personas, conviene tener su
+            permiso. Descarga una plantilla lista para pedírselo y entregarles el
+            aviso de privacidad.
+          </p>
+          <p className="mt-1 text-[11px] leading-relaxed text-muted-foreground/80">
+            Te ayuda a cumplir la ley de protección de datos (LFPDPPP). Adáptala
+            con tu área legal; no es asesoría jurídica.
           </p>
 
           <div className="mt-3">
@@ -86,7 +89,7 @@ export default function ConsentKit({ accent }: { accent: ToolAccent }) {
               className={accent.solid}
               items={[
                 {
-                  label: 'Plantilla Word (.docx)',
+                  label: 'Plantilla de permiso (Word)',
                   onSelect: () => {
                     void downloadMarkdownAsDocx(
                       CONSENT_TEMPLATE,
@@ -97,7 +100,7 @@ export default function ConsentKit({ accent }: { accent: ToolAccent }) {
                   },
                 },
                 {
-                  label: 'Plantilla Markdown (.md)',
+                  label: 'Plantilla de permiso (Markdown)',
                   onSelect: () =>
                     downloadText(CONSENT_TEMPLATE, 'consentimiento-grabacion.md'),
                 },
