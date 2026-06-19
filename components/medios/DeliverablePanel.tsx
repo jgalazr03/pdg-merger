@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { FileText, Copy, AlertCircle } from 'lucide-react';
 import ResolveSpinner from '@/components/ResolveSpinner';
 import { toast } from 'sonner';
@@ -20,12 +20,27 @@ type Props = {
   names?: SpeakerNames;
 };
 
-type Kind = 'acta' | 'correo' | 'post';
+type Kind =
+  | 'acta'
+  | 'correo'
+  | 'post'
+  | 'memo-auditoria'
+  | 'minuta-fiscal'
+  | 'cobranza';
+type Group = 'general' | 'contable';
 
-const KINDS: { key: Kind; label: string; file: string }[] = [
-  { key: 'acta', label: 'Acta de reunión', file: 'acta' },
-  { key: 'correo', label: 'Correo de seguimiento', file: 'correo' },
-  { key: 'post', label: 'Publicación', file: 'publicacion' },
+const KINDS: { key: Kind; label: string; file: string; group: Group }[] = [
+  { key: 'acta', label: 'Acta de reunión', file: 'acta', group: 'general' },
+  { key: 'correo', label: 'Correo de seguimiento', file: 'correo', group: 'general' },
+  { key: 'post', label: 'Publicación', file: 'publicacion', group: 'general' },
+  { key: 'memo-auditoria', label: 'Memo de auditoría', file: 'memo-auditoria', group: 'contable' },
+  { key: 'minuta-fiscal', label: 'Minuta fiscal', file: 'minuta-fiscal', group: 'contable' },
+  { key: 'cobranza', label: 'Resumen de cobranza', file: 'cobranza', group: 'contable' },
+];
+
+const GROUPS: { key: Group; label: string }[] = [
+  { key: 'general', label: 'Generales' },
+  { key: 'contable', label: 'Contable y fiscal' },
 ];
 
 function downloadText(content: string, filename: string) {
@@ -47,11 +62,30 @@ function downloadDocx(md: string, filename: string) {
 }
 
 /**
+ * Sugiere la plantilla más probable según el contenido (heurística client-side,
+ * gratis e instantánea; nadie en el mercado lo automatiza). Conservadora: cae a
+ * 'acta' si no hay señales claras de un tipo específico.
+ */
+function suggestKind(text: string): Kind {
+  const t = text.toLowerCase();
+  const has = (...w: string[]) => w.some((x) => t.includes(x));
+  if (has('cobranza', 'adeudo', 'pago vencido', 'saldo vencido', 'morosidad', 'pago pendiente'))
+    return 'cobranza';
+  if (has('auditor', 'papeles de trabajo', 'dictamen', 'partes relacionadas', 'contingencia'))
+    return 'memo-auditoria';
+  if (has('sat', 'declaraci', 'cfdi', 'isr', ' iva', 'impuesto', 'fiscal', 'diot', 'resico'))
+    return 'minuta-fiscal';
+  return 'acta';
+}
+
+/**
  * Genera un entregable a partir de la grabación: acta de reunión, correo de
  * seguimiento o publicación. Claude redacta el documento en Markdown.
  */
 export default function DeliverablePanel({ chunks, accent, baseName, names }: Props) {
-  const [kind, setKind] = useState<Kind>('acta');
+  // Preselecciona la plantilla según el contenido (gratis, al montar).
+  const suggested = useMemo(() => suggestKind(plainText(chunks, names)), [chunks, names]);
+  const [kind, setKind] = useState<Kind>(suggested);
   const [phase, setPhase] = useState<'idle' | 'loading' | 'done' | 'error'>(
     'idle'
   );
@@ -87,28 +121,47 @@ export default function DeliverablePanel({ chunks, accent, baseName, names }: Pr
           Convierte la grabación en un documento listo para usar.
         </p>
 
-        {/* Selector de tipo */}
-        <div className="mb-4 flex flex-wrap gap-1.5">
-          {KINDS.map((k) => {
-            const active = kind === k.key;
-            return (
-              <button
-                key={k.key}
-                type="button"
-                onClick={() => setKind(k.key)}
-                disabled={phase === 'loading'}
-                aria-pressed={active}
-                className={cn(
-                  'rounded-full border-2 px-3 py-1 text-xs font-medium transition-colors duration-150 disabled:opacity-50',
-                  active
-                    ? 'border-ink bg-ink text-white'
-                    : 'border-ink/20 text-ink hover-fine:border-ink hover-fine:bg-muted'
-                )}
-              >
-                {k.label}
-              </button>
-            );
-          })}
+        {suggested !== 'acta' && (
+          <p className="mb-3 text-xs text-muted-foreground">
+            Sugerido por el contenido:{' '}
+            <span className="font-medium text-ink">
+              {KINDS.find((k) => k.key === suggested)?.label}
+            </span>
+            .
+          </p>
+        )}
+
+        {/* Selector de tipo, agrupado: generales y específicos contable-fiscal */}
+        <div className="mb-4 space-y-3">
+          {GROUPS.map((g) => (
+            <div key={g.key}>
+              <p className="mb-1.5 text-xs font-bold uppercase tracking-wide text-muted-foreground">
+                {g.label}
+              </p>
+              <div className="flex flex-wrap gap-1.5">
+                {KINDS.filter((k) => k.group === g.key).map((k) => {
+                  const active = kind === k.key;
+                  return (
+                    <button
+                      key={k.key}
+                      type="button"
+                      onClick={() => setKind(k.key)}
+                      disabled={phase === 'loading'}
+                      aria-pressed={active}
+                      className={cn(
+                        'rounded-full border-2 px-3 py-1 text-xs font-medium transition-colors duration-150 disabled:opacity-50',
+                        active
+                          ? 'border-ink bg-ink text-white'
+                          : 'border-ink/20 text-ink hover-fine:border-ink hover-fine:bg-muted'
+                      )}
+                    >
+                      {k.label}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
         </div>
 
         <Button

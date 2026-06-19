@@ -8,13 +8,25 @@ export const maxDuration = 120;
 const MODEL = 'claude-haiku-4-5-20251001';
 const MAX_CHARS = 200_000;
 
-type Kind = 'acta' | 'correo' | 'post';
+type Kind =
+  | 'acta'
+  | 'correo'
+  | 'post'
+  | 'memo-auditoria'
+  | 'minuta-fiscal'
+  | 'cobranza';
 
 const KIND_INSTRUCTIONS: Record<Kind, string> = {
   acta: 'Redacta un ACTA DE REUNIÓN formal en español, en Markdown: un título, fecha si se menciona, asistentes si se infieren, los temas tratados, los acuerdos (decisiones), las tareas con su responsable y, al final, los próximos pasos. Estructúrala con encabezados y listas.',
   correo:
     'Redacta un CORREO DE SEGUIMIENTO en español, en Markdown: una línea de "Asunto:", un saludo, un párrafo breve con lo tratado, una lista con los acuerdos y tareas (con responsables), y un cierre cordial. Tono profesional y conciso.',
   post: 'Redacta una PUBLICACIÓN para redes (estilo LinkedIn) en español, en Markdown: un gancho inicial, 2-4 ideas clave del contenido en un tono cercano y profesional, y un cierre con una reflexión o llamado a la acción. Puedes usar alguna lista. Evita inventar datos.',
+  'memo-auditoria':
+    'Redacta un MEMORÁNDUM DE AUDITORÍA en español, en Markdown, con foco en los elementos relevantes para la auditoría tratados en la reunión. Usa encabezados y agrupa por: Deuda y financiamientos nuevos; Partes relacionadas; Litigios y contingencias; Cambios operativos o contables (políticas, estimaciones, juicios); Eventos posteriores; Otros riesgos de revelación. En cada apartado resume SOLO lo que se dijo; si un apartado relevante no se abordó, indícalo como "No se abordó en la reunión". Cierra con "Puntos de seguimiento para papeles de trabajo" (lista, con responsable si se mencionó). No inventes cifras ni hechos.',
+  'minuta-fiscal':
+    'Redacta una MINUTA FISCAL en español, en Markdown, centrada en obligaciones y plazos. Incluye: un breve resumen; "Obligaciones y trámites" (lista); "Plazos y fechas" (lista con la fecha o vencimiento mencionado —p. ej. ante el SAT— y el responsable); "Impuestos y conceptos" involucrados (ISR, IVA, etc., solo los mencionados); "Documentación requerida" (CFDI, papeles de trabajo, etc.); "Pendientes y riesgos fiscales"; y "Próximos pasos" con fecha si se dijo. Extrae con cuidado cualquier fecha o plazo. No inventes fechas, montos ni obligaciones que no se hayan mencionado.',
+  cobranza:
+    'Redacta un RESUMEN DE LLAMADA DE COBRANZA en español, en Markdown. Incluye: "Datos de la gestión" (cliente/cuenta, monto y estatus si se mencionan); "Resumen de la conversación"; "Compromiso de pago" (monto y fecha acordados, si los hay); "Acuerdos y próximos pasos". Agrega una sección "Cumplimiento" donde señales ÚNICAMENTE las situaciones evidentes en la transcripción que pudieran implicar riesgo (p. ej. lenguaje ofensivo o amenazante, falta de identificación del gestor, llamada fuera de horario, falta de trato digno o de aviso de privacidad). Si no detectas señales, escribe "Sin señales de incumplimiento detectadas". No infieras incumplimientos que no estén respaldados por lo dicho.',
 };
 
 const BASE_SYSTEM =
