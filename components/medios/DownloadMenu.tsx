@@ -40,7 +40,7 @@ export default function DownloadMenu({
   }, [open]);
 
   return (
-    <div ref={ref} className="relative">
+    <div ref={ref} className="relative inline-block">
       <Button
         type="button"
         className={className}
