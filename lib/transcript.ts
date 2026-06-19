@@ -11,6 +11,12 @@ export type Chunk = {
   speaker?: number;
 };
 
+/** Nombres personalizados por hablante (id de diarización → nombre). El usuario
+ *  los asigna en la UI; un nombre vacío o ausente cae al genérico «Hablante N».
+ *  Se propaga a todos los formateadores para que el nombre real aparezca en la
+ *  transcripción, el resumen, el análisis y lo que se manda al modelo. */
+export type SpeakerNames = Record<number, string>;
+
 function pad(n: number, len = 2): string {
   return String(n).padStart(len, '0');
 }
@@ -56,13 +62,15 @@ export function activeIndexAt(chunks: Chunk[], t: number): number {
   return -1;
 }
 
-/** Etiqueta legible de un hablante (0 → «Hablante 1»). */
-export function speakerLabel(speaker: number): string {
-  return `Hablante ${speaker + 1}`;
+/** Etiqueta legible de un hablante: el nombre que le puso el usuario, o el
+ *  genérico «Hablante 1» (0-based → 1-based) si no hay ninguno. */
+export function speakerLabel(speaker: number, names?: SpeakerNames): string {
+  const custom = names?.[speaker]?.trim();
+  return custom || `Hablante ${speaker + 1}`;
 }
 
 /** Texto corrido y limpio (un párrafo), o por hablante si hubo diarización. */
-export function plainText(chunks: Chunk[]): string {
+export function plainText(chunks: Chunk[], names?: SpeakerNames): string {
   const hasSpeakers = chunks.some((c) => c.speaker != null);
   if (!hasSpeakers) {
     return chunks
@@ -80,7 +88,7 @@ export function plainText(chunks: Chunk[]): string {
     if (sp !== current) {
       if (buffer) lines.push(buffer.trim());
       current = sp;
-      buffer = `${speakerLabel(sp)}: ${c.text.trim()}`;
+      buffer = `${speakerLabel(sp, names)}: ${c.text.trim()}`;
     } else {
       buffer += ` ${c.text.trim()}`;
     }
@@ -91,22 +99,25 @@ export function plainText(chunks: Chunk[]): string {
 
 /** Transcripción para enviar a un LLM: cada línea con su inicio en SEGUNDOS
  *  entre corchetes (`[45] …`), para que pueda citar tiempos exactos. */
-export function transcriptWithSeconds(chunks: Chunk[]): string {
+export function transcriptWithSeconds(
+  chunks: Chunk[],
+  names?: SpeakerNames
+): string {
   return chunks
     .map((c) => {
       const t = Math.round(c.timestamp[0] ?? 0);
-      const who = c.speaker != null ? ` ${speakerLabel(c.speaker)}:` : '';
+      const who = c.speaker != null ? ` ${speakerLabel(c.speaker, names)}:` : '';
       return `[${t}]${who} ${c.text.trim()}`;
     })
     .join('\n');
 }
 
 /** Texto con marcas de tiempo por línea: `[m:ss] …`. */
-export function timedText(chunks: Chunk[]): string {
+export function timedText(chunks: Chunk[], names?: SpeakerNames): string {
   return chunks
     .map((c) => {
       const stamp = `[${clock(c.timestamp[0] ?? 0)}]`;
-      const who = c.speaker != null ? ` ${speakerLabel(c.speaker)}:` : '';
+      const who = c.speaker != null ? ` ${speakerLabel(c.speaker, names)}:` : '';
       return `${stamp}${who} ${c.text.trim()}`;
     })
     .join('\n');

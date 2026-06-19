@@ -28,8 +28,10 @@ import TranscriptPlayer, {
 } from '@/components/medios/TranscriptPlayer';
 import DownloadMenu from '@/components/medios/DownloadMenu';
 import AiWorkspace, { type WorkspaceTab } from '@/components/medios/AiWorkspace';
+import SpeakerNamer from '@/components/medios/SpeakerNamer';
 import {
   type Chunk,
+  type SpeakerNames,
   plainText,
   timedText,
   toSrt,
@@ -90,6 +92,9 @@ export default function Transcriber({
   const [modelPct, setModelPct] = useState(0);
   const [text, setText] = useState('');
   const [chunks, setChunks] = useState<Chunk[]>([]);
+  // Nombres que el usuario le pone a cada hablante diarizado; se propagan a la
+  // transcripción, el reparto de participación, el resumen y el análisis.
+  const [speakerNames, setSpeakerNames] = useState<SpeakerNames>({});
   const [errorMsg, setErrorMsg] = useState('');
   const [mode, setMode] = useState<Mode>('local');
   const [uploadPct, setUploadPct] = useState(0);
@@ -146,6 +151,7 @@ export default function Transcriber({
     setPhase('idle');
     setText('');
     setChunks([]);
+    setSpeakerNames({});
     setErrorMsg('');
   };
 
@@ -154,16 +160,24 @@ export default function Transcriber({
     setPhase('idle');
     setText('');
     setChunks([]);
+    setSpeakerNames({});
     setErrorMsg('');
     setModelPct(0);
   };
 
-  // El usuario corrigió el texto de un segmento en el reproductor: re-derivamos
-  // el texto plano para copiar/descargar.
+  // El usuario corrigió el texto de un segmento en el reproductor: guardamos los
+  // chunks y el efecto de abajo re-deriva el texto plano (con nombres) para
+  // copiar/descargar/IA.
   const handleEdit = (ch: Chunk[]) => {
     setChunks(ch);
-    setText(plainText(ch));
   };
+
+  // `text` es la versión plana de la transcripción (con los nombres de hablante
+  // aplicados). Se re-deriva cuando cambian los chunks o los nombres, así el
+  // resumen, el análisis y el copiar/descargar siempre usan el nombre real.
+  useEffect(() => {
+    if (chunks.length) setText(plainText(chunks, speakerNames));
+  }, [chunks, speakerNames]);
 
   const handleWorkerMessage = (e: MessageEvent) => {
     const d = e.data;
@@ -205,6 +219,7 @@ export default function Transcriber({
     setErrorMsg('');
     setText('');
     setChunks([]);
+    setSpeakerNames({});
     if (mode === 'server') void transcribeServer();
     else void transcribeLocal();
   };
@@ -515,15 +530,24 @@ export default function Transcriber({
             {/* Izquierda: reproductor + transcripción + exportar */}
             <div className="min-w-0 space-y-4">
               {chunks.length > 0 && previewUrl ? (
-                <TranscriptPlayer
-                  key={runId}
-                  ref={playerRef}
-                  chunks={chunks}
-                  mediaUrl={previewUrl}
-                  isVideo={!!isVideo}
-                  accent={accent}
-                  onChange={handleEdit}
-                />
+                <>
+                  <SpeakerNamer
+                    chunks={chunks}
+                    names={speakerNames}
+                    onChange={setSpeakerNames}
+                    accent={accent}
+                  />
+                  <TranscriptPlayer
+                    key={runId}
+                    ref={playerRef}
+                    chunks={chunks}
+                    mediaUrl={previewUrl}
+                    isVideo={!!isVideo}
+                    accent={accent}
+                    names={speakerNames}
+                    onChange={handleEdit}
+                  />
+                </>
               ) : (
                 <Textarea
                   value={text}
@@ -550,7 +574,7 @@ export default function Transcriber({
                   <Button
                     onClick={() => {
                       void navigator.clipboard
-                        .writeText(timedText(chunks))
+                        .writeText(timedText(chunks, speakerNames))
                         .then(() =>
                           toast.success('Copiado con marcas de tiempo')
                         );
@@ -596,6 +620,7 @@ export default function Transcriber({
                   text={text}
                   accent={accent}
                   baseName={baseName}
+                  names={speakerNames}
                   defaultTab={defaultPanel}
                   onSeek={(t) => playerRef.current?.seekTo(t)}
                 />

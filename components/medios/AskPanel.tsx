@@ -6,6 +6,7 @@ import { cn } from '@/lib/utils';
 import type { ToolAccent } from '@/lib/tools';
 import {
   type Chunk,
+  type SpeakerNames,
   clock,
   plainText,
   transcriptWithSeconds,
@@ -17,6 +18,8 @@ import Markdown from '@/components/medios/Markdown';
 type Props = {
   chunks: Chunk[];
   accent: ToolAccent;
+  /** Nombres de los hablantes, para que la respuesta los use al citar. */
+  names?: SpeakerNames;
   /** Salta el reproductor al momento citado (segundos). */
   onSeek: (time: number) => void;
 };
@@ -40,7 +43,7 @@ const FALLBACK_SUGGESTIONS = [
  * responde citando los momentos exactos del audio (chips clicables que saltan el
  * reproductor). Cada pregunta es independiente sobre la transcripción.
  */
-export default function AskPanel({ chunks, accent, onSeek }: Props) {
+export default function AskPanel({ chunks, accent, names, onSeek }: Props) {
   const [input, setInput] = useState('');
   const [turns, setTurns] = useState<Turn[]>([]);
   const [busy, setBusy] = useState(false);
@@ -91,7 +94,7 @@ export default function AskPanel({ chunks, accent, onSeek }: Props) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           question,
-          transcript: transcriptWithSeconds(chunks),
+          transcript: transcriptWithSeconds(chunks, names),
         }),
       });
       const data = await res.json();

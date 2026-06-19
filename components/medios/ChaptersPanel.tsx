@@ -5,13 +5,20 @@ import { ListTree, Play, Loader2, Copy, AlertCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import type { ToolAccent } from '@/lib/tools';
-import { type Chunk, clock, transcriptWithSeconds } from '@/lib/transcript';
+import {
+  type Chunk,
+  type SpeakerNames,
+  clock,
+  transcriptWithSeconds,
+} from '@/lib/transcript';
 import { type Chapter, chaptersToText } from '@/lib/chapters';
 import { Button } from '@/components/ui/button';
 
 type Props = {
   chunks: Chunk[];
   accent: ToolAccent;
+  /** Nombres de los hablantes (para que el contexto enviado los use). */
+  names?: SpeakerNames;
   /** Salta el reproductor al inicio del capítulo (segundos). */
   onSeek: (time: number) => void;
 };
@@ -21,7 +28,7 @@ type Props = {
  * tiempo de inicio. Cada capítulo es clicable (salta el reproductor) y se pueden
  * copiar en formato de capítulos (estilo YouTube).
  */
-export default function ChaptersPanel({ chunks, accent, onSeek }: Props) {
+export default function ChaptersPanel({ chunks, accent, names, onSeek }: Props) {
   const [phase, setPhase] = useState<'idle' | 'loading' | 'done' | 'error'>(
     'idle'
   );
@@ -35,7 +42,7 @@ export default function ChaptersPanel({ chunks, accent, onSeek }: Props) {
       const res = await fetch('/api/chapters', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ transcript: transcriptWithSeconds(chunks) }),
+        body: JSON.stringify({ transcript: transcriptWithSeconds(chunks, names) }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data?.error || 'No se pudieron generar.');

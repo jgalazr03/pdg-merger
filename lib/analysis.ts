@@ -3,7 +3,7 @@
 // participación (talk-time) se calculan en el cliente a partir de los
 // timestamps + diarización de los chunks, sin gastar IA. Tipo compartido.
 
-import type { Chunk } from './transcript';
+import type { Chunk, SpeakerNames } from './transcript';
 import { endOf, speakerLabel } from './transcript';
 
 export type Compromiso = {
@@ -61,7 +61,7 @@ export type TalkTime = {
  * duración de los fragmentos de cada quien (no requiere IA). Si no hubo
  * diarización (un solo hablante), `diarized` es false y se usa solo el total.
  */
-export function talkTime(chunks: Chunk[]): TalkTime {
+export function talkTime(chunks: Chunk[], names?: SpeakerNames): TalkTime {
   const totals = new Map<number, number>();
   let total = 0;
   chunks.forEach((c, i) => {
@@ -75,7 +75,7 @@ export function talkTime(chunks: Chunk[]): TalkTime {
   const speakers: SpeakerStat[] = Array.from(totals.entries())
     .map(([speaker, seconds]) => ({
       speaker,
-      label: speakerLabel(speaker),
+      label: speakerLabel(speaker, names),
       seconds,
       share: total ? seconds / total : 0,
     }))

@@ -11,13 +11,22 @@ import {
 import { Play } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { ToolAccent } from '@/lib/tools';
-import { type Chunk, activeIndexAt, clock, speakerLabel } from '@/lib/transcript';
+import {
+  type Chunk,
+  type SpeakerNames,
+  activeIndexAt,
+  clock,
+  speakerLabel,
+} from '@/lib/transcript';
+import { speakerColor } from '@/lib/speakers';
 
 type Props = {
   chunks: Chunk[];
   mediaUrl: string;
   isVideo: boolean;
   accent: ToolAccent;
+  /** Nombres personalizados de los hablantes (vacío = etiquetas genéricas). */
+  names?: SpeakerNames;
   /** Notifica al padre el texto editado (en `onBlur`) para copiar/exportar. */
   onChange: (chunks: Chunk[]) => void;
 };
@@ -25,17 +34,6 @@ type Props = {
 /** API imperativa para que otras partes (p. ej. el panel de preguntas) salten
  *  el reproductor a un momento concreto. */
 export type TranscriptPlayerHandle = { seekTo: (time: number) => void };
-
-// Color por hablante (clases LITERALES para el JIT de Tailwind). Solo se usan
-// cuando hubo diarización; se ciclan si hay más hablantes que colores.
-const SPEAKER_DOT = [
-  'bg-violet-700',
-  'bg-amber-700',
-  'bg-teal-700',
-  'bg-fuchsia-700',
-  'bg-sky-700',
-  'bg-rose-700',
-];
 
 /**
  * Transcripción viva: reproductor + segmentos sincronizados. Tocar una línea
@@ -45,7 +43,7 @@ const SPEAKER_DOT = [
  * sobrevive al resaltado durante la reproducción).
  */
 function TranscriptPlayer(
-  { chunks, mediaUrl, isVideo, accent, onChange }: Props,
+  { chunks, mediaUrl, isVideo, accent, names, onChange }: Props,
   ref: React.Ref<TranscriptPlayerHandle>
 ) {
   const mediaRef = useRef<HTMLMediaElement | null>(null);
@@ -184,11 +182,11 @@ function TranscriptPlayer(
                   <span
                     className={cn(
                       'inline-block h-2.5 w-2.5 rounded-full border-2 border-ink',
-                      SPEAKER_DOT[c.speaker % SPEAKER_DOT.length]
+                      speakerColor(c.speaker)
                     )}
                   />
                   <span className="text-xs font-bold uppercase tracking-wide text-ink">
-                    {speakerLabel(c.speaker)}
+                    {speakerLabel(c.speaker, names)}
                   </span>
                 </div>
               )}

@@ -12,7 +12,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { ToolAccent } from '@/lib/tools';
-import type { Chunk } from '@/lib/transcript';
+import type { Chunk, SpeakerNames } from '@/lib/transcript';
 import AskPanel from './AskPanel';
 import SummaryPanel from './SummaryPanel';
 import AnalysisPanel from './AnalysisPanel';
@@ -33,6 +33,8 @@ type Props = {
   text: string;
   accent: ToolAccent;
   baseName: string;
+  /** Nombres personalizados de los hablantes (se propagan a cada panel). */
+  names?: SpeakerNames;
   onSeek: (time: number) => void;
   /** Pestaña activa al montar (la herramienta "Analizar" abre en "analisis"). */
   defaultTab?: WorkspaceTab;
@@ -58,6 +60,7 @@ export default function AiWorkspace({
   text,
   accent,
   baseName,
+  names,
   onSeek,
   defaultTab = 'preguntar',
 }: Props) {
@@ -95,19 +98,19 @@ export default function AiWorkspace({
       </div>
 
       <div className={cn(active !== 'preguntar' && 'hidden')}>
-        <AskPanel chunks={chunks} accent={accent} onSeek={onSeek} />
+        <AskPanel chunks={chunks} accent={accent} names={names} onSeek={onSeek} />
       </div>
       <div className={cn(active !== 'resumen' && 'hidden')}>
         <SummaryPanel text={text} accent={accent} baseName={baseName} />
       </div>
       <div className={cn(active !== 'analisis' && 'hidden')}>
-        <AnalysisPanel chunks={chunks} text={text} accent={accent} baseName={baseName} />
+        <AnalysisPanel chunks={chunks} text={text} accent={accent} baseName={baseName} names={names} />
       </div>
       <div className={cn(active !== 'capitulos' && 'hidden')}>
-        <ChaptersPanel chunks={chunks} accent={accent} onSeek={onSeek} />
+        <ChaptersPanel chunks={chunks} accent={accent} names={names} onSeek={onSeek} />
       </div>
       <div className={cn(active !== 'documento' && 'hidden')}>
-        <DeliverablePanel chunks={chunks} accent={accent} baseName={baseName} />
+        <DeliverablePanel chunks={chunks} accent={accent} baseName={baseName} names={names} />
       </div>
       <div className={cn(active !== 'traducir' && 'hidden')}>
         <TranslatePanel chunks={chunks} accent={accent} baseName={baseName} />

@@ -18,8 +18,9 @@ import {
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import type { ToolAccent } from '@/lib/tools';
-import { type Chunk, clock } from '@/lib/transcript';
+import { type Chunk, type SpeakerNames, clock } from '@/lib/transcript';
 import { type MeetingAnalysis, analysisToText, talkTime } from '@/lib/analysis';
+import { speakerColor } from '@/lib/speakers';
 import { Button } from '@/components/ui/button';
 import Markdown from '@/components/medios/Markdown';
 
@@ -28,6 +29,8 @@ type Props = {
   text: string;
   baseName: string;
   accent: ToolAccent;
+  /** Nombres de los hablantes, para el reparto de participación. */
+  names?: SpeakerNames;
 };
 
 function downloadText(content: string, filename: string) {
@@ -84,8 +87,8 @@ function Bullets({ items, accent }: { items: string[]; accent: ToolAccent }) {
  *  - Análisis cualitativo (temas, decisiones, compromisos, pendientes, tono):
  *    lo emite Claude bajo demanda. Sin marco de card propio: vive en el workspace.
  */
-export default function AnalysisPanel({ chunks, text, baseName, accent }: Props) {
-  const stats = useMemo(() => talkTime(chunks), [chunks]);
+export default function AnalysisPanel({ chunks, text, baseName, accent, names }: Props) {
+  const stats = useMemo(() => talkTime(chunks, names), [chunks, names]);
   const [phase, setPhase] = useState<'idle' | 'loading' | 'done' | 'error'>('idle');
   const [analysis, setAnalysis] = useState<MeetingAnalysis | null>(null);
   const [truncated, setTruncated] = useState(false);
@@ -145,8 +148,16 @@ export default function AnalysisPanel({ chunks, text, baseName, accent }: Props)
               return (
                 <li key={s.speaker} className="text-sm">
                   <div className="mb-1 flex items-center justify-between gap-2">
-                    <span className="font-medium text-ink">{s.label}</span>
-                    <span className="font-mono text-xs tabular-nums text-muted-foreground">
+                    <span className="flex min-w-0 items-center gap-1.5 font-medium text-ink">
+                      <span
+                        className={cn(
+                          'inline-block h-2.5 w-2.5 shrink-0 rounded-full border-2 border-ink',
+                          speakerColor(s.speaker)
+                        )}
+                      />
+                      <span className="truncate">{s.label}</span>
+                    </span>
+                    <span className="shrink-0 font-mono text-xs tabular-nums text-muted-foreground">
                       {clock(s.seconds)} · {pct}%
                     </span>
                   </div>

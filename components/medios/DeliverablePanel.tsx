@@ -5,7 +5,7 @@ import { FileText, Loader2, Copy, Download, AlertCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import type { ToolAccent } from '@/lib/tools';
-import { type Chunk, plainText } from '@/lib/transcript';
+import { type Chunk, type SpeakerNames, plainText } from '@/lib/transcript';
 import { Button } from '@/components/ui/button';
 import Markdown from '@/components/medios/Markdown';
 
@@ -13,6 +13,8 @@ type Props = {
   chunks: Chunk[];
   accent: ToolAccent;
   baseName: string;
+  /** Nombres de los hablantes (para que el documento los use). */
+  names?: SpeakerNames;
 };
 
 type Kind = 'acta' | 'correo' | 'post';
@@ -39,7 +41,7 @@ function downloadText(content: string, filename: string) {
  * Genera un entregable a partir de la grabación: acta de reunión, correo de
  * seguimiento o publicación. Claude redacta el documento en Markdown.
  */
-export default function DeliverablePanel({ chunks, accent, baseName }: Props) {
+export default function DeliverablePanel({ chunks, accent, baseName, names }: Props) {
   const [kind, setKind] = useState<Kind>('acta');
   const [phase, setPhase] = useState<'idle' | 'loading' | 'done' | 'error'>(
     'idle'
@@ -55,7 +57,7 @@ export default function DeliverablePanel({ chunks, accent, baseName }: Props) {
       const res = await fetch('/api/deliverable', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ transcript: plainText(chunks), kind }),
+        body: JSON.stringify({ transcript: plainText(chunks, names), kind }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data?.error || 'No se pudo generar.');
