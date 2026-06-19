@@ -2,21 +2,32 @@ import { NextResponse } from 'next/server';
 import { del } from '@vercel/blob';
 import { rejectCrossOrigin } from '@/lib/api-guard';
 import { upstreamError, serviceError } from '@/lib/upstream';
+import { DOMAIN_KEYTERMS } from '@/lib/keyterms';
 
 export const runtime = 'nodejs';
 // Deepgram batch procesa ~30× tiempo real; 300 s cubre audios de varias horas.
 export const maxDuration = 300;
 
-const DG_PARAMS = new URLSearchParams({
-  model: 'nova-3',
-  language: 'es',
-  smart_format: 'true',
-  punctuate: 'true',
-  utterances: 'true',
-  // Diarización: separa por hablante (útil para reuniones/entrevistas). Cada
-  // utterance trae su `speaker` (entero) que el cliente pinta como «Hablante N».
-  diarize: 'true',
-}).toString();
+// Parámetros de Deepgram + "keyterm prompting" con vocabulario fiscal-contable
+// MX para subir la precisión en jerga de dominio y anglicismos (Spanglish). El
+// keyterm es contextual (no fuerza), seguro aunque el audio no sea contable.
+// Límite Deepgram: ~500 tokens; recortamos a 100 términos por seguridad.
+function buildDgParams(): string {
+  const p = new URLSearchParams({
+    model: 'nova-3',
+    language: 'es',
+    smart_format: 'true',
+    punctuate: 'true',
+    utterances: 'true',
+    // Diarización: separa por hablante (útil para reuniones/entrevistas). Cada
+    // utterance trae su `speaker` (entero) que el cliente pinta como «Hablante N».
+    diarize: 'true',
+  });
+  for (const term of DOMAIN_KEYTERMS.slice(0, 100)) p.append('keyterm', term);
+  return p.toString();
+}
+
+const DG_PARAMS = buildDgParams();
 
 interface Utterance {
   start: number;
