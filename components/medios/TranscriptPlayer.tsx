@@ -5,10 +5,11 @@ import {
   useCallback,
   useEffect,
   useImperativeHandle,
+  useMemo,
   useRef,
   useState,
 } from 'react';
-import { Play } from 'lucide-react';
+import { Play, Search, ChevronUp, ChevronDown, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { ToolAccent } from '@/lib/tools';
 import {
@@ -35,6 +36,11 @@ type Props = {
  *  el reproductor a un momento concreto. */
 export type TranscriptPlayerHandle = { seekTo: (time: number) => void };
 
+/** Normaliza para buscar sin distinguir mayúsculas ni acentos. */
+function norm(s: string): string {
+  return s.normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase();
+}
+
 /**
  * Transcripción viva: reproductor + segmentos sincronizados. Tocar una línea
  * salta el audio ahí; mientras suena, la línea activa se resalta y el panel se
@@ -54,8 +60,56 @@ function TranscriptPlayer(
   const editingRef = useRef(false);
   const [activeIndex, setActiveIndex] = useState(-1);
   const [playing, setPlaying] = useState(false);
+  // Búsqueda dentro de la transcripción (resalta y navega coincidencias).
+  const [query, setQuery] = useState('');
+  const [cursor, setCursor] = useState(0);
 
   const hasSpeakers = chunks.some((c) => c.speaker != null);
+
+  // Centra una línea en el panel de la transcripción (reutilizable: seguimiento
+  // de la reproducción y salto entre coincidencias de búsqueda).
+  const centerRow = useCallback((index: number) => {
+    const el = rowRefs.current[index];
+    const cont = listRef.current;
+    if (!el || !cont) return;
+    const er = el.getBoundingClientRect();
+    const cr = cont.getBoundingClientRect();
+    const delta = er.top - cr.top - (cont.clientHeight / 2 - el.clientHeight / 2);
+    cont.scrollTo({ top: cont.scrollTop + delta, behavior: 'smooth' });
+  }, []);
+
+  // Texto normalizado por segmento (una sola vez por transcripción) para buscar
+  // sin acentos ni mayúsculas y sin recalcular en cada tecla.
+  const normTexts = useMemo(() => chunks.map((c) => norm(c.text)), [chunks]);
+  const matches = useMemo(() => {
+    const q = norm(query.trim());
+    if (!q) return [];
+    const out: number[] = [];
+    normTexts.forEach((t, i) => {
+      if (t.includes(q)) out.push(i);
+    });
+    return out;
+  }, [normTexts, query]);
+  const matchSet = useMemo(() => new Set(matches), [matches]);
+  const currentMatch = matches.length ? matches[Math.min(cursor, matches.length - 1)] : -1;
+
+  // Al cambiar la búsqueda: vuelve a la primera coincidencia y la trae a la vista.
+  useEffect(() => {
+    setCursor(0);
+    if (matches.length) centerRow(matches[0]);
+  }, [matches, centerRow]);
+
+  const goToMatch = useCallback(
+    (dir: 1 | -1) => {
+      if (!matches.length) return;
+      setCursor((c) => {
+        const next = (c + dir + matches.length) % matches.length;
+        centerRow(matches[next]);
+        return next;
+      });
+    },
+    [matches, centerRow]
+  );
 
   // Sincroniza el segmento activo con la reproducción.
   useEffect(() => {
@@ -155,6 +209,70 @@ function TranscriptPlayer(
         corregirlo.
       </p>
 
+      {/* Buscar dentro de la transcripción (resalta y navega coincidencias). */}
+      {chunks.length > 6 && (
+        <div className="mb-2 flex items-center gap-2">
+          <div className="relative flex-1">
+            <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <input
+              type="text"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  goToMatch(e.shiftKey ? -1 : 1);
+                } else if (e.key === 'Escape' && query) {
+                  e.preventDefault();
+                  setQuery('');
+                }
+              }}
+              placeholder="Buscar en la transcripción…"
+              aria-label="Buscar en la transcripción"
+              className="h-9 w-full rounded-lg border-2 border-ink/20 bg-surface pl-8 pr-8 text-sm text-ink outline-none transition-colors duration-150 focus-visible:border-ink focus-visible:ring-2 focus-visible:ring-ink"
+            />
+            {query && (
+              <button
+                type="button"
+                onClick={() => setQuery('')}
+                aria-label="Limpiar búsqueda"
+                className="absolute right-1.5 top-1/2 flex h-6 w-6 -translate-y-1/2 items-center justify-center rounded text-muted-foreground transition-colors duration-150 hover-fine:bg-muted hover-fine:text-ink"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            )}
+          </div>
+          {query.trim() && (
+            <div className="flex shrink-0 items-center gap-1">
+              <span
+                className="min-w-[3rem] text-right font-mono text-xs tabular-nums text-muted-foreground"
+                aria-live="polite"
+              >
+                {matches.length ? `${cursor + 1}/${matches.length}` : '0/0'}
+              </span>
+              <button
+                type="button"
+                onClick={() => goToMatch(-1)}
+                disabled={!matches.length}
+                aria-label="Coincidencia anterior"
+                className="flex h-8 w-8 items-center justify-center rounded-lg border-2 border-ink/20 text-ink transition-colors duration-150 hover-fine:border-ink hover-fine:bg-muted disabled:opacity-40"
+              >
+                <ChevronUp className="h-4 w-4" strokeWidth={2.5} />
+              </button>
+              <button
+                type="button"
+                onClick={() => goToMatch(1)}
+                disabled={!matches.length}
+                aria-label="Coincidencia siguiente"
+                className="flex h-8 w-8 items-center justify-center rounded-lg border-2 border-ink/20 text-ink transition-colors duration-150 hover-fine:border-ink hover-fine:bg-muted disabled:opacity-40"
+              >
+                <ChevronDown className="h-4 w-4" strokeWidth={2.5} />
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Transcripción sincronizada */}
       <div
         ref={listRef}
@@ -164,6 +282,8 @@ function TranscriptPlayer(
         {chunks.map((c, i) => {
           const start = c.timestamp[0] ?? 0;
           const isActive = i === activeIndex;
+          const isMatch = matchSet.has(i);
+          const isCurrentMatch = i === currentMatch;
           const showSpeaker =
             c.speaker != null && c.speaker !== chunks[i - 1]?.speaker;
           return (
@@ -174,7 +294,9 @@ function TranscriptPlayer(
               }}
               className={cn(
                 'border-b-2 border-ink/10 px-3 py-2 transition-colors duration-200 last:border-b-0 sm:px-4 sm:py-2.5',
-                isActive ? accent.soft : 'hover-fine:bg-muted'
+                isActive ? accent.soft : !isMatch && 'hover-fine:bg-muted',
+                isMatch && !isActive && 'bg-amber-200/60',
+                isCurrentMatch && 'ring-2 ring-inset ring-ink'
               )}
             >
               {showSpeaker && c.speaker != null && (
