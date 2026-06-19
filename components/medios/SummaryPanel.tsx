@@ -7,9 +7,9 @@ import {
   Gavel,
   ListTodo,
   Copy,
-  Loader2,
   AlertCircle,
 } from 'lucide-react';
+import ResolveSpinner from '@/components/ResolveSpinner';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import type { ToolAccent } from '@/lib/tools';
@@ -210,7 +210,7 @@ export default function SummaryPanel({ text, baseName, accent }: Props) {
         aria-busy={phase === 'loading'}
       >
         {phase === 'loading' ? (
-          <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+          <ResolveSpinner className="mr-2 h-5 w-5" />
         ) : (
           <Sparkles className="mr-2 h-5 w-5" />
         )}

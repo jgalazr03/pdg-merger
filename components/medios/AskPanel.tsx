@@ -1,7 +1,8 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { Play, Loader2, CornerDownLeft, AlertCircle } from 'lucide-react';
+import { Play, CornerDownLeft, AlertCircle } from 'lucide-react';
+import ResolveSpinner from '@/components/ResolveSpinner';
 import { cn } from '@/lib/utils';
 import type { ToolAccent } from '@/lib/tools';
 import {
@@ -146,7 +147,7 @@ export default function AskPanel({ chunks, accent, names, onSeek }: Props) {
               </div>
               {turn.loading ? (
                 <p className="flex items-center gap-2 text-[13px] text-muted-foreground sm:text-sm">
-                  <Loader2 className={cn('h-4 w-4 animate-spin', accent.text)} />
+                  <ResolveSpinner className={cn('h-4 w-4', accent.text)} />
                   Pensando…
                 </p>
               ) : turn.error ? (
@@ -233,7 +234,7 @@ export default function AskPanel({ chunks, accent, names, onSeek }: Props) {
           aria-label="Preguntar"
         >
           {busy ? (
-            <Loader2 className="h-5 w-5 animate-spin" />
+            <ResolveSpinner className="h-5 w-5" />
           ) : (
             <CornerDownLeft className="h-5 w-5" />
           )}

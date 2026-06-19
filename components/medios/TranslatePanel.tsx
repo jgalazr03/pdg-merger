@@ -1,7 +1,8 @@
 'use client';
 
 import { useState } from 'react';
-import { Languages, Loader2, Copy, AlertCircle } from 'lucide-react';
+import { Languages, Copy, AlertCircle } from 'lucide-react';
+import ResolveSpinner from '@/components/ResolveSpinner';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import type { ToolAccent } from '@/lib/tools';
@@ -118,7 +119,7 @@ export default function TranslatePanel({ chunks, accent, baseName }: Props) {
           aria-busy={phase === 'loading'}
         >
           {phase === 'loading' ? (
-            <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+            <ResolveSpinner className="mr-2 h-5 w-5" />
           ) : (
             <Languages className="mr-2 h-5 w-5" />
           )}

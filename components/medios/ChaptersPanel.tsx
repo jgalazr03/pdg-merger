@@ -1,7 +1,8 @@
 'use client';
 
 import { useState } from 'react';
-import { ListTree, Play, Loader2, Copy, AlertCircle } from 'lucide-react';
+import { ListTree, Play, Copy, AlertCircle } from 'lucide-react';
+import ResolveSpinner from '@/components/ResolveSpinner';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import type { ToolAccent } from '@/lib/tools';
@@ -114,7 +115,7 @@ export default function ChaptersPanel({ chunks, accent, names, onSeek }: Props) 
               aria-busy={phase === 'loading'}
             >
               {phase === 'loading' ? (
-                <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                <ResolveSpinner className="mr-2 h-5 w-5" />
               ) : (
                 <ListTree className="mr-2 h-5 w-5" />
               )}
