@@ -35,7 +35,7 @@ export default function VocabEditor({ terms, onChange, accent }: Props) {
     <div className="mt-4 rounded-lg border-2 border-ink/15 bg-card p-3">
       <div className="mb-1 flex items-center gap-2">
         <BookMarked className={cn('h-4 w-4', accent.text)} strokeWidth={2.5} />
-        <h3 className="text-sm font-bold text-ink">Vocabulario del despacho</h3>
+        <h3 className="text-sm font-bold text-ink">Vocabulario personalizado</h3>
         <span className="text-xs text-muted-foreground">(opcional)</span>
       </div>
       <p className="mb-2.5 text-xs leading-relaxed text-muted-foreground">
@@ -54,7 +54,7 @@ export default function VocabEditor({ terms, onChange, accent }: Props) {
               add();
             }
           }}
-          placeholder="p. ej. Grupo Aresa, ISR diferido…"
+          placeholder="p. ej. Grupo Aresa, nombres propios, siglas…"
           aria-label="Agregar término al vocabulario"
           maxLength={60}
           className="h-9 min-w-0 flex-1 rounded-lg border-2 border-ink/20 bg-surface px-3 text-sm text-ink outline-none transition-colors duration-150 focus-visible:border-ink focus-visible:ring-2 focus-visible:ring-ink"
