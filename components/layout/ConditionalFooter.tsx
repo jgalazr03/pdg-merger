@@ -10,8 +10,11 @@ import SiteFooter from './SiteFooter';
  * + lienzo a pantalla completa, sin footer que distraiga durante la tarea
  * (patrón de Figma, Linear, Notion, Stripe Dashboard). La privacidad ya se
  * comunica dentro de cada herramienta, en el hero del ToolShell.
+ *
+ * Superficies de marketing/descubrimiento (llevan footer): la portada de cada
+ * módulo (`/` = Documentos, `/medios`) y el índice global (`/herramientas`).
  */
-const MARKETING_ROUTES = new Set(['/']);
+const MARKETING_ROUTES = new Set(['/', '/medios', '/herramientas']);
 
 export default function ConditionalFooter() {
   const pathname = usePathname();

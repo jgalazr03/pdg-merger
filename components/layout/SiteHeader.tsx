@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { usePathname } from 'next/navigation';
-import { Menu, ChevronDown, LayoutGrid, Search } from 'lucide-react';
+import { Menu, ChevronDown, ChevronRight, LayoutGrid, Search } from 'lucide-react';
 import {
   TOOLS,
   toolsByCategory,
@@ -384,6 +384,21 @@ export default function SiteHeader() {
                   );
                 })}
               </div>
+
+              {/* Índice global: la página /herramientas (buscador + filtros). */}
+              <Link
+                href="/herramientas"
+                onClick={() => setMegaOpen(false)}
+                className="mt-1.5 flex items-center justify-between gap-3 rounded-lg border-3 border-ink/15 px-3 py-2.5 transition-colors duration-150 hover-fine:border-ink hover-fine:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink"
+              >
+                <span className="text-sm font-bold text-ink">
+                  Todas las herramientas
+                </span>
+                <ChevronRight
+                  className="h-4 w-4 shrink-0 text-muted-foreground"
+                  aria-hidden="true"
+                />
+              </Link>
             </div>
           )}
         </div>
@@ -428,6 +443,23 @@ export default function SiteHeader() {
                   className="w-full rounded-lg border-3 border-ink bg-surface py-2.5 pl-9 pr-3 text-base font-bold text-ink placeholder:font-normal placeholder:text-muted-foreground focus:outline-none focus-visible:outline-none focus-visible:bg-muted"
                 />
               </div>
+
+              {/* Índice global como CTA fijo (oculto al buscar, para dejar
+                  sitio a los resultados). Paralelo al "Buscar" del desktop. */}
+              {!menuQuery.trim() && (
+                <SheetClose asChild>
+                  <Link
+                    href="/herramientas"
+                    className="mb-4 flex shrink-0 items-center justify-between gap-3 rounded-lg border-3 border-ink bg-ink px-3 py-2.5 text-white transition-opacity duration-150 hover-fine:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink focus-visible:ring-offset-2"
+                  >
+                    <span className="flex items-center gap-3 text-sm font-bold">
+                      <LayoutGrid className="h-5 w-5 shrink-0" aria-hidden="true" />
+                      Todas las herramientas
+                    </span>
+                    <ChevronRight className="h-4 w-4 shrink-0" aria-hidden="true" />
+                  </Link>
+                </SheetClose>
+              )}
 
               <nav
                 ref={setNavRef}

@@ -943,6 +943,25 @@ export const TOOLS: ToolDef[] = [
 export const getTool = (slug: ToolSlug): ToolDef =>
   TOOLS.find((t) => t.slug === slug)!;
 
+/**
+ * Herramientas estrella, en curaduría editorial (no derivable del catálogo).
+ * Alimentan accesos rápidos donde el catálogo completo abrumaría —el footer—:
+ * el patrón big-tech es que el footer sea un sitemap curado, no la lista de las
+ * 30+ herramientas (eso vive en ⌘K, en el catálogo y en /herramientas).
+ */
+const FEATURED_SLUGS: ToolSlug[] = [
+  'unir',
+  'dividir',
+  'comprimir',
+  'convertir',
+  'ocr',
+  'transcribir',
+];
+
+/** Destacadas resueltas a su `ToolDef`, en el orden del catálogo (`TOOLS`). */
+export const featuredTools = (): ToolDef[] =>
+  TOOLS.filter((t) => FEATURED_SLUGS.includes(t.slug));
+
 /** Etiqueta visible de cada categoría. */
 export const CATEGORY_LABELS: Record<ToolCategory, string> = {
   organizar: 'Organizar',
