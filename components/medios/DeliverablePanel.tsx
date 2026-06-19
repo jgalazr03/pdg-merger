@@ -1,13 +1,15 @@
 'use client';
 
 import { useState } from 'react';
-import { FileText, Loader2, Copy, Download, AlertCircle } from 'lucide-react';
+import { FileText, Loader2, Copy, AlertCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import type { ToolAccent } from '@/lib/tools';
 import { type Chunk, type SpeakerNames, plainText } from '@/lib/transcript';
+import { downloadMarkdownAsDocx } from '@/lib/docx';
 import { Button } from '@/components/ui/button';
 import Markdown from '@/components/medios/Markdown';
+import DownloadMenu from '@/components/medios/DownloadMenu';
 
 type Props = {
   chunks: Chunk[];
@@ -35,6 +37,12 @@ function downloadText(content: string, filename: string) {
   link.click();
   document.body.removeChild(link);
   URL.revokeObjectURL(url);
+}
+
+function downloadDocx(md: string, filename: string) {
+  void downloadMarkdownAsDocx(md, filename)
+    .then(() => toast.success('Documento Word listo'))
+    .catch(() => toast.error('No se pudo generar el Word'));
 }
 
 /**
@@ -140,15 +148,21 @@ export default function DeliverablePanel({ chunks, accent, baseName, names }: Pr
                 <Copy className="mr-2 h-4 w-4" />
                 Copiar
               </Button>
-              <Button
-                variant="outline"
-                onClick={() =>
-                  downloadText(content, `${baseName}-${fileBase}.md`)
-                }
-              >
-                <Download className="mr-2 h-4 w-4" />
-                Descargar .md
-              </Button>
+              <DownloadMenu
+                className={accent.solid}
+                items={[
+                  {
+                    label: 'Word (.docx)',
+                    onSelect: () =>
+                      downloadDocx(content, `${baseName}-${fileBase}.docx`),
+                  },
+                  {
+                    label: 'Markdown (.md)',
+                    onSelect: () =>
+                      downloadText(content, `${baseName}-${fileBase}.md`),
+                  },
+                ]}
+              />
             </div>
           </div>
         )}

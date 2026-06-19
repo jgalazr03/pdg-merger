@@ -1,9 +1,12 @@
 # Storyboard — Experiencia Higgsfield (modo: ambiental coherente)
 
-Pipeline: **keyframes (Soul) → animar (image-to-video) → integrar en Next**.
-Los assets de Higgsfield son archivos (PNG/MP4/WebM) que incrustamos; Higgsfield
+Pipeline: **keyframe (Recraft 4.1, vector + paleta bloqueada) → animar (Kling 3.0,
+start=end frame para loop) → integrar en Next**.
+Los assets de Higgsfield son archivos (SVG/MP4/WebM) que incrustamos; Higgsfield
 NO es la UI en runtime. La experiencia **envuelve, no bloquea**: respeta el valor
 de la app ("resueltos al instante" + privacidad client-side).
+Detalle técnico del pipeline (modelos, costos, trucos): ver memoria
+`higgsfield-experience-pipeline`.
 
 ---
 
@@ -46,7 +49,10 @@ documento limpio, al instante. Todos los beats son variaciones de eso.
 
 ## Beats (Fase 1 = los 3 primeros)
 
-### Beat 1 — HERO · "El documento que se resuelve"
+### Beat 1 — HERO · "El documento que se resuelve" ✅ HECHO
+- **Estado:** integrado en `app/page.tsx` (columna derecha del hero). Assets en
+  `public/higgsfield/hero/` (`hero.mp4` + `hero.webm` + `hero.svg` póster).
+  Keyframe elegido: variante 1 de `docs/higgsfield/keyframes/hero-v1/`.
 - **Dónde:** junto/detrás del H1 del landing (`app/page.tsx`). Loop sutil.
 - **Aspect:** 16:9 (probar 21:9 si va como banda).
 - **Keyframe (Soul):**
