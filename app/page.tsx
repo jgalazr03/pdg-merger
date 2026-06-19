@@ -1,4 +1,4 @@
-import AmbientMedia from '@/components/AmbientMedia';
+import ResolveFigure from '@/components/ResolveFigure';
 import ToolCatalog from '@/components/landing/ToolCatalog';
 import ModuleSwitcher from '@/components/landing/ModuleSwitcher';
 
@@ -6,16 +6,15 @@ export default function Home() {
   return (
     <div className="container mx-auto max-w-6xl py-12 pl-[max(20px,env(safe-area-inset-left))] pr-[max(20px,env(safe-area-inset-right))] sm:py-14 md:py-20">
       <section className="mb-10 motion-safe:animate-fade-in sm:mb-14">
-        {/* Hero a dos columnas en pantallas medianas: el texto manda (queda a la
-            izquierda y primero en el flujo), la media ambiental acompaña a la
-            derecha. En móvil se apila —texto arriba— para no empujar las
-            herramientas: la app sigue sintiéndose "al instante". */}
-        <div className="grid items-center gap-8 md:grid-cols-[1.1fr_1fr] md:gap-12">
+        {/* Hero a dos columnas: el titular manda (izquierda, primero en el flujo)
+            y el documento "resolve" acompaña como figura de línea a la derecha.
+            En móvil se apila —texto arriba—; nada de fondo, la figura vive sobre
+            el papel como el resto del sistema. */}
+        <div className="grid items-center gap-8 md:grid-cols-[1.1fr_0.9fr] md:gap-12">
           <div className="max-w-xl">
             {/* Tamaño fluido (clamp) en vez de saltos por breakpoint: en Roboto
                 Mono —glifos anchos— un `text-4xl` fijo desbordaba en teléfonos
-                chicos. El salto de línea solo se fuerza con sitio (≥400px); por
-                debajo, envuelve solo. */}
+                chicos. El salto de línea solo se fuerza con sitio (≥400px). */}
             <h1 className="text-[clamp(1.65rem,8vw,3.75rem)] font-bold leading-[1.05] tracking-tight text-ink">
               Tus documentos,
               <br className="hidden min-[400px]:block" /> resueltos al instante.
@@ -25,13 +24,7 @@ export default function Home() {
               desde tu navegador.
             </p>
           </div>
-          <AmbientMedia
-            src="/higgsfield/hero/hero.mp4"
-            srcWebm="/higgsfield/hero/hero.webm"
-            poster="/higgsfield/hero/hero.svg"
-            alt="Hojas de papel dispersas que se reúnen en un documento encuadernado"
-            loop={false}
-          />
+          <ResolveFigure variant="documents" />
         </div>
       </section>
 

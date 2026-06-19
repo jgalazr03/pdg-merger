@@ -1,106 +1,57 @@
-# Storyboard — Experiencia Higgsfield (modo: ambiental coherente)
+# Storyboard — Experiencia "El Orden Instantáneo"
 
-Pipeline: **keyframe (Recraft 4.1, vector + paleta bloqueada) → animar (Kling 3.0,
-start=end frame para loop) → integrar en Next**.
-Los assets de Higgsfield son archivos (SVG/MP4/WebM) que incrustamos; Higgsfield
-NO es la UI en runtime. La experiencia **envuelve, no bloquea**: respeta el valor
-de la app ("resueltos al instante" + privacidad client-side).
-Detalle técnico del pipeline (modelos, costos, trucos): ver memoria
-`higgsfield-experience-pipeline`.
+## Concepto (el motivo firma)
 
----
+Todo el producto en un gesto: **el desorden que se resuelve en orden, al
+instante.** No una pila de hojas (literal, caricaturesco), sino **una sola hoja**
+cuyo contenido —texto reducido a trazos navy— pasa de *desalineado* a
+*perfectamente alineado*, con **un único acento teal en el instante de
+resolución**. Reductivo, preciso, con el alma de "documento" intacta.
 
-## Dirección de arte (la regla, para TODOS los prompts)
+Tono de referencia (de PRODUCT.md): **Linear / Raycast** — rápido, enfocado, cero
+ruido. El cromo **acompaña, nunca compite** con la tarea. Test anti-slop: si
+parece "hecho por IA", falló.
 
-Anclada a los tokens reales del sistema neo-brutalista:
+## El motivo se vuelve sistema
 
-| Rol            | Hex        | Uso en los assets                              |
-| -------------- | ---------- | ---------------------------------------------- |
-| Papel / fondo  | `#fcfaf7`  | fondo cálido casi blanco, SIEMPRE              |
-| Navy / ink     | `#000044`  | líneas, bordes gruesos, "texto" sugerido       |
-| Teal           | `#0d9488`  | un solo acento de línea, mínimo                 |
-| Arena / panel  | `#f3ead9`  | superficies/tarjetas si hace falta volumen      |
-| Rojo señal     | `#c60014`  | PROHIBIDO en ambiente (solo = error en la app) |
+El mismo gesto se repite en tres momentos → cohesión "hecho por un solo equipo":
 
-Principios no negociables (van como estilo en cada prompt):
-- **Bicromo papel+navy.** Casi monocromo. Teal solo como un toque.
-- **Tinta sobre papel / risograph / editorial plano.** Nada de realismo 3D,
-  nada de gradientes lujosos, nada de lens flare, nada de bokeh cinematográfico.
-- **Geometría rígida, bordes gruesos** (3–4px equivalente). Es la firma.
-- **Movimiento contenido y mecánico.** Loops cortos, cámara casi fija, sin
-  easing dramático. La emoción está en la *resolución* (caos→orden), no en la
-  cámara.
-- Texto = **sugerido** con rayas/barras navy, nunca letras reales (evita gibberish).
+1. **Hero** — el *resolve* como **figura de línea, sin fondo**, una vez al llegar. ✅ HECHO: `components/ResolveFigure.tsx` (variantes `documents` y `medios`).
+2. **Procesando** — los trazos a medio alinear, en loop sutil (el trabajo ocurriendo). Pendiente.
+3. **Listo** — trazos cuadrados + tick teal de confirmación. Pendiente.
 
-Cola anti-deriva para pegar al final de cada prompt de Soul:
-> flat editorial risograph illustration, two-tone warm paper #fcfaf7 and deep
-> navy ink #000044, single teal #0d9488 line accent, thick clean outlines, no
-> gradients, no lens flare, no 3D realism, no photographic depth of field,
-> minimal, restrained, high contrast print aesthetic.
+## Pipeline (quién hace qué)
 
----
+- **Higgsfield = exploración y definición del look.** Recraft 4.1 (vector, paleta
+  bloqueada) para generar bocetos rápidos y *especificar* la estética. Los
+  bocetos viven en `docs/higgsfield/keyframes/`. El boceto guía es
+  `hero-v3-resolve/order-2` (la hoja resuelta + marca teal).
+- **Código = el movimiento que importa.** Un motivo geométrico tan preciso se
+  anima en SVG/React (no en video de IA): cada trazo se alinea con
+  `ease-out-expo`, timing perfecto, ~0 KB, paleta exacta, anti-slop total. Kling
+  interpolaría geometría fina con artefactos y pesaría MB.
+  (Higgsfield/Kling se reserva para piezas ricas/texturadas, no para esto.)
 
-## El "story": Caos → Orden
+## Dirección de arte
 
-La narrativa ya vive en la app: páginas dispersas que se **resuelven** en un
-documento limpio, al instante. Todos los beats son variaciones de eso.
+- **Menos elementos, más grandes.** El papel respira (mucho espacio negativo).
+- **Encuadre estable**, solo cambia el *orden* → un *snap* elegante, no un revoltijo.
+- **Mono estricto:** navy `#000044` + papel `#fcfaf7`; teal `#0d9488` SOLO como el
+  beat de resolución (Regla del Sub-acento Callado). **Cero rojo** (acción, ≤10%).
+- **Movimiento:** `cubic-bezier(0.16,1,0.3,1)` (ease-out-expo), asentamiento
+  confiado, sin bounce. Solo `transform`/`opacity`. `prefers-reduced-motion` →
+  estado resuelto fijo, sin animación.
+- Marco: hoja con borde navy grueso (`border-4 border-ink`, `rounded-lg`), como
+  los paneles del sistema.
 
----
+## Estado y limpieza
 
-## Beats (Fase 1 = los 3 primeros)
-
-### Beat 1 — HERO · "El documento que se resuelve" ✅ HECHO
-- **Estado:** integrado en `app/page.tsx` (columna derecha del hero). Assets en
-  `public/higgsfield/hero/` (`hero.mp4` + `hero.webm` + `hero.svg` póster).
-  Keyframe elegido: variante 1 de `docs/higgsfield/keyframes/hero-v1/`.
-- **Dónde:** junto/detrás del H1 del landing (`app/page.tsx`). Loop sutil.
-- **Aspect:** 16:9 (probar 21:9 si va como banda).
-- **Keyframe (Soul):**
-  > Top-down view of several loose paper sheets, slightly rotated and scattered
-  > on a warm paper surface, converging and stacking into one clean bound
-  > document with a thick navy outline; text on the pages suggested only as navy
-  > horizontal bars; a single teal line marks the binding seam. [+ cola anti-deriva]
-- **Animación (image-to-video):** las hojas se deslizan y se apilan en su sitio,
-  ensamblaje mecánico de ~2–3s; cámara fija top-down. Loop seamless.
-
-### Beat 2 — PROCESANDO · "Tinta que alinea"
-- **Dónde:** overlay/inline mientras una herramienta procesa (OCR, unir, comprimir).
-- **Aspect:** 1:1 (loop perfecto).
-- **Keyframe (Soul):**
-  > A column of short navy ink bars on warm paper, progressively aligning into a
-  > neat justified block, a thin teal progress line sweeping down; flat minimal,
-  > thick framing border. [+ cola anti-deriva]
-- **Animación:** barrido teal de arriba a abajo + barras que se alinean; bucle
-  perfecto sin "salto". Corto (~1.5–2s).
-
-### Beat 3 — VACÍO / DROP ZONE · "Papel en reposo, listo"
-- **Dónde:** zona de soltar archivos antes de cargar.
-- **Aspect:** 4:3 o 1:1 (según contenedor).
-- **Keyframe (Soul):**
-  > A single document outline with a thick navy dashed border and a folded
-  > corner, centered on warm paper, calm and waiting; subtle teal pulse on the
-  > dashed edge. [+ cola anti-deriva]
-- **Animación:** "respiración" mínima (escala 1.0↔1.01) + pulso teal en el borde.
-  Muy lento, casi imperceptible.
-
-### Fase 2 (después de validar el look)
-- Acentos por módulo (Documentos vs Medios), transiciones entre herramientas.
-
----
-
-## Integración en Next (cuando lleguen los clips)
-
-- Formato: **WebM (VP9) + MP4 (H.264) fallback** + `poster` con el keyframe PNG.
-- `loading="lazy"`, `muted`, `playsinline`, `loop`; pausar fuera de viewport.
-- `prefers-reduced-motion: reduce` → mostrar **solo el poster estático**.
-- Peso objetivo: ambiente = ligero. Loops cortos, recorte agresivo. El hero no
-  debe retrasar la interacción con el catálogo (la app sigue siendo "al instante").
-
----
-
-## Orden de producción (lean)
-
-1. Generar **solo el Beat 1 (hero)** en Soul, iterar hasta que el look encaje.
-2. Validar contra la UI real antes de producir Beats 2 y 3 (no producir los tres
-   a ciegas).
-3. Animar → integrar el hero → medir que no rompe velocidad → seguir.
+- **Aterrizaje final:** el motivo vive como **figura de línea sin fondo**
+  (`ResolveFigure`), navy sobre papel, en documentos (`app/page.tsx`) y medios
+  (`app/medios/page.tsx`). Se descartaron en el camino: la versión flat con marco
+  (HeroResolve/MediosResolve) y el hero "stage" oscuro tipo Railway (HeroStage) —
+  rompía el lenguaje neo-brutalista. Todos borrados.
+- **Sin uso / a borrar:** `public/higgsfield/hero/*` (~5 MB, video del intento 1),
+  `components/AmbientMedia.tsx`, `components/ResolveSpinner.tsx` (micro-motivo para
+  estados "procesando", opcional/pendiente).
+- Bocetos de exploración (registro de diseño): `docs/higgsfield/keyframes/`.

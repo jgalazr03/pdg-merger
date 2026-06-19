@@ -210,3 +210,33 @@
     @apply block font-bold text-ink;
   }
 }
+
+/*
+ * Micro-motivo "resolve": un trazo que se alinea (de desplazado/tenue a su sitio).
+ * Lo usa ResolveSpinner como indicador de "trabajando". La cascada se logra con
+ * `animation-delay` por trazo; `alternate` lo hace latir. El catch-all de
+ * prefers-reduced-motion (arriba) lo congela alineado.
+ */
+@keyframes resolve-shuffle {
+  from {
+    transform: translateX(var(--rs-shift, -4px));
+    opacity: 0.35;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+/*
+ * Scan teal que recorre la figura del hero como un flujo de datos (lo usa
+ * ResolveFigure). El catch-all de prefers-reduced-motion lo neutraliza.
+ */
+@keyframes hero-scan {
+  0% {
+    transform: translateY(-130%);
+  }
+  100% {
+    transform: translateY(330%);
+  }
+}

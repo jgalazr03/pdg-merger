@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import ResolveFigure from '@/components/ResolveFigure';
 import ToolCatalog from '@/components/landing/ToolCatalog';
 import ModuleSwitcher from '@/components/landing/ModuleSwitcher';
 
@@ -11,15 +12,23 @@ export const metadata: Metadata = {
 export default function MediosPage() {
   return (
     <div className="container mx-auto max-w-6xl py-12 pl-[max(20px,env(safe-area-inset-left))] pr-[max(20px,env(safe-area-inset-right))] sm:py-14 md:py-20">
-      <section className="mb-10 max-w-3xl motion-safe:animate-fade-in sm:mb-14">
-        <h1 className="text-[clamp(1.65rem,8vw,3.75rem)] font-bold leading-[1.05] tracking-tight text-ink">
-          Tus grabaciones,
-          <br className="hidden min-[400px]:block" /> convertidas en texto.
-        </h1>
-        <p className="mt-5 max-w-xl text-base leading-relaxed text-muted-foreground sm:mt-6 sm:text-lg">
-          Transcribe audio y video a texto en español, directo desde tu
-          navegador.
-        </p>
+      <section className="mb-10 motion-safe:animate-fade-in sm:mb-14">
+        {/* Mismo lenguaje que documentos: titular + figura de línea (sin fondo).
+            Aquí la figura es la variante de medios: la onda de audio se calma y
+            la transcripción se alinea — sonido convertido en texto. */}
+        <div className="grid items-center gap-8 md:grid-cols-[1.1fr_0.9fr] md:gap-12">
+          <div className="max-w-xl">
+            <h1 className="text-[clamp(1.65rem,8vw,3.75rem)] font-bold leading-[1.05] tracking-tight text-ink">
+              Tus grabaciones,
+              <br className="hidden min-[400px]:block" /> convertidas en texto.
+            </h1>
+            <p className="mt-5 max-w-xl text-base leading-relaxed text-muted-foreground sm:mt-6 sm:text-lg">
+              Transcribe audio y video a texto en español, directo desde tu
+              navegador.
+            </p>
+          </div>
+          <ResolveFigure variant="medios" />
+        </div>
       </section>
 
       <section>
