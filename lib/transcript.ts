@@ -74,7 +74,7 @@ export function plainText(chunks: Chunk[], names?: SpeakerNames): string {
   const hasSpeakers = chunks.some((c) => c.speaker != null);
   if (!hasSpeakers) {
     return chunks
-      .map((c) => c.text.trim())
+      .map((c) => (c.text ?? '').trim())
       .join(' ')
       .replace(/\s+/g, ' ')
       .trim();
@@ -88,9 +88,9 @@ export function plainText(chunks: Chunk[], names?: SpeakerNames): string {
     if (sp !== current) {
       if (buffer) lines.push(buffer.trim());
       current = sp;
-      buffer = `${speakerLabel(sp, names)}: ${c.text.trim()}`;
+      buffer = `${speakerLabel(sp, names)}: ${(c.text ?? '').trim()}`;
     } else {
-      buffer += ` ${c.text.trim()}`;
+      buffer += ` ${(c.text ?? '').trim()}`;
     }
   }
   if (buffer) lines.push(buffer.trim());
@@ -107,7 +107,7 @@ export function transcriptWithSeconds(
     .map((c) => {
       const t = Math.round(c.timestamp[0] ?? 0);
       const who = c.speaker != null ? ` ${speakerLabel(c.speaker, names)}:` : '';
-      return `[${t}]${who} ${c.text.trim()}`;
+      return `[${t}]${who} ${(c.text ?? '').trim()}`;
     })
     .join('\n');
 }
@@ -118,7 +118,7 @@ export function timedText(chunks: Chunk[], names?: SpeakerNames): string {
     .map((c) => {
       const stamp = `[${clock(c.timestamp[0] ?? 0)}]`;
       const who = c.speaker != null ? ` ${speakerLabel(c.speaker, names)}:` : '';
-      return `${stamp}${who} ${c.text.trim()}`;
+      return `${stamp}${who} ${(c.text ?? '').trim()}`;
     })
     .join('\n');
 }
@@ -129,7 +129,7 @@ export function toSrt(chunks: Chunk[]): string {
     .map((c, i) => {
       const start = c.timestamp[0] ?? 0;
       const end = endOf(chunks, i);
-      return `${i + 1}\n${srtTime(start)} --> ${srtTime(end)}\n${c.text.trim()}`;
+      return `${i + 1}\n${srtTime(start)} --> ${srtTime(end)}\n${(c.text ?? '').trim()}`;
     })
     .join('\n\n');
 }
@@ -140,7 +140,7 @@ export function toVtt(chunks: Chunk[]): string {
     .map((c, i) => {
       const start = c.timestamp[0] ?? 0;
       const end = endOf(chunks, i);
-      return `${vttTime(start)} --> ${vttTime(end)}\n${c.text.trim()}`;
+      return `${vttTime(start)} --> ${vttTime(end)}\n${(c.text ?? '').trim()}`;
     })
     .join('\n\n');
   return `WEBVTT\n\n${body}`;

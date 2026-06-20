@@ -16,6 +16,7 @@ import { toast } from 'sonner';
 import { getTool, type ToolDef } from '@/lib/tools';
 import { cn, scrollIntoViewSafe } from '@/lib/utils';
 import ToolShell from '@/components/tools/ToolShell';
+import ErrorBoundary from '@/components/ErrorBoundary';
 import FileDropzone from '@/components/tools/FileDropzone';
 import ToolConstraints from '@/components/tools/ToolConstraints';
 import { Card, CardContent } from '@/components/ui/card';
@@ -568,7 +569,7 @@ export default function Transcriber({
             {/* Izquierda: reproductor + transcripción + exportar */}
             <div className="min-w-0 space-y-4">
               {chunks.length > 0 && previewUrl ? (
-                <>
+                <ErrorBoundary label="el reproductor de la transcripción">
                   <SpeakerNamer
                     chunks={chunks}
                     names={speakerNames}
@@ -585,7 +586,7 @@ export default function Transcriber({
                     names={speakerNames}
                     onChange={handleEdit}
                   />
-                </>
+                </ErrorBoundary>
               ) : (
                 <Textarea
                   value={text}
@@ -652,17 +653,19 @@ export default function Transcriber({
             {/* Derecha: workspace de herramientas AI (pestañas, no pila de cards) */}
             {chunks.length > 0 && previewUrl && (
               <div className="min-w-0 lg:sticky lg:top-24 lg:self-start">
-                <AiWorkspace
-                  key={runId}
-                  chunks={chunks}
-                  text={text}
-                  accent={accent}
-                  baseName={baseName}
-                  names={speakerNames}
-                  defaultTab={defaultPanel}
-                  variant={variant}
-                  onSeek={(t) => playerRef.current?.seekTo(t)}
-                />
+                <ErrorBoundary label="las herramientas de IA">
+                  <AiWorkspace
+                    key={runId}
+                    chunks={chunks}
+                    text={text}
+                    accent={accent}
+                    baseName={baseName}
+                    names={speakerNames}
+                    defaultTab={defaultPanel}
+                    variant={variant}
+                    onSeek={(t) => playerRef.current?.seekTo(t)}
+                  />
+                </ErrorBoundary>
               </div>
             )}
           </div>

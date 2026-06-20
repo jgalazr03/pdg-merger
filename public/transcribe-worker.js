@@ -70,10 +70,20 @@ self.onmessage = async (event) => {
       stride_length_s: 5,
     });
 
+    // Whisper/transformers.js a veces emite un chunk sin `text` (límites de
+    // fragmento o silencios). Normalizamos para garantizar el contrato
+    // Chunk.text: string y evitar que los formateadores revienten al hacer .trim().
+    const chunks = Array.isArray(output.chunks)
+      ? output.chunks.map((c) => ({
+          timestamp: c.timestamp,
+          text: typeof c.text === 'string' ? c.text : '',
+        }))
+      : [];
+
     self.postMessage({
       status: 'complete',
       text: (output.text || '').trim(),
-      chunks: Array.isArray(output.chunks) ? output.chunks : [],
+      chunks,
     });
   } catch (err) {
     self.postMessage({

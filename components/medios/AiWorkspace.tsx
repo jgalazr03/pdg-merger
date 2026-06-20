@@ -13,6 +13,7 @@ import {
 import { cn } from '@/lib/utils';
 import type { ToolAccent } from '@/lib/tools';
 import type { Chunk, SpeakerNames } from '@/lib/transcript';
+import ErrorBoundary from '@/components/ErrorBoundary';
 import AskPanel from './AskPanel';
 import SummaryPanel from './SummaryPanel';
 import AnalysisPanel from './AnalysisPanel';
@@ -100,23 +101,38 @@ export default function AiWorkspace({
         })}
       </div>
 
+      {/* Cada panel queda aislado: si uno revienta en render, su error boundary
+          lo contiene (no tumba el workspace ni la página) y la transcripción
+          —que vive en el estado del padre— se preserva. */}
       <div className={cn(active !== 'preguntar' && 'hidden')}>
-        <AskPanel chunks={chunks} accent={accent} names={names} onSeek={onSeek} />
+        <ErrorBoundary label="el panel de preguntas">
+          <AskPanel chunks={chunks} accent={accent} names={names} onSeek={onSeek} />
+        </ErrorBoundary>
       </div>
       <div className={cn(active !== 'resumen' && 'hidden')}>
-        <SummaryPanel text={text} accent={accent} baseName={baseName} />
+        <ErrorBoundary label="el resumen">
+          <SummaryPanel text={text} accent={accent} baseName={baseName} />
+        </ErrorBoundary>
       </div>
       <div className={cn(active !== 'analisis' && 'hidden')}>
-        <AnalysisPanel chunks={chunks} text={text} accent={accent} baseName={baseName} names={names} onSeek={onSeek} />
+        <ErrorBoundary label="el análisis">
+          <AnalysisPanel chunks={chunks} text={text} accent={accent} baseName={baseName} names={names} onSeek={onSeek} />
+        </ErrorBoundary>
       </div>
       <div className={cn(active !== 'capitulos' && 'hidden')}>
-        <ChaptersPanel chunks={chunks} accent={accent} names={names} onSeek={onSeek} />
+        <ErrorBoundary label="los capítulos">
+          <ChaptersPanel chunks={chunks} accent={accent} names={names} onSeek={onSeek} />
+        </ErrorBoundary>
       </div>
       <div className={cn(active !== 'documento' && 'hidden')}>
-        <DeliverablePanel chunks={chunks} accent={accent} baseName={baseName} names={names} variant={variant} />
+        <ErrorBoundary label="el documento">
+          <DeliverablePanel chunks={chunks} accent={accent} baseName={baseName} names={names} variant={variant} />
+        </ErrorBoundary>
       </div>
       <div className={cn(active !== 'traducir' && 'hidden')}>
-        <TranslatePanel chunks={chunks} accent={accent} baseName={baseName} />
+        <ErrorBoundary label="la traducción">
+          <TranslatePanel chunks={chunks} accent={accent} baseName={baseName} />
+        </ErrorBoundary>
       </div>
     </div>
   );
