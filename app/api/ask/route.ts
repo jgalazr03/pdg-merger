@@ -99,7 +99,19 @@ export async function POST(request: Request) {
         messages: [
           {
             role: 'user',
-            content: `Transcripción:\n\n${content}\n\n---\nPregunta: ${question}`,
+            // La transcripción (lo más pesado y constante entre preguntas) va en
+            // un bloque con cache_control: Anthropic la cachea y la reutiliza en
+            // las siguientes preguntas sobre la misma grabación (~10× menos coste
+            // y menos presión de tokens/min). La pregunta, que cambia, va en otro
+            // bloque sin cachear. El caching es GA, no requiere beta header.
+            content: [
+              {
+                type: 'text',
+                text: `Transcripción:\n\n${content}`,
+                cache_control: { type: 'ephemeral' },
+              },
+              { type: 'text', text: `---\nPregunta: ${question}` },
+            ],
           },
         ],
       }),

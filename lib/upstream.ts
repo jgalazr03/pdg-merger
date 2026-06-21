@@ -21,6 +21,22 @@ interface RetryOptions {
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
+/**
+ * Resume las cabeceras de rate-limit de la respuesta: `retry-after` + cualquiera
+ * que contenga `ratelimit` (cubre las `anthropic-ratelimit-*` de Anthropic y las
+ * `x-ratelimit-*` de otros). Sirve para ver en los logs de Vercel si el 429 es
+ * saturación pasajera o el cupo de la cuenta agotado (tokens/min restantes).
+ */
+function rateLimitInfo(res: Response): string {
+  const bits: string[] = [];
+  const retryAfter = res.headers.get('retry-after');
+  if (retryAfter) bits.push(`retry-after=${retryAfter}s`);
+  res.headers.forEach((value, name) => {
+    if (name.toLowerCase().includes('ratelimit')) bits.push(`${name}=${value}`);
+  });
+  return bits.length ? bits.join(' ') : '(sin cabeceras de rate-limit)';
+}
+
 /** Lee `retry-after` (segundos o fecha HTTP). Devuelve ms, o null si no aplica. */
 function retryAfterMs(res: Response): number | null {
   const header = res.headers.get('retry-after');
@@ -66,11 +82,20 @@ export async function fetchWithRetry(
     if (Date.now() - start + wait > budget) break;
 
     console.warn(
-      `[upstream retry ${attempt + 1}/${retries}] ${res.status} ${url} — espera ${Math.round(wait)}ms`
+      `[upstream retry ${attempt + 1}/${retries}] ${res.status} ${url} — espera ${Math.round(wait)}ms — ${rateLimitInfo(res)}`
     );
     await res.body?.cancel().catch(() => {});
     await sleep(wait);
     res = await fetch(url, init);
+  }
+
+  // Si tras los reintentos seguimos en un código transitorio, dejamos constancia
+  // del límite exacto que se topó: con `tokens-remaining` cerca de 0 es cupo de la
+  // cuenta (subir de tier); si hay margen, fue saturación pasajera del proveedor.
+  if (RETRYABLE_STATUS.has(res.status)) {
+    console.error(
+      `[upstream agotado] ${res.status} ${url} tras ${Math.round((Date.now() - start) / 1000)}s — ${rateLimitInfo(res)}`
+    );
   }
   return res;
 }
