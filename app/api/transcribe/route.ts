@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { del } from '@vercel/blob';
 import { rejectCrossOrigin } from '@/lib/api-guard';
-import { upstreamError, serviceError } from '@/lib/upstream';
+import { fetchWithRetry, upstreamError, serviceError } from '@/lib/upstream';
 import { DOMAIN_KEYTERMS } from '@/lib/keyterms';
 
 export const runtime = 'nodejs';
@@ -81,14 +81,19 @@ export async function POST(request: Request) {
   }
 
   try {
-    const dg = await fetch(`https://api.deepgram.com/v1/listen?${buildDgParams(keyterms, includeFiscal)}`, {
-      method: 'POST',
-      headers: {
-        Authorization: `Token ${apiKey}`,
-        'Content-Type': 'application/json',
+    const dg = await fetchWithRetry(
+      `https://api.deepgram.com/v1/listen?${buildDgParams(keyterms, includeFiscal)}`,
+      {
+        method: 'POST',
+        headers: {
+          Authorization: `Token ${apiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ url }),
       },
-      body: JSON.stringify({ url }),
-    });
+      // Deepgram batch tiene 300 s de margen: presupuesto holgado para reintentos.
+      { budgetMs: 60_000, retries: 6 }
+    );
 
     if (!dg.ok) {
       return upstreamError(dg.status, await dg.text().catch(() => ''));

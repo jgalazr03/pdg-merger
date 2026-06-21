@@ -1,6 +1,81 @@
 import { NextResponse } from 'next/server';
 
 /**
+ * Códigos en los que SÍ reintentar: límite de tasa (429, "mucha demanda"),
+ * sobrecarga del proveedor (529) y errores transitorios de servidor/gateway.
+ * El resto (400/401/403/404…) son definitivos: reintentarlos no ayuda.
+ */
+const RETRYABLE_STATUS = new Set([408, 425, 429, 500, 502, 503, 504, 529]);
+
+interface RetryOptions {
+  /** Reintentos máximos, además del primer intento. */
+  retries?: number;
+  /** Base del backoff exponencial (ms). */
+  baseDelayMs?: number;
+  /** Tope de espera por intento (ms). */
+  maxDelayMs?: number;
+  /** Presupuesto total de espera entre reintentos (ms). Acotado por el
+   *  `maxDuration` de la ruta para no arriesgar un timeout de la función. */
+  budgetMs?: number;
+}
+
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+/** Lee `retry-after` (segundos o fecha HTTP). Devuelve ms, o null si no aplica. */
+function retryAfterMs(res: Response): number | null {
+  const header = res.headers.get('retry-after');
+  if (!header) return null;
+  const secs = Number(header);
+  if (Number.isFinite(secs)) return Math.max(0, secs * 1000);
+  const when = Date.parse(header);
+  return Number.isFinite(when) ? Math.max(0, when - Date.now()) : null;
+}
+
+/**
+ * `fetch` con reintentos automáticos: backoff exponencial + jitter, respetando
+ * la cabecera `retry-after` del proveedor. Absorbe los 429 ("mucha demanda") y
+ * 529 (sobrecarga) transitorios de Anthropic/Deepgram para que NO lleguen al
+ * usuario: cuesta algún reintento extra a cambio de no fallar al primer rechazo.
+ * Se detiene si se agotaría el presupuesto de tiempo (evita exceder el
+ * `maxDuration` de la ruta) y devuelve la última respuesta para que el handler
+ * la traduzca con `upstreamError`. El `body` de `init` debe ser un string
+ * (JSON serializado): así se puede reenviar intacto en cada reintento.
+ */
+export async function fetchWithRetry(
+  url: string,
+  init: RequestInit,
+  opts: RetryOptions = {}
+): Promise<Response> {
+  const retries = opts.retries ?? 5;
+  const baseDelay = opts.baseDelayMs ?? 500;
+  const maxDelay = opts.maxDelayMs ?? 8_000;
+  const budget = opts.budgetMs ?? 20_000;
+  const start = Date.now();
+
+  let res = await fetch(url, init);
+  for (
+    let attempt = 0;
+    attempt < retries && RETRYABLE_STATUS.has(res.status);
+    attempt++
+  ) {
+    const backoff = Math.min(maxDelay, baseDelay * 2 ** attempt);
+    const wait = retryAfterMs(res) ?? backoff + Math.random() * baseDelay;
+
+    // Sin margen dentro del presupuesto: devolvemos el error en vez de
+    // arriesgar que la función serverless se quede sin tiempo.
+    if (Date.now() - start + wait > budget) break;
+
+    console.warn(
+      `[upstream retry ${attempt + 1}/${retries}] ${res.status} ${url} — espera ${Math.round(wait)}ms`
+    );
+    await res.body?.cancel().catch(() => {});
+    await sleep(wait);
+    res = await fetch(url, init);
+  }
+  return res;
+}
+
+/**
  * Traduce un fallo de un servicio externo (Anthropic / Deepgram) a un mensaje
  * amigable en español, SIN exponer códigos crudos (p. ej. 429) al usuario. El
  * detalle real se registra en los logs del servidor para depurar.

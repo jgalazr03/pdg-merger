@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import type { Answer } from '@/lib/ask';
 import { rejectCrossOrigin } from '@/lib/api-guard';
-import { upstreamError, serviceError } from '@/lib/upstream';
+import { fetchWithRetry, upstreamError, serviceError } from '@/lib/upstream';
 
 export const runtime = 'nodejs';
 export const maxDuration = 60;
@@ -83,7 +83,7 @@ export async function POST(request: Request) {
     transcript.length > MAX_CHARS ? transcript.slice(0, MAX_CHARS) : transcript;
 
   try {
-    const res = await fetch('https://api.anthropic.com/v1/messages', {
+    const res = await fetchWithRetry('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: {
         'x-api-key': apiKey,

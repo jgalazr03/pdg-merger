@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import type { MeetingAnalysis } from '@/lib/analysis';
 import { rejectCrossOrigin } from '@/lib/api-guard';
-import { upstreamError, serviceError } from '@/lib/upstream';
+import { fetchWithRetry, upstreamError, serviceError } from '@/lib/upstream';
 
 export const runtime = 'nodejs';
 // Analizar una transcripción larga con Claude puede tomar decenas de segundos.
@@ -117,7 +117,7 @@ export async function POST(request: Request) {
   const content = truncated ? text.slice(0, MAX_CHARS) : text;
 
   try {
-    const res = await fetch('https://api.anthropic.com/v1/messages', {
+    const res = await fetchWithRetry('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: {
         'x-api-key': apiKey,
