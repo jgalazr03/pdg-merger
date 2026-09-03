@@ -19,7 +19,8 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { cn, scrollIntoViewSafe } from '@/lib/utils';
+import { Progress } from '@/components/ui/progress';
+import { cn } from '@/lib/utils';
 import { toastUndo } from '@/lib/toast';
 import { getTool } from '@/lib/tools';
 import ToolShell from '@/components/tools/ToolShell';
@@ -38,34 +39,59 @@ interface PDFFile {
   size: string;
   type: 'pdf' | 'image';
   cropped?: CropResult;
+  /** Páginas del archivo: `undefined` mientras se cuenta, `null` si no se pudo. */
+  pages?: number | null;
 }
+
+interface MergeResult {
+  url: string;
+  size: number;
+  pages: number;
+}
+
+interface MergeProgress {
+  done: number;
+  total: number;
+  label: string;
+}
+
+const formatFileSize = (bytes: number): string => {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+};
+
+/** Deja pintar a React antes de un tramo de trabajo síncrono pesado. */
+const yieldToPaint = () =>
+  new Promise<void>((resolve) => {
+    requestAnimationFrame(() => setTimeout(resolve, 0));
+  });
+
+/** Cuenta páginas de un PDF sin conservarlo en memoria. `null` si no se pudo. */
+const countPages = async (file: File): Promise<number | null> => {
+  try {
+    const bytes = await file.arrayBuffer();
+    const doc = await PDFDocument.load(bytes, {
+      ignoreEncryption: true,
+      updateMetadata: false,
+    });
+    return doc.getPageCount();
+  } catch {
+    return null;
+  }
+};
 
 export default function PDFMerger() {
   const [files, setFiles] = useState<PDFFile[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
-  const [downloadUrl, setDownloadUrl] = useState<string | null>(null);
+  const [progress, setProgress] = useState<MergeProgress | null>(null);
+  const [result, setResult] = useState<MergeResult | null>(null);
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
   const [overIndex, setOverIndex] = useState<number | null>(null);
   const [removingIds, setRemovingIds] = useState<Set<string>>(new Set());
   const [fileName, setFileName] = useState('');
   const [fileNameError, setFileNameError] = useState('');
   const [cropFileId, setCropFileId] = useState<string | null>(null);
-  const filesListRef = useRef<HTMLDivElement>(null);
-  const resultRef = useRef<HTMLDivElement>(null);
-
-  // Al agregar archivos, baja a la lista.
-  useEffect(() => {
-    if (files.length > 0 && filesListRef.current) {
-      setTimeout(() => scrollIntoViewSafe(filesListRef.current), 100);
-    }
-  }, [files.length]);
-
-  // Al generarse el PDF, baja al inicio de la sección de resultado.
-  useEffect(() => {
-    if (downloadUrl) {
-      setTimeout(() => scrollIntoViewSafe(resultRef.current), 100);
-    }
-  }, [downloadUrl]);
 
   // El PDF generado es una foto de la lista en el momento de unir. Si la lista
   // cambia después (agregar, quitar, reordenar, recortar), ese resultado ya no
@@ -79,7 +105,7 @@ export default function PDFMerger() {
     )
     .join('|');
   useEffect(() => {
-    setDownloadUrl(null);
+    setResult(null);
   }, [filesSignature]);
   // Última firma vista: la unión es asíncrona y la lista puede cambiar mientras
   // corre; al terminar se compara para no publicar un PDF que ya nació viejo.
@@ -91,15 +117,9 @@ export default function PDFMerger() {
   // Libera el object URL del resultado al descartarlo, regenerar o desmontar.
   useEffect(() => {
     return () => {
-      if (downloadUrl) URL.revokeObjectURL(downloadUrl);
+      if (result) URL.revokeObjectURL(result.url);
     };
-  }, [downloadUrl]);
-
-  const formatFileSize = (bytes: number): string => {
-    if (bytes < 1024) return `${bytes} B`;
-    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-  };
+  }, [result]);
 
   const validateFileName = (name: string): boolean => {
     if (!name.trim()) return true; // Empty is allowed, will use default
@@ -146,20 +166,35 @@ export default function PDFMerger() {
     file.type === 'image/png' ||
     /\.(jpe?g|png)$/i.test(file.name);
 
+  // Cuenta páginas de los PDFs recién agregados, uno a uno para no abrir varios
+  // a la vez. Si el archivo se quitó mientras tanto, el map no hace nada.
+  const hydratePages = async (added: PDFFile[]) => {
+    for (const f of added) {
+      if (f.type !== 'pdf') continue;
+      const pages = await countPages(f.file);
+      setFiles((prev) => prev.map((x) => (x.id === f.id ? { ...x, pages } : x)));
+    }
+  };
+
   const handleFileSelect = (selectedFiles: FileList) => {
     const incoming = Array.from(selectedFiles);
     const rejected = incoming.filter(
       (file) => !isPdfFile(file) && !isImageFile(file)
     );
-    const newFiles = incoming
+    const newFiles: PDFFile[] = incoming
       .filter((file) => isPdfFile(file) || isImageFile(file))
-      .map((file) => ({
-        id: Math.random().toString(36).substring(2, 15),
-        file,
-        name: file.name.replace(/\.(pdf|jpe?g|png)$/i, ''),
-        size: formatFileSize(file.size),
-        type: isPdfFile(file) ? ('pdf' as const) : ('image' as const),
-      }));
+      .map((file) => {
+        const type = isPdfFile(file) ? ('pdf' as const) : ('image' as const);
+        return {
+          id: Math.random().toString(36).substring(2, 15),
+          file,
+          name: file.name.replace(/\.(pdf|jpe?g|png)$/i, ''),
+          size: formatFileSize(file.size),
+          type,
+          // Una imagen siempre es una página; los PDFs se cuentan aparte.
+          pages: type === 'image' ? 1 : undefined,
+        };
+      });
 
     if (rejected.length > 0) {
       toast.error('Algunos archivos no son válidos', {
@@ -172,6 +207,7 @@ export default function PDFMerger() {
       toast.success(
         `${newFiles.length} archivo${newFiles.length !== 1 ? 's' : ''} agregado${newFiles.length !== 1 ? 's' : ''}`
       );
+      void hydratePages(newFiles);
     }
   };
 
@@ -201,9 +237,9 @@ export default function PDFMerger() {
     return bytes;
   };
 
-  const handleCropConfirm = (result: CropResult) => {
+  const handleCropConfirm = (crop: CropResult) => {
     setFiles((prev) =>
-      prev.map((f) => (f.id === cropFileId ? { ...f, cropped: result } : f))
+      prev.map((f) => (f.id === cropFileId ? { ...f, cropped: crop } : f))
     );
     setCropFileId(null);
   };
@@ -223,6 +259,10 @@ export default function PDFMerger() {
   };
 
   const handleDragStart = (e: React.DragEvent, index: number) => {
+    if (isProcessing) {
+      e.preventDefault();
+      return;
+    }
     setDraggedIndex(index);
     e.dataTransfer.effectAllowed = 'move';
   };
@@ -241,6 +281,7 @@ export default function PDFMerger() {
 
   // Reordenamiento accesible por teclado
   const moveFile = (from: number, to: number) => {
+    if (isProcessing) return;
     if (to < 0 || to >= files.length || from === to) return;
     const newFiles = [...files];
     const [moved] = newFiles.splice(from, 1);
@@ -253,6 +294,7 @@ export default function PDFMerger() {
     if (!validateFileName(fileName)) return;
 
     const signatureAtStart = filesSignature;
+    const total = files.length;
     setIsProcessing(true);
     try {
       const mergedPdf = await PDFDocument.create();
@@ -261,7 +303,13 @@ export default function PDFMerger() {
       const LETTER_SHORT = 612;
       const LETTER_LONG = 792;
 
-      for (const pdfFile of files) {
+      for (let i = 0; i < files.length; i++) {
+        const pdfFile = files[i];
+        // Progreso por archivo: el trabajo pesado de pdf-lib es síncrono, así
+        // que se cede un frame para que el texto y la barra lleguen a pintarse.
+        setProgress({ done: i, total, label: `Uniendo ${i + 1} de ${total}…` });
+        await yieldToPaint();
+
         if (pdfFile.type === 'image' && pdfFile.cropped) {
           // Imagen recortada: se coloca centrada en una hoja Carta auto-orientada
           const bytes = dataUrlToBytes(pdfFile.cropped.dataUrl);
@@ -304,6 +352,8 @@ export default function PDFMerger() {
         }
       }
 
+      setProgress({ done: total, total, label: 'Guardando el PDF…' });
+      await yieldToPaint();
       const pdfBytes = await mergedPdf.save();
       if (filesSignatureRef.current !== signatureAtStart) {
         // Se agregó, quitó o reordenó algo durante la unión: este PDF no
@@ -314,8 +364,11 @@ export default function PDFMerger() {
         return;
       }
       const blob = new Blob([pdfBytes], { type: 'application/pdf' });
-      const url = URL.createObjectURL(blob);
-      setDownloadUrl(url);
+      setResult({
+        url: URL.createObjectURL(blob),
+        size: blob.size,
+        pages: mergedPdf.getPageCount(),
+      });
       toast.success('¡PDF generado correctamente!');
     } catch (error) {
       console.error('Error merging PDFs:', error);
@@ -324,15 +377,16 @@ export default function PDFMerger() {
       });
     } finally {
       setIsProcessing(false);
+      setProgress(null);
     }
   };
 
   const downloadMergedPDF = () => {
-    if (!downloadUrl) return;
+    if (!result) return;
 
     const finalFileName = `${getValidFileName()}.pdf`;
     const link = document.createElement('a');
-    link.href = downloadUrl;
+    link.href = result.url;
     link.download = finalFileName;
     document.body.appendChild(link);
     link.click();
@@ -341,7 +395,8 @@ export default function PDFMerger() {
 
   const resetAll = () => {
     setFiles([]);
-    setDownloadUrl(null);
+    setResult(null);
+    setProgress(null);
     setFileName('');
     setFileNameError('');
   };
@@ -350,7 +405,7 @@ export default function PDFMerger() {
   // Se restauran archivos y nombre, no el PDF generado: su URL ya se liberó y
   // el usuario vuelve a "Unir archivos" con la lista recuperada.
   const clearAll = () => {
-    if (files.length === 0) return;
+    if (files.length === 0 || isProcessing) return;
     const snapshot = { files, fileName };
     const count = files.length;
     resetAll();
@@ -363,10 +418,208 @@ export default function PDFMerger() {
     });
   };
 
-  const step: 1 | 2 | 3 = files.length === 0 ? 1 : downloadUrl ? 3 : 2;
+  const step: 1 | 2 | 3 = files.length === 0 ? 1 : result ? 3 : 2;
+
+  // ---- Resumen para el panel de acción -------------------------------------
+  const totalBytes = files.reduce((sum, f) => sum + f.file.size, 0);
+  const pagesPending = files.some((f) => f.pages === undefined);
+  const pagesUnknown = files.some((f) => f.pages === null);
+  const pagesKnown = files.reduce((sum, f) => sum + (f.pages ?? 0), 0);
+  const pagesLabel = pagesPending
+    ? 'contando páginas…'
+    : `${pagesUnknown ? 'al menos ' : ''}${pagesKnown} ${pagesKnown === 1 ? 'página' : 'páginas'}`;
+  const filesLabel = `${files.length} ${files.length === 1 ? 'archivo' : 'archivos'}`;
+  const ctaLabel = isProcessing
+    ? 'Procesando…'
+    : files.length > 1
+      ? 'Unir archivos'
+      : 'Generar PDF';
+  const ctaDisabled = isProcessing || !!fileNameError;
+  const resultName = `${getValidFileName()}.pdf`;
+
+  const progressBlock = progress && (
+    <div className="mt-3" aria-live="polite">
+      <p className="text-sm font-bold tabular-nums text-ink">{progress.label}</p>
+      <Progress
+        value={(progress.done / progress.total) * 100}
+        className="mt-2 h-2"
+        aria-label="Progreso de la unión"
+      />
+    </div>
+  );
+
+  // Panel de acción (lg+: columna derecha pegajosa; debajo: fluye tras la lista
+  // y deja el resumen y el botón a la barra inferior).
+  const aside = files.length > 0 && (
+    <div className="rounded-lg border-3 border-ink bg-card p-4 sm:p-5">
+      {result ? (
+        <>
+          <p className="text-xs font-bold uppercase tracking-[0.15em] text-success">
+            Listo
+          </p>
+          <p className="mt-2 break-words text-base font-bold text-ink">{resultName}</p>
+          <p className="mt-1 text-sm tabular-nums text-muted-foreground">
+            {result.pages} {result.pages === 1 ? 'página' : 'páginas'} ·{' '}
+            {formatFileSize(result.size)}
+          </p>
+          <div className="mt-4 hidden flex-col gap-2 lg:flex">
+            <Button
+              onClick={downloadMergedPDF}
+              size="lg"
+              className={cn('w-full', accent.solid)}
+            >
+              <Download className="mr-2 h-5 w-5" />
+              Descargar PDF
+            </Button>
+            <Button variant="outline" onClick={resetAll} size="lg" className="w-full">
+              Crear otro PDF
+            </Button>
+          </div>
+        </>
+      ) : (
+        <>
+          <div className="hidden lg:block">
+            <p className="text-xs font-bold uppercase tracking-[0.15em] text-muted-foreground">
+              Resumen
+            </p>
+            <p className="mt-2 text-sm font-bold tabular-nums text-ink" aria-live="polite">
+              {filesLabel} · {formatFileSize(totalBytes)}
+            </p>
+            <p className="text-sm tabular-nums text-muted-foreground">{pagesLabel}</p>
+          </div>
+
+          <div className="lg:mt-4">
+            <p className="mb-3 text-xs font-bold uppercase tracking-[0.15em] text-muted-foreground lg:hidden">
+              Opciones
+            </p>
+            <Label
+              htmlFor="filename"
+              className="mb-2 block text-sm font-medium text-ink"
+            >
+              <Edit3 className="mr-2 inline h-4 w-4" />
+              Nombre del archivo final
+            </Label>
+            <div className="relative">
+              <Input
+                id="filename"
+                type="text"
+                placeholder="documento_final"
+                value={fileName}
+                onChange={(e) => handleFileNameChange(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && !ctaDisabled) void mergePDFs();
+                }}
+                disabled={isProcessing}
+                aria-invalid={!!fileNameError}
+                aria-describedby="filename-help"
+                className={cn(
+                  'pr-12',
+                  fileNameError && 'border-brand-red focus-visible:ring-ink'
+                )}
+              />
+              <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3">
+                <span className="text-sm text-muted-foreground">.pdf</span>
+              </div>
+            </div>
+            {fileNameError ? (
+              <p className="mt-2 text-sm text-brand-red" id="filename-help">
+                {fileNameError}
+              </p>
+            ) : (
+              <p className="mt-2 text-xs text-muted-foreground" id="filename-help">
+                Si lo dejas vacío, se usará &quot;documento_final.pdf&quot;
+              </p>
+            )}
+          </div>
+
+          <div className="mt-4 hidden lg:block">
+            <Button
+              onClick={mergePDFs}
+              disabled={ctaDisabled}
+              aria-busy={isProcessing}
+              size="lg"
+              className={cn('w-full', accent.solid)}
+            >
+              {isProcessing ? (
+                <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+              ) : (
+                <FileText className="mr-2 h-5 w-5" />
+              )}
+              {ctaLabel}
+            </Button>
+            {progressBlock}
+          </div>
+        </>
+      )}
+    </div>
+  );
+
+  // Barra inferior fija (solo por debajo de lg): resumen compacto + acción.
+  const bar = files.length > 0 && (
+    <div className="border-t-3 border-ink bg-surface pl-[max(20px,env(safe-area-inset-left))] pr-[max(20px,env(safe-area-inset-right))] pb-[max(12px,env(safe-area-inset-bottom))] pt-3">
+      <div className="container mx-auto flex max-w-6xl items-center gap-3">
+        <div className="min-w-0 flex-1">
+          {result ? (
+            <>
+              <p className="truncate text-sm font-bold text-ink">{resultName}</p>
+              <p className="truncate text-xs tabular-nums text-muted-foreground">
+                {result.pages} {result.pages === 1 ? 'página' : 'páginas'} ·{' '}
+                {formatFileSize(result.size)}
+              </p>
+            </>
+          ) : progress ? (
+            <div aria-live="polite">
+              <p className="truncate text-sm font-bold tabular-nums text-ink">
+                {progress.label}
+              </p>
+              <Progress
+                value={(progress.done / progress.total) * 100}
+                className="mt-1.5 h-2"
+                aria-label="Progreso de la unión"
+              />
+            </div>
+          ) : (
+            <>
+              <p className="truncate text-sm font-bold tabular-nums text-ink">
+                {filesLabel}
+              </p>
+              <p className="truncate text-xs tabular-nums text-muted-foreground">
+                {formatFileSize(totalBytes)} · {pagesLabel}
+              </p>
+            </>
+          )}
+        </div>
+        {result ? (
+          <>
+            <Button variant="outline" onClick={resetAll} className="shrink-0">
+              Otro
+            </Button>
+            <Button onClick={downloadMergedPDF} className={cn('shrink-0', accent.solid)}>
+              <Download className="mr-2 h-4 w-4" />
+              Descargar
+            </Button>
+          </>
+        ) : (
+          <Button
+            onClick={mergePDFs}
+            disabled={ctaDisabled}
+            aria-busy={isProcessing}
+            className={cn('shrink-0', accent.solid)}
+          >
+            {isProcessing ? (
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            ) : (
+              <FileText className="mr-2 h-4 w-4" />
+            )}
+            {ctaLabel}
+          </Button>
+        )}
+      </div>
+    </div>
+  );
 
   return (
-    <ToolShell tool={tool} step={step}>
+    <ToolShell tool={tool} step={step} aside={aside} bar={bar}>
       <FileDropzone
         className="mb-4"
         accent={accent}
@@ -384,7 +637,7 @@ export default function PDFMerger() {
       <ToolConstraints items={tool.constraints} />
 
       {files.length > 0 && (
-        <Card className="mb-8 motion-safe:animate-slide-up" ref={filesListRef}>
+        <Card className="motion-safe:animate-slide-up">
           <CardContent className="p-4 sm:p-6">
             {/* Encabezado + acción: apilados en móvil (el título mono envuelve
                 y chocaba con el botón); en una fila a partir de sm. */}
@@ -396,6 +649,7 @@ export default function PDFMerger() {
                 variant="outline"
                 size="sm"
                 onClick={clearAll}
+                disabled={isProcessing}
                 className="shrink-0"
               >
                 <X className="mr-2 h-4 w-4" />
@@ -408,7 +662,7 @@ export default function PDFMerger() {
                 <li
                   key={file.id}
                   data-flip-id={file.id}
-                  draggable
+                  draggable={!isProcessing}
                   onDragStart={(e) => handleDragStart(e, index)}
                   onDragOver={(e) => handleDragOver(e, index)}
                   onDrop={(e) => handleDrop(e, index)}
@@ -440,7 +694,7 @@ export default function PDFMerger() {
                     <button
                       type="button"
                       onClick={() => moveFile(index, index - 1)}
-                      disabled={index === 0}
+                      disabled={index === 0 || isProcessing}
                       aria-label={`Mover ${file.name} hacia arriba`}
                       className={cn(
                         'flex h-9 w-9 items-center justify-center rounded-md text-muted-foreground transition-colors hover-fine:bg-muted hover-fine:text-ink active:bg-muted disabled:opacity-30 disabled:hover-fine:bg-transparent disabled:hover-fine:text-muted-foreground disabled:active:bg-transparent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-1',
@@ -452,7 +706,7 @@ export default function PDFMerger() {
                     <button
                       type="button"
                       onClick={() => moveFile(index, index + 1)}
-                      disabled={index === files.length - 1}
+                      disabled={index === files.length - 1 || isProcessing}
                       aria-label={`Mover ${file.name} hacia abajo`}
                       className={cn(
                         'flex h-9 w-9 items-center justify-center rounded-md text-muted-foreground transition-colors hover-fine:bg-muted hover-fine:text-ink active:bg-muted disabled:opacity-30 disabled:hover-fine:bg-transparent disabled:hover-fine:text-muted-foreground disabled:active:bg-transparent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-1',
@@ -475,10 +729,15 @@ export default function PDFMerger() {
                       <p className="truncate font-medium text-ink">
                         {file.name}
                       </p>
-                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                        <span>{file.size}</span>
+                      <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-sm tabular-nums text-muted-foreground">
+                        <span className="whitespace-nowrap">{file.size}</span>
+                        {typeof file.pages === 'number' && (
+                          <span className="whitespace-nowrap">
+                            · {file.pages} {file.pages === 1 ? 'página' : 'páginas'}
+                          </span>
+                        )}
                         {file.cropped && (
-                          <span className="inline-flex items-center gap-1 font-medium text-success">
+                          <span className="inline-flex items-center gap-1 whitespace-nowrap font-medium text-success">
                             <Crop className="h-3 w-3" />
                             Recortado
                           </span>
@@ -490,13 +749,14 @@ export default function PDFMerger() {
                     </span>
                   </div>
 
-                  {/* Acciones: en móvil ocupan ancho completo (w-full → bajan a
-                      su propia línea con sitio para el texto); en sm+ van en
-                      línea. Para PDFs (sin recortar) la X cabe siempre inline. */}
+                  {/* Acciones: para imágenes (Recortar + X) ocupan su propia
+                      línea (w-full) hasta xl, donde la columna de contenido ya
+                      da sitio al nombre; así el nombre no se trunca. Para PDFs
+                      la X cabe siempre inline. */}
                   <div
                     className={cn(
-                      'flex items-center justify-end gap-2 sm:w-auto',
-                      file.type === 'image' ? 'w-full sm:w-auto' : 'w-auto'
+                      'flex items-center justify-end gap-2',
+                      file.type === 'image' ? 'w-full xl:w-auto' : 'w-auto'
                     )}
                   >
                     {file.type === 'image' && (
@@ -504,6 +764,7 @@ export default function PDFMerger() {
                         variant="outline"
                         size="sm"
                         onClick={() => setCropFileId(file.id)}
+                        disabled={isProcessing}
                         className="shrink-0"
                         title="Recortar imagen"
                       >
@@ -515,6 +776,7 @@ export default function PDFMerger() {
                       variant="ghost"
                       size="sm"
                       onClick={() => removeFile(file.id)}
+                      disabled={isProcessing}
                       aria-label={`Quitar ${file.name}`}
                       className="shrink-0 text-muted-foreground hover-fine:text-ink"
                     >
@@ -531,113 +793,6 @@ export default function PDFMerger() {
                 cambiar el orden. Se unirán en el orden que aparecen aquí. Usa el
                 ícono de recorte en las imágenes para ajustarlas a tamaño Carta.
               </p>
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {files.length >= 1 && !downloadUrl && (
-        <Card className="mb-8">
-          <CardContent className="p-4 sm:p-6">
-            <div className="mb-6 text-center">
-              <h2 className="mb-2 font-display text-lg font-bold text-ink">
-                {files.length > 1 ? '¿Listo para unir?' : '¿Listo para generar el PDF?'}
-              </h2>
-              <p className="text-muted-foreground">
-                {files.length > 1
-                  ? `Se unirán ${files.length} archivos en un solo documento PDF.`
-                  : 'Se generará un documento PDF a partir de tu archivo.'}
-              </p>
-            </div>
-
-            <div className="mx-auto mb-6 max-w-md">
-              <Label
-                htmlFor="filename"
-                className="mb-2 block text-sm font-medium text-ink"
-              >
-                <Edit3 className="mr-2 inline h-4 w-4" />
-                Nombre del archivo final
-              </Label>
-              <div className="relative">
-                <Input
-                  id="filename"
-                  type="text"
-                  placeholder="documento_final"
-                  value={fileName}
-                  onChange={(e) => handleFileNameChange(e.target.value)}
-                  aria-invalid={!!fileNameError}
-                  aria-describedby="filename-help"
-                  className={cn(
-                    'pr-12',
-                    fileNameError && 'border-brand-red focus-visible:ring-ink'
-                  )}
-                />
-                <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3">
-                  <span className="text-sm text-muted-foreground">.pdf</span>
-                </div>
-              </div>
-              {fileNameError ? (
-                <p className="mt-2 text-sm text-brand-red" id="filename-help">
-                  {fileNameError}
-                </p>
-              ) : (
-                <p className="mt-2 text-xs text-muted-foreground" id="filename-help">
-                  Si lo dejas vacío, se usará &quot;documento_final.pdf&quot;
-                </p>
-              )}
-            </div>
-
-            <div className="text-center">
-              <Button
-                onClick={mergePDFs}
-                disabled={isProcessing || !!fileNameError}
-                aria-busy={isProcessing}
-                size="lg"
-                className={accent.solid}
-              >
-                {isProcessing ? (
-                  <>
-                    <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                    Procesando…
-                  </>
-                ) : (
-                  <>
-                    <FileText className="mr-2 h-5 w-5" />
-                    {files.length > 1 ? 'Unir archivos' : 'Generar PDF'}
-                  </>
-                )}
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {downloadUrl && (
-        <Card
-          ref={resultRef}
-          className="motion-safe:animate-slide-up"
-        >
-          <CardContent className="p-4 text-center sm:p-6">
-            <div className="mb-4 inline-flex h-16 w-16 items-center justify-center rounded-full border-3 border-ink bg-success text-white">
-              <Download className="h-8 w-8" />
-            </div>
-            <h2 className="mb-2 text-lg font-bold text-success">¡Listo!</h2>
-            <p className="mb-6 text-ink">
-              Tu PDF unificado está listo para descargar como &quot;
-              {getValidFileName()}.pdf&quot;
-            </p>
-            <div className="flex flex-col justify-center gap-3 sm:flex-row">
-              <Button
-                onClick={downloadMergedPDF}
-                size="lg"
-                className={accent.solid}
-              >
-                <Download className="mr-2 h-5 w-5" />
-                Descargar PDF
-              </Button>
-              <Button variant="outline" onClick={resetAll} size="lg">
-                Crear otro PDF
-              </Button>
             </div>
           </CardContent>
         </Card>

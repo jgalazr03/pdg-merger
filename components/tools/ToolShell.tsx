@@ -8,20 +8,37 @@ import StepIndicator from './StepIndicator';
  * Cáscara común de cada herramienta. Hero asimétrico (lockup alineado a la
  * izquierda) con tile navy de marca, breadcrumb e indicador de pasos, sobre
  * la atmósfera global. El contenido específico va como children.
+ *
+ * Panel de acción opcional (patrón iLovePDF: el botón nunca se pierde):
+ *  - `aside`: en lg+ es una columna derecha pegajosa (resumen, opciones, CTA);
+ *    por debajo de lg fluye tras el contenido (ahí vive lo que no cabe en la
+ *    barra, p. ej. el nombre del archivo).
+ *  - `bar`: barra inferior FIJA solo por debajo de lg (resumen compacto + CTA).
+ *    Cuando existe, el contenido reserva sitio abajo para no quedar tapado.
  */
 export default function ToolShell({
   tool,
   step,
   children,
+  aside,
+  bar,
 }: {
   tool: ToolDef;
   step: 1 | 2 | 3;
   children: React.ReactNode;
+  aside?: React.ReactNode;
+  bar?: React.ReactNode;
 }) {
   return (
     // Móvil: preludio comprimido (la tarea primero — el dropzone debe asomar
     // sin scroll al entrar); escritorio conserva el aire generoso.
-    <div className="container mx-auto max-w-6xl py-5 pl-[max(20px,env(safe-area-inset-left))] pr-[max(20px,env(safe-area-inset-right))] sm:py-8 md:py-16">
+    <div
+      className={cn(
+        'container mx-auto py-5 pl-[max(20px,env(safe-area-inset-left))] pr-[max(20px,env(safe-area-inset-right))] sm:py-8 md:py-16',
+        // Con panel lateral hay tres columnas: el contenido gana anchura.
+        aside ? 'max-w-7xl' : 'max-w-6xl'
+      )}
+    >
       <nav aria-label="Ruta de navegación" className="mb-4 sm:mb-8">
         <ol className="flex items-center gap-1.5 text-sm text-muted-foreground">
           <li>
@@ -71,15 +88,34 @@ export default function ToolShell({
         </div>
       </header>
 
-      {/* Riel de pasos vertical a la izquierda (md+); apilado arriba en móvil */}
-      <div className="md:grid md:grid-cols-[auto_1fr] md:gap-10">
+      {/* Riel de pasos vertical a la izquierda (md+); apilado arriba en móvil.
+          Con `aside`, en lg+ aparece una tercera columna pegajosa a la derecha. */}
+      <div
+        className={cn(
+          'md:grid md:grid-cols-[auto_1fr] md:gap-10',
+          aside && 'lg:grid-cols-[auto_1fr_minmax(260px,300px)] lg:gap-8',
+          bar && 'pb-24 lg:pb-0'
+        )}
+      >
         <StepIndicator
           current={step}
           accent={tool.accent}
           className="mb-5 md:mb-0 md:sticky md:top-24 md:self-start"
         />
         <div className="min-w-0">{children}</div>
+        {aside && (
+          <aside
+            aria-label="Acciones"
+            className="mt-8 min-w-0 md:col-start-2 lg:col-start-3 lg:row-start-1 lg:mt-0 lg:sticky lg:top-24 lg:self-start"
+          >
+            {aside}
+          </aside>
+        )}
       </div>
+
+      {bar && (
+        <div className="fixed inset-x-0 bottom-0 z-30 lg:hidden">{bar}</div>
+      )}
     </div>
   );
 }
