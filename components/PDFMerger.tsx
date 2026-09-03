@@ -67,6 +67,28 @@ export default function PDFMerger() {
     }
   }, [downloadUrl]);
 
+  // El PDF generado es una foto de la lista en el momento de unir. Si la lista
+  // cambia después (agregar, quitar, reordenar, recortar), ese resultado ya no
+  // corresponde: se descarta para que vuelva "Unir archivos" y se regenere.
+  // Se detecta por firma (no por cada mutador) para no olvidar ninguno.
+  const filesSignature = files
+    .map((f) =>
+      f.cropped
+        ? `${f.id}:${f.cropped.width}x${f.cropped.height}:${f.cropped.dataUrl.length}`
+        : f.id
+    )
+    .join('|');
+  useEffect(() => {
+    setDownloadUrl(null);
+  }, [filesSignature]);
+
+  // Libera el object URL del resultado al descartarlo, regenerar o desmontar.
+  useEffect(() => {
+    return () => {
+      if (downloadUrl) URL.revokeObjectURL(downloadUrl);
+    };
+  }, [downloadUrl]);
+
   const formatFileSize = (bytes: number): string => {
     if (bytes < 1024) return `${bytes} B`;
     if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
@@ -310,9 +332,11 @@ export default function PDFMerger() {
   };
 
   // Acción destructiva con red de seguridad: vacía la lista pero ofrece deshacer.
+  // Se restauran archivos y nombre, no el PDF generado: su URL ya se liberó y
+  // el usuario vuelve a "Unir archivos" con la lista recuperada.
   const clearAll = () => {
     if (files.length === 0) return;
-    const snapshot = { files, fileName, downloadUrl };
+    const snapshot = { files, fileName };
     const count = files.length;
     resetAll();
     toastUndo('Lista vaciada', {
@@ -320,7 +344,6 @@ export default function PDFMerger() {
       onUndo: () => {
         setFiles(snapshot.files);
         setFileName(snapshot.fileName);
-        setDownloadUrl(snapshot.downloadUrl);
       },
     });
   };
