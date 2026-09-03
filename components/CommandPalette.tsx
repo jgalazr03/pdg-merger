@@ -5,15 +5,18 @@ import { useRouter } from 'next/navigation';
 import * as Dialog from '@radix-ui/react-dialog';
 import { Search } from 'lucide-react';
 import { TOOLS, toolsByCategory, type ToolDef } from '@/lib/tools';
+import { searchTools, findUnavailableIntent } from '@/lib/search-tools';
 import { useRecentTools } from '@/lib/recent-tools';
 import { cn } from '@/lib/utils';
+import UnavailableHint from '@/components/UnavailableHint';
 
 /**
  * Command palette global (⌘K / Ctrl+K), el gesto del North Star (Raycast): saltar
  * a cualquier herramienta desde cualquier página sin volver al inicio.
  *
- *  - Buscando: resultados planos (insensible a acentos), con su categoría a la
- *    derecha para desambiguar.
+ *  - Buscando: resultados planos del buscador único (`searchTools`: sinónimos,
+ *    acentos, plural/infinitivo, ranking), con su categoría a la derecha para
+ *    desambiguar. Si la tarea no existe en el hub, lo dice (UnavailableHint).
  *  - Vacío: Recientes arriba + el catálogo COMPLETO por categoría debajo, todo
  *    navegable con teclado (no solo los recientes).
  *
@@ -25,9 +28,6 @@ const GROUPS = toolsByCategory();
 const CATEGORY_LABEL: Record<string, string> = Object.fromEntries(
   GROUPS.map((g) => [g.category, g.label])
 );
-
-const norm = (s: string) =>
-  s.normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase();
 
 type Row =
   | { kind: 'header'; label: string }
@@ -72,9 +72,7 @@ export default function CommandPalette() {
       flatTools.push(tool);
     };
     if (q) {
-      TOOLS.filter((t) =>
-        norm(`${t.name} ${t.title} ${t.tagline}`).includes(norm(q))
-      ).forEach(push);
+      searchTools(TOOLS, q).forEach(push);
     } else {
       if (recents.length) {
         rows.push({ kind: 'header', label: 'Recientes' });
@@ -126,6 +124,7 @@ export default function CommandPalette() {
   };
 
   const count = q ? flatTools.length : TOOLS.length;
+  const intent = q ? findUnavailableIntent(q) : undefined;
 
   return (
     <Dialog.Root open={open} onOpenChange={setOpen}>
@@ -214,9 +213,21 @@ export default function CommandPalette() {
                 })}
               </ul>
             ) : (
-              <p className="px-3 py-8 text-center text-sm text-muted-foreground">
+              <p
+                className={cn(
+                  'px-3 text-center text-sm text-muted-foreground',
+                  intent ? 'pb-2 pt-4' : 'py-8'
+                )}
+              >
                 Sin resultados para «{q}».
               </p>
+            )}
+            {intent && (
+              <UnavailableHint
+                intent={intent}
+                onAlternative={go}
+                className="mx-1 mb-1 mt-2"
+              />
             )}
           </div>
 

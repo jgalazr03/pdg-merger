@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { Menu, ChevronDown, ChevronRight, LayoutGrid, Search } from 'lucide-react';
 import {
   TOOLS,
@@ -13,7 +13,9 @@ import {
   type ToolDef,
   type CategoryGroup,
 } from '@/lib/tools';
+import { searchTools, findUnavailableIntent } from '@/lib/search-tools';
 import { cn } from '@/lib/utils';
+import UnavailableHint from '@/components/UnavailableHint';
 import {
   Sheet,
   SheetContent,
@@ -65,6 +67,10 @@ export default function SiteHeader() {
 
   // --- Menú móvil (Sheet): buscador + categorías colapsables ---
   const [menuQuery, setMenuQuery] = useState('');
+  // Controlado para poder cerrarlo desde la nota "no está en el hub" al abrir
+  // la herramienta alternativa (los enlaces normales cierran vía SheetClose).
+  const [sheetOpen, setSheetOpen] = useState(false);
+  const router = useRouter();
   const [openCats, setOpenCats] = useState<Set<string>>(new Set());
   // Foco al abrir: al título, NO al buscador. Como el buscador es el primer
   // enfocable del panel, Radix lo autoenfocaba y abría el teclado en móvil; el
@@ -111,13 +117,15 @@ export default function SiteHeader() {
     };
   }, [megaOpen]);
 
-  // Búsqueda insensible a mayúsculas y acentos sobre el nombre de la herramienta.
-  const norm = (s: string) =>
-    s.normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase();
-  const menuResults =
-    menuQuery.trim().length > 0
-      ? TOOLS.filter((t) => norm(t.name).includes(norm(menuQuery)))
-      : [];
+  // Buscador único (mismo motor que ⌘K y el catálogo): sinónimos, acentos,
+  // plural/infinitivo y ranking. Antes solo comparaba contra `name`.
+  const menuQ = menuQuery.trim();
+  const menuResults = menuQ.length > 0 ? searchTools(TOOLS, menuQ) : [];
+  const menuIntent = menuQ.length > 0 ? findUnavailableIntent(menuQ) : undefined;
+  const openAlternative = (tool: ToolDef) => {
+    setSheetOpen(false);
+    router.push(tool.href);
+  };
   const toggleCat = (c: string) =>
     setOpenCats((prev) => {
       const next = new Set(prev);
@@ -405,7 +413,13 @@ export default function SiteHeader() {
 
         {/* Móvil / tablet (hasta lg): Sheet con buscador + categorías colapsables */}
         <div className="lg:hidden">
-          <Sheet onOpenChange={(o) => !o && setMenuQuery('')}>
+          <Sheet
+            open={sheetOpen}
+            onOpenChange={(o) => {
+              setSheetOpen(o);
+              if (!o) setMenuQuery('');
+            }}
+          >
             <SheetTrigger
               className="inline-flex h-11 w-11 items-center justify-center rounded-lg border-3 border-ink bg-surface text-ink transition-[background-color,transform] duration-150 ease-out hover-fine:bg-muted active:scale-[0.98] active:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink focus-visible:ring-offset-2"
               aria-label="Abrir menú"
@@ -480,15 +494,27 @@ export default function SiteHeader() {
                 <div>
                 {menuQuery.trim() ? (
                   /* Resultados de búsqueda: lista plana */
-                  menuResults.length > 0 ? (
-                    <div className="flex flex-col gap-1">
-                      {menuResults.map((tool) => renderToolLink(tool))}
-                    </div>
-                  ) : (
-                    <p className="px-1 py-8 text-center text-sm text-muted-foreground">
-                      Sin resultados para “{menuQuery}”.
-                    </p>
-                  )
+                  <div className="flex flex-col gap-1">
+                    {menuResults.length > 0 ? (
+                      menuResults.map((tool) => renderToolLink(tool))
+                    ) : (
+                      <p
+                        className={cn(
+                          'px-1 text-center text-sm text-muted-foreground',
+                          menuIntent ? 'pb-2 pt-4' : 'py-8'
+                        )}
+                      >
+                        Sin resultados para “{menuQuery}”.
+                      </p>
+                    )}
+                    {menuIntent && (
+                      <UnavailableHint
+                        intent={menuIntent}
+                        onAlternative={openAlternative}
+                        className="mt-2"
+                      />
+                    )}
+                  </div>
                 ) : (
                   /* Categorías colapsables, agrupadas por módulo si hay 2+ */
                   byModule ? (

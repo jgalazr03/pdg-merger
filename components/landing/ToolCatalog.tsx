@@ -10,9 +10,11 @@ import {
   type ToolCategory,
   type ToolModule,
 } from '@/lib/tools';
+import { searchTools, findUnavailableIntent } from '@/lib/search-tools';
 import { useRecentTools } from '@/lib/recent-tools';
 import { cn } from '@/lib/utils';
 import ToolCard from './ToolCard';
+import UnavailableHint from '@/components/UnavailableHint';
 
 /**
  * Catálogo de herramientas como LANZADOR (no como muro de tarjetas).
@@ -22,8 +24,9 @@ import ToolCard from './ToolCard';
  * acceso rápido: un buscador tipo command-bar + filtros de categoría que llevan
  * la carga de "muro" a "navegable en un tap o un tecleo".
  *
- *  - Buscar: filtra al instante, insensible a mayúsculas y acentos, sobre nombre
- *    y descripción. Atajo "/" para enfocar (patrón big tech); Escape limpia.
+ *  - Buscar: el buscador único (`searchTools`): nombre, sinónimos, título y
+ *    descripción, insensible a acentos y con ranking. Atajo "/" para enfocar
+ *    (patrón big tech); Escape limpia. Si la tarea no existe, lo dice.
  *  - Filtrar: chips de categoría; el estado seleccionado se rellena en navy.
  *  - Vista por defecto (sin filtro): todas las secciones agrupadas, descubribles
  *    y renderizadas en el HTML (SSR) para no perder SEO.
@@ -36,9 +39,6 @@ const STAGGER_CAP = 12; // a partir de aquí, todo entra a la vez
 const STAGGER_BASE = 50; // arranca justo tras el fade del hero
 const revealDelay = (order: number) =>
   STAGGER_BASE + Math.min(order, STAGGER_CAP) * STAGGER_STEP;
-
-const norm = (s: string) =>
-  s.normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase();
 
 export default function ToolCatalog({ module }: { module?: ToolModule } = {}) {
   const groups = toolsByCategory(module);
@@ -83,13 +83,16 @@ export default function ToolCatalog({ module }: { module?: ToolModule } = {}) {
 
   // Resultados de búsqueda (planos), respetando el módulo y la categoría activa.
   const results = isSearching
-    ? TOOLS.filter(
-        (t) =>
-          (!module || moduleOf(t) === module) &&
-          (cat === 'all' || t.category === cat) &&
-          norm(`${t.name} ${t.tagline}`).includes(norm(q))
+    ? searchTools(
+        TOOLS.filter(
+          (t) =>
+            (!module || moduleOf(t) === module) &&
+            (cat === 'all' || t.category === cat)
+        ),
+        q
       )
     : [];
+  const intent = isSearching ? findUnavailableIntent(q) : undefined;
 
   // Vista de navegación (sin búsqueda): todas las secciones o solo la activa.
   const browseGroups =
@@ -211,6 +214,7 @@ export default function ToolCatalog({ module }: { module?: ToolModule } = {}) {
                 <ToolCard key={tool.slug} tool={tool} />
               ))}
             </div>
+            {intent && <UnavailableHint intent={intent} className="mt-6" />}
           </>
         ) : (
           <div className="rounded-lg border-4 border-ink bg-card p-8 text-center">
@@ -221,6 +225,12 @@ export default function ToolCatalog({ module }: { module?: ToolModule } = {}) {
               Prueba con otro término o limpia la búsqueda para ver todas las
               herramientas.
             </p>
+            {intent && (
+              <UnavailableHint
+                intent={intent}
+                className="mx-auto mt-5 max-w-md bg-surface"
+              />
+            )}
             <button
               type="button"
               onClick={clear}
