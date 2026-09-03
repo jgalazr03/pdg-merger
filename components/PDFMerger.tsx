@@ -81,6 +81,12 @@ export default function PDFMerger() {
   useEffect(() => {
     setDownloadUrl(null);
   }, [filesSignature]);
+  // Última firma vista: la unión es asíncrona y la lista puede cambiar mientras
+  // corre; al terminar se compara para no publicar un PDF que ya nació viejo.
+  const filesSignatureRef = useRef(filesSignature);
+  useEffect(() => {
+    filesSignatureRef.current = filesSignature;
+  }, [filesSignature]);
 
   // Libera el object URL del resultado al descartarlo, regenerar o desmontar.
   useEffect(() => {
@@ -246,6 +252,7 @@ export default function PDFMerger() {
     if (files.length < 1) return;
     if (!validateFileName(fileName)) return;
 
+    const signatureAtStart = filesSignature;
     setIsProcessing(true);
     try {
       const mergedPdf = await PDFDocument.create();
@@ -298,6 +305,14 @@ export default function PDFMerger() {
       }
 
       const pdfBytes = await mergedPdf.save();
+      if (filesSignatureRef.current !== signatureAtStart) {
+        // Se agregó, quitó o reordenó algo durante la unión: este PDF no
+        // refleja la lista actual. Se descarta y se pide volver a unir.
+        toast('La lista cambió mientras se unía', {
+          description: 'Vuelve a pulsar "Unir archivos" para generar el PDF con la lista actual.',
+        });
+        return;
+      }
       const blob = new Blob([pdfBytes], { type: 'application/pdf' });
       const url = URL.createObjectURL(blob);
       setDownloadUrl(url);
