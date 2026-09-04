@@ -4,8 +4,9 @@ import { useState, useRef, useEffect } from 'react';
 // Las librerías pesadas (ExcelJS ~900 KB, pdfjs-dist, pdf-lib, JSZip) se cargan
 // con import() dinámico SOLO al comprimir/descargar, no al abrir la herramienta,
 // para que la pantalla aparezca al instante (ver loaders más abajo).
-import { FileText, Download, Loader2, X, Minimize2 as Compress, FileSpreadsheet, Clock } from 'lucide-react';
+import { FileText, Download, Loader2, X, Minimize2 as Compress, FileSpreadsheet, Clock, Info } from 'lucide-react';
 import { toast } from 'sonner';
+import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { performanceMonitor } from '@/lib/performance-monitor';
 import { Card, CardContent } from '@/components/ui/card';
@@ -44,15 +45,20 @@ interface ProcessableFile {
   error?: string;
   type: 'pdf' | 'excel';
   progress?: number; // Progress percentage for large files
-  estimatedTime?: string; // Estimated time remaining
+  estimatedTime?: string; // Tiempo restante estimado (compresión de Excel)
+  progressLabel?: string; // Texto de progreso más preciso, p. ej. "Página 12 de 40" (PDF)
+  errorKind?: 'password' | 'generic'; // Distingue el error de contraseña para mostrar el enlace a Proteger PDF
 }
 
 type CompressionLevel = 'low' | 'medium' | 'high';
 
+const PASSWORD_ERROR = 'Protegido con contraseña. Quítala primero con Proteger PDF.';
+const GENERIC_FILE_ERROR = 'No se pudo abrir este archivo. Comprueba que no esté dañado.';
+
 const compressionSettings = {
-  low: { scale: 0.9, quality: 0.85, description: 'Mejor calidad, menor reducción' },
-  medium: { scale: 0.7, quality: 0.6, description: 'Equilibrado' },
-  high: { scale: 0.5, quality: 0.4, description: 'Menor calidad, mayor reducción' }
+  low: { scale: 0.9, quality: 0.85, label: 'Ligera', description: 'Casi igual al original, reduce poco' },
+  medium: { scale: 0.7, quality: 0.6, label: 'Recomendada', description: 'Equilibrio para correo' },
+  high: { scale: 0.5, quality: 0.4, label: 'Máxima', description: 'Menor calidad, mínimo peso' }
 };
 
 const tool = getTool('comprimir');
@@ -72,7 +78,7 @@ const accent = tool.accent;
  * 
  * Supported formats:
  * - PDF (.pdf)
- * - Excel (.xlsx, .xls)
+ * - Excel (.xlsx)
  */
 export default function PDFCompressor() {
   const [files, setFiles] = useState<ProcessableFile[]>([]);
@@ -112,13 +118,23 @@ export default function PDFCompressor() {
     let totalSize = files.reduce((sum, file) => sum + file.originalSize, 0);
 
     for (const file of Array.from(selectedFiles)) {
+      const lowerName = file.name.toLowerCase();
+
+      // El formato .xls antiguo no lo puede leer ExcelJS (solo .xlsx): se
+      // rechaza aparte con un mensaje que explica cómo resolverlo.
+      const isOldExcel = file.type === 'application/vnd.ms-excel' || lowerName.endsWith('.xls');
+      if (isOldExcel) {
+        toast.error('El formato .xls antiguo no es compatible', {
+          description: 'Ábrelo en Excel y guárdalo como .xlsx.',
+        });
+        continue;
+      }
+
       // Validate file type (PDF or Excel)
       const isPDF = file.type === 'application/pdf';
-      const isExcel = file.type === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' || 
-                     file.type === 'application/vnd.ms-excel' ||
-                     file.name.toLowerCase().endsWith('.xlsx') ||
-                     file.name.toLowerCase().endsWith('.xls');
-      
+      const isExcel = file.type === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' ||
+                     lowerName.endsWith('.xlsx');
+
       if (!isPDF && !isExcel) {
         toast.error('Archivo no válido', {
           description: `"${file.name}" no es un PDF ni un Excel válido.`,
@@ -158,7 +174,7 @@ export default function PDFCompressor() {
       const newFiles: ProcessableFile[] = await Promise.all(
         validFiles.map(async (file) => {
           const fileType = file.type === 'application/pdf' ? 'pdf' : 'excel';
-          const fileName = file.name.replace(/\.(pdf|xlsx|xls)$/i, '');
+          const fileName = file.name.replace(/\.(pdf|xlsx)$/i, '');
 
           return {
             id: Math.random().toString(36).substring(2, 15),
@@ -233,8 +249,24 @@ export default function PDFCompressor() {
         width: viewport.width,
         height: viewport.height,
       });
+
+      // Progreso real por página (deja 90-100% para el guardado final).
+      setFiles(prev => prev.map(f =>
+        f.id === pdfFile.id ? {
+          ...f,
+          progress: Math.round((pageNum / pdf.numPages) * 90),
+          progressLabel: `Página ${pageNum} de ${pdf.numPages}`,
+        } : f
+      ));
+
+      // Cede el hilo para que la barra se pinte antes de renderizar la siguiente página.
+      await new Promise((resolve) => setTimeout(resolve, 0));
     }
-    
+
+    setFiles(prev => prev.map(f =>
+      f.id === pdfFile.id ? { ...f, progress: 90, progressLabel: 'Guardando…' } : f
+    ));
+
     const pdfBytes = await newPdf.save();
     return new Blob([pdfBytes], { type: 'application/pdf' });
   };
@@ -513,6 +545,7 @@ export default function PDFCompressor() {
             compressedSize: bestBlob.size,
             isProcessing: false,
             progress: 100,
+            progressLabel: undefined,
             estimatedTime: undefined
           } : f
         ));
@@ -527,12 +560,17 @@ export default function PDFCompressor() {
         performanceMonitor.recordError(file.id, error instanceof Error ? error.message : 'Unknown error');
         performanceMonitor.finishMonitoring(file.id);
 
+        // El PDF pedía contraseña: mensaje específico con enlace a Proteger PDF.
+        const isPasswordError = (error as { name?: string } | null)?.name === 'PasswordException';
+
         setFiles(prev => prev.map(f =>
           f.id === file.id ? {
             ...f,
             isProcessing: false,
-            error: 'Error al comprimir el archivo',
+            error: isPasswordError ? PASSWORD_ERROR : GENERIC_FILE_ERROR,
+            errorKind: isPasswordError ? 'password' : 'generic',
             progress: undefined,
+            progressLabel: undefined,
             estimatedTime: undefined
           } : f
         ));
@@ -541,12 +579,14 @@ export default function PDFCompressor() {
 
     setIsProcessing(false);
 
-    if (successCount > 0) {
+    if (successCount > 0 && errorCount > 0) {
+      const warn = typeof toast.warning === 'function' ? toast.warning : toast;
+      warn(`Se comprimieron ${successCount} de ${successCount + errorCount} archivos`, {
+        description: 'Revisa los marcados en rojo.',
+      });
+    } else if (successCount > 0) {
       toast.success(
-        `${successCount} archivo${successCount !== 1 ? 's' : ''} comprimido${successCount !== 1 ? 's' : ''}`,
-        errorCount > 0
-          ? { description: `${errorCount} no se pudo comprimir.` }
-          : undefined
+        `${successCount} archivo${successCount !== 1 ? 's' : ''} comprimido${successCount !== 1 ? 's' : ''}`
       );
     } else if (errorCount > 0) {
       toast.error('No se pudo comprimir', {
@@ -651,9 +691,9 @@ export default function PDFCompressor() {
         accent={accent}
         loaded={step > 1}
         multiple
-        accept=".pdf,.xlsx,.xls,application/pdf,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel"
+        accept=".pdf,.xlsx,application/pdf,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
         idleTitle="Selecciona archivos PDF o Excel"
-        idleSubtitle="Haz clic aquí o arrastra y suelta tus archivos PDF (.pdf) o Excel (.xlsx, .xls)"
+        idleSubtitle="Haz clic aquí o arrastra y suelta tus archivos PDF (.pdf) o Excel (.xlsx)"
         dragTitle="Suelta los archivos aquí"
         buttonLabel="Seleccionar archivos"
         ariaLabel="Seleccionar o arrastrar archivos PDF o Excel"
@@ -718,8 +758,8 @@ export default function PDFCompressor() {
                         : 'bg-surface hover-fine:bg-muted'
                     )}
                   >
-                    <div className="mb-1 font-bold capitalize text-ink">
-                      {level === 'low' ? 'Baja' : level === 'medium' ? 'Media' : 'Alta'}
+                    <div className="mb-1 font-bold text-ink">
+                      {settings.label}
                     </div>
                     <div className="text-sm text-muted-foreground">
                       {settings.description}
@@ -727,8 +767,12 @@ export default function PDFCompressor() {
                   </button>
                 ))}
               </div>
+              <p className="mt-3 flex items-start gap-2 text-xs text-muted-foreground">
+                <Info className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                Los PDF se guardan como imagen por página: el texto ya no se podrá buscar ni copiar. Ideal para escaneos y para enviar por correo.
+              </p>
             </div>
-            
+
             <div className="space-y-4">
               {files.map((file) => (
                 <div
@@ -763,7 +807,9 @@ export default function PDFCompressor() {
                       {file.isProcessing && file.progress !== undefined && (
                         <div className="space-y-2" aria-live="polite">
                           <div className="flex items-center justify-between text-xs">
-                            <span className={accent.text}>Progreso: {file.progress}%</span>
+                            <span className={accent.text}>
+                              {file.progressLabel ?? `Progreso: ${file.progress}%`}
+                            </span>
                             {file.estimatedTime && (
                               <span className="flex items-center gap-1 text-muted-foreground">
                                 <Clock className="h-3 w-3" />
@@ -775,7 +821,17 @@ export default function PDFCompressor() {
                         </div>
                       )}
                       {file.error && (
-                        <p className="text-brand-red">{file.error}</p>
+                        <div className="space-y-1">
+                          <p className="text-brand-red">{file.error}</p>
+                          {file.errorKind === 'password' && (
+                            <Link
+                              href="/contrasena-pdf"
+                              className="font-bold text-ink underline underline-offset-4"
+                            >
+                              Abrir Proteger PDF
+                            </Link>
+                          )}
+                        </div>
                       )}
                     </div>
                   </div>
@@ -851,10 +907,7 @@ export default function PDFCompressor() {
               ¿Listo para comprimir?
             </h2>
             <p className="mb-6 text-muted-foreground">
-              Se comprimir{files.length !== 1 ? 'án' : 'á'} {files.length} archivo{files.length !== 1 ? 's' : ''} con nivel de compresión {
-                compressionLevel === 'low' ? 'bajo' :
-                compressionLevel === 'medium' ? 'medio' : 'alto'
-              }.
+              Se comprimir{files.length !== 1 ? 'án' : 'á'} {files.length} archivo{files.length !== 1 ? 's' : ''} con nivel {compressionSettings[compressionLevel].label}.
             </p>
             <div className="text-center">
               <Button
