@@ -20,13 +20,16 @@ import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
-import { cn, scrollIntoViewSafe } from '@/lib/utils';
+import { cn } from '@/lib/utils';
 import { toastUndo } from '@/lib/toast';
 import { getTool } from '@/lib/tools';
+import { loadPdfjs } from '@/lib/pdf-thumbnails';
 import { fileNameError, resolveFileName } from '@/lib/file-name';
+import { useHandoff } from '@/lib/handoff';
 import ToolShell from '@/components/tools/ToolShell';
 import FileDropzone from '@/components/tools/FileDropzone';
 import ToolConstraints from '@/components/tools/ToolConstraints';
+import NextSteps from '@/components/tools/NextSteps';
 import FileNameField from '@/components/tools/FileNameField';
 import { useFlip } from '@/components/tools/useFlip';
 
@@ -36,20 +39,6 @@ const accent = tool.accent;
 // PDF + imágenes que el navegador sabe decodificar (mismo criterio que Convertir).
 const ACCEPT =
   '.pdf,.jpg,.jpeg,.png,.webp,.gif,.bmp,.svg,.avif,application/pdf,image/*';
-
-// Carga perezosa y memoizada de pdfjs-dist (solo para las miniaturas); configura
-// el worker una sola vez. pdf-lib (la reorganización real, sin pérdida) se
-// importa aparte al guardar. Así la herramienta abre al instante.
-let pdfjsPromise: Promise<typeof import('pdfjs-dist')> | null = null;
-const loadPdfjs = async () => {
-  if (!pdfjsPromise) {
-    pdfjsPromise = import('pdfjs-dist').then((mod) => {
-      mod.GlobalWorkerOptions.workerSrc = '/pdf.worker.min.js';
-      return mod;
-    });
-  }
-  return pdfjsPromise;
-};
 
 type SourceKind = 'pdf' | 'image';
 
@@ -149,20 +138,9 @@ export default function PDFOrganizer() {
   // Foto del documento "como se cargó" para "Restablecer"; crece al agregar archivos.
   const initialRef = useRef<PageItem[]>([]);
   const addInputRef = useRef<HTMLInputElement>(null);
-  const editorRef = useRef<HTMLDivElement>(null);
-  const resultRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (pages.length > 0 && !downloadUrl) {
-      setTimeout(() => scrollIntoViewSafe(editorRef.current), 100);
-    }
-  }, [pages.length, downloadUrl]);
-
-  useEffect(() => {
-    if (downloadUrl) {
-      setTimeout(() => scrollIntoViewSafe(resultRef.current), 100);
-    }
-  }, [downloadUrl]);
+  // Blob detrás de `downloadUrl`: se conserva para poder traspasarlo
+  // ("Continuar con…") como un `File` nuevo sin volver a generar el PDF.
+  const resultBlobRef = useRef<Blob | null>(null);
 
   // Libera el object URL del resultado al desmontar / regenerar.
   useEffect(() => {
@@ -170,6 +148,31 @@ export default function PDFOrganizer() {
       if (downloadUrl) URL.revokeObjectURL(downloadUrl);
     };
   }, [downloadUrl]);
+
+  // El PDF generado es una foto de la rejilla en el momento de guardar. Si la
+  // rejilla cambia después (agregar, quitar, reordenar, girar), ese resultado
+  // ya no corresponde: se descarta para que vuelva "Guardar PDF organizado" y
+  // se regenere. Se detecta por firma (no por cada mutador) para no olvidar
+  // ninguno.
+  const pagesSignature = pages.map((p) => `${p.id}:${p.rotation}`).join('|');
+  // Último resultado visto (no en las dependencias del efecto: si lo
+  // metiéramos, el propio setDownloadUrl(null) volvería a dispararlo). Así el
+  // aviso de abajo solo suena cuando SÍ había un PDF generado.
+  const lastResultRef = useRef<string | null>(null);
+  useEffect(() => {
+    lastResultRef.current = downloadUrl;
+  }, [downloadUrl]);
+
+  useEffect(() => {
+    if (lastResultRef.current) {
+      toast('El documento cambió', {
+        description: 'Vuelve a guardar para incluir los cambios.',
+      });
+    }
+    setDownloadUrl(null);
+    setResultMeta(null);
+    resultBlobRef.current = null;
+  }, [pagesSignature]);
 
   const formatFileSize = (bytes: number): string => {
     if (bytes < 1024) return `${bytes} B`;
@@ -299,8 +302,9 @@ export default function PDFOrganizer() {
       setPages((prev) => [...prev, ...newPages]);
       // "Restablecer" vuelve al orden de carga, conservando los archivos agregados.
       initialRef.current = [...initialRef.current, ...newPages.map((p) => ({ ...p }))];
-      setDownloadUrl(null);
-      setResultMeta(null);
+      // El resultado (si lo hay) se invalida solo: el efecto de `pagesSignature`
+      // lo detecta y avisa (agregar páginas SÍ debe avisar, a diferencia de
+      // "Restablecer" o "Quitar todo").
       if (firstLoad) {
         // Nombre nuevo solo al empezar de cero: agregar más archivos a un
         // documento ya en curso no debe borrar el nombre que la persona escribió.
@@ -326,6 +330,12 @@ export default function PDFOrganizer() {
       );
     }
   };
+
+  // Recibe el archivo traspasado desde otra herramienta ("Continuar con…"),
+  // si lo hay, y lo agrega igual que si se hubiera seleccionado a mano.
+  useHandoff((file) => {
+    void addFiles([file]);
+  });
 
   const movePage = (from: number, to: number) => {
     setPages((prev) => {
@@ -379,6 +389,12 @@ export default function PDFOrganizer() {
 
   const resetChanges = () => {
     setPages(initialRef.current.map((p) => ({ ...p, rotation: 0 })));
+    // Mismo evento que el cambio de páginas: el efecto de `pagesSignature` ve
+    // el resultado ya limpio y no dispara el aviso "El documento cambió"
+    // (mismo truco que `resetAll`, ver ese useEffect más arriba).
+    setDownloadUrl(null);
+    setResultMeta(null);
+    resultBlobRef.current = null;
   };
 
   // FLIP: desliza las miniaturas a su nueva celda al reordenar (arrastre o flechas).
@@ -449,6 +465,7 @@ export default function PDFOrganizer() {
       const pageCount = out.getPageCount();
       const pdfBytes = await out.save();
       const blob = new Blob([pdfBytes], { type: 'application/pdf' });
+      resultBlobRef.current = blob;
       setDownloadUrl(URL.createObjectURL(blob));
       setResultMeta({ pages: pageCount, size: blob.size });
       toast.success('¡PDF organizado correctamente!');
@@ -472,6 +489,17 @@ export default function PDFOrganizer() {
     document.body.removeChild(link);
   };
 
+  // Archivo del resultado para el traspaso "Continuar con…": se reconstruye
+  // del blob guardado (no vuelve a generar el PDF).
+  const resultFile = (): File | null =>
+    resultBlobRef.current
+      ? new File(
+          [resultBlobRef.current],
+          `${resolveFileName(fileName, defaultFileName())}.pdf`,
+          { type: 'application/pdf' }
+        )
+      : null;
+
   const resetAll = () => {
     setSources([]);
     setPages([]);
@@ -481,6 +509,7 @@ export default function PDFOrganizer() {
     setFileName('');
     setNameError(null);
     initialRef.current = [];
+    resultBlobRef.current = null;
   };
 
   const clearAllWithUndo = () => {
@@ -493,6 +522,7 @@ export default function PDFOrganizer() {
     setFileName('');
     setNameError(null);
     initialRef.current = [];
+    resultBlobRef.current = null;
     toastUndo('Archivos descartados', {
       description: 'Agrega otros archivos, o recupéralos si fue un error.',
       onUndo: () => {
@@ -508,8 +538,191 @@ export default function PDFOrganizer() {
   const step: 1 | 2 | 3 =
     sources.length === 0 && !isRendering ? 1 : downloadUrl ? 3 : 2;
 
+  // ---- Derivados para el panel de acción -----------------------------------
+  const sourcesLabel =
+    sources.length === 1 ? sources[0].file.name : `${sources.length} archivos`;
+  const pagesLabel = `${pages.length} ${pages.length === 1 ? 'página' : 'páginas'}`;
+  const ctaLabel = isProcessing ? 'Organizando…' : 'Guardar PDF organizado';
+  const ctaDisabled = isProcessing || isRendering || !!nameError || pages.length === 0;
+  const resultName = `${resolveFileName(fileName, defaultFileName())}.pdf`;
+
+  // Progreso de la vista previa cuando se agregan archivos a una rejilla que
+  // ya tiene páginas visibles (el caso "sin páginas" tiene su propia tarjeta
+  // en el contenido).
+  const progressBlock = isRendering && pages.length > 0 && (
+    <div className="mt-3" aria-live="polite">
+      <p className="text-sm font-bold tabular-nums text-ink">
+        Generando vista previa… {renderProgress}%
+      </p>
+      <Progress
+        value={renderProgress}
+        className="mt-2 h-2"
+        aria-label="Progreso de la vista previa"
+      />
+    </div>
+  );
+
+  // Panel de acción (lg+: columna derecha pegajosa; debajo: fluye tras el
+  // editor y deja el resumen, el nombre y el botón a la barra inferior).
+  const aside = (pages.length > 0 || !!downloadUrl) && (
+    <div className="rounded-lg border-3 border-ink bg-card p-4 sm:p-5">
+      {downloadUrl ? (
+        <>
+          <p className="text-xs font-bold uppercase tracking-[0.15em] text-success">
+            Listo
+          </p>
+          <p className="mt-2 break-words text-base font-bold text-ink">{resultName}</p>
+          {resultMeta && (
+            <p className="mt-1 text-sm tabular-nums text-muted-foreground">
+              {resultMeta.pages} {resultMeta.pages === 1 ? 'página' : 'páginas'} ·{' '}
+              {formatFileSize(resultMeta.size)}
+            </p>
+          )}
+          <div className="mt-4 hidden flex-col gap-2 lg:flex">
+            <Button
+              onClick={downloadOrganized}
+              size="lg"
+              className={cn('w-full', accent.solid)}
+            >
+              <Download className="mr-2 h-5 w-5" />
+              Descargar PDF
+            </Button>
+            <Button variant="outline" onClick={resetAll} size="lg" className="w-full">
+              Organizar otros archivos
+            </Button>
+          </div>
+          <NextSteps
+            tool={tool}
+            getFile={resultFile}
+            className="mt-4 border-t-3 border-ink pt-4"
+          />
+        </>
+      ) : (
+        <>
+          <div className="hidden lg:block">
+            <p className="text-xs font-bold uppercase tracking-[0.15em] text-muted-foreground">
+              Resumen
+            </p>
+            <p
+              className="mt-2 break-words text-sm font-bold tabular-nums text-ink"
+              aria-live="polite"
+            >
+              {sourcesLabel}
+            </p>
+            <p className="text-sm tabular-nums text-muted-foreground">
+              {formatFileSize(totalSize)} · {pagesLabel}
+            </p>
+          </div>
+
+          <div className="lg:mt-4">
+            <p className="mb-3 text-xs font-bold uppercase tracking-[0.15em] text-muted-foreground lg:hidden">
+              Opciones
+            </p>
+            <FileNameField
+              id="organizer-filename"
+              label="Nombre del archivo final"
+              value={fileName}
+              onChange={handleFileNameChange}
+              error={nameError}
+              placeholder={defaultFileName()}
+              extension=".pdf"
+              disabled={isProcessing}
+              onSubmit={() => {
+                if (!isProcessing && !isRendering && !nameError) void applyOrganize();
+              }}
+            />
+          </div>
+
+          <div className="mt-4 hidden lg:block">
+            <Button
+              onClick={applyOrganize}
+              disabled={ctaDisabled}
+              aria-busy={isProcessing}
+              size="lg"
+              className={cn('w-full', accent.solid)}
+            >
+              {isProcessing ? (
+                <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+              ) : (
+                <LayoutGrid className="mr-2 h-5 w-5" />
+              )}
+              {ctaLabel}
+            </Button>
+            {progressBlock}
+          </div>
+        </>
+      )}
+    </div>
+  );
+
+  // Barra inferior fija (solo por debajo de lg): resumen compacto + acción.
+  const bar = (pages.length > 0 || !!downloadUrl) && (
+    <div className="border-t-3 border-ink bg-surface pl-[max(20px,env(safe-area-inset-left))] pr-[max(20px,env(safe-area-inset-right))] pb-[max(12px,env(safe-area-inset-bottom))] pt-3">
+      <div className="container mx-auto flex max-w-6xl items-center gap-3">
+        <div className="min-w-0 flex-1">
+          {downloadUrl ? (
+            <>
+              <p className="truncate text-sm font-bold text-ink">{resultName}</p>
+              {resultMeta && (
+                <p className="truncate text-xs tabular-nums text-muted-foreground">
+                  {resultMeta.pages} {resultMeta.pages === 1 ? 'página' : 'páginas'} ·{' '}
+                  {formatFileSize(resultMeta.size)}
+                </p>
+              )}
+            </>
+          ) : isRendering ? (
+            <div aria-live="polite">
+              <p className="truncate text-sm font-bold tabular-nums text-ink">
+                Generando vista previa…
+              </p>
+              <Progress
+                value={renderProgress}
+                className="mt-1.5 h-2"
+                aria-label="Progreso de la vista previa"
+              />
+            </div>
+          ) : (
+            <>
+              <p className="truncate text-sm font-bold tabular-nums text-ink">
+                {pagesLabel}
+              </p>
+              <p className="truncate text-xs tabular-nums text-muted-foreground">
+                {formatFileSize(totalSize)}
+              </p>
+            </>
+          )}
+        </div>
+        {downloadUrl ? (
+          <>
+            <Button variant="outline" onClick={resetAll} className="shrink-0">
+              Otro
+            </Button>
+            <Button onClick={downloadOrganized} className={cn('shrink-0', accent.solid)}>
+              <Download className="mr-2 h-4 w-4" />
+              Descargar
+            </Button>
+          </>
+        ) : (
+          <Button
+            onClick={applyOrganize}
+            disabled={ctaDisabled}
+            aria-busy={isProcessing}
+            className={cn('shrink-0', accent.solid)}
+          >
+            {isProcessing ? (
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            ) : (
+              <LayoutGrid className="mr-2 h-4 w-4" />
+            )}
+            Guardar PDF
+          </Button>
+        )}
+      </div>
+    </div>
+  );
+
   return (
-    <ToolShell tool={tool} step={step}>
+    <ToolShell tool={tool} step={step} aside={aside} bar={bar}>
       {/* Entrada oculta para "Agregar" desde el editor; value se limpia para
           permitir volver a elegir el mismo archivo. */}
       <input
@@ -556,8 +769,8 @@ export default function PDFOrganizer() {
         </Card>
       )}
 
-      {pages.length > 0 && !downloadUrl && (
-        <Card className="mb-8 motion-safe:animate-slide-up" ref={editorRef}>
+      {pages.length > 0 && (
+        <Card className="mb-8 motion-safe:animate-slide-up">
           <CardContent className="p-4 sm:p-6">
             {/* Encabezado + agregar/quitar: apilado en móvil. */}
             <div className="mb-5 flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -763,74 +976,6 @@ export default function PDFOrganizer() {
                 </li>
               ))}
             </ul>
-
-            <div className="mt-6 text-center">
-              <div className="mx-auto mb-4 max-w-md text-left">
-                <FileNameField
-                  id="organizer-filename"
-                  label="Nombre del archivo final"
-                  value={fileName}
-                  onChange={handleFileNameChange}
-                  error={nameError}
-                  placeholder={defaultFileName()}
-                  extension=".pdf"
-                  disabled={isProcessing}
-                  onSubmit={() => {
-                    if (!isProcessing && !isRendering && !nameError) void applyOrganize();
-                  }}
-                />
-              </div>
-              <Button
-                onClick={applyOrganize}
-                disabled={isProcessing || isRendering || !!nameError}
-                aria-busy={isProcessing}
-                size="lg"
-                className={accent.solid}
-              >
-                {isProcessing ? (
-                  <>
-                    <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                    Organizando…
-                  </>
-                ) : (
-                  <>
-                    <LayoutGrid className="mr-2 h-5 w-5" />
-                    Guardar PDF organizado
-                  </>
-                )}
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {downloadUrl && (
-        <Card ref={resultRef} className="motion-safe:animate-slide-up">
-          <CardContent className="p-4 text-center sm:p-6">
-            <div className="mb-4 inline-flex h-16 w-16 items-center justify-center rounded-full border-3 border-ink bg-success text-white">
-              <Download className="h-8 w-8" />
-            </div>
-            <h2 className="mb-2 text-lg font-bold text-success">¡Listo!</h2>
-            <p className="mb-1 text-ink">
-              Tu PDF organizado está listo para descargar como &quot;
-              {resolveFileName(fileName, defaultFileName())}.pdf&quot;.
-            </p>
-            {resultMeta && (
-              <p className="mb-6 text-sm tabular-nums text-muted-foreground">
-                {resolveFileName(fileName, defaultFileName())}.pdf ·{' '}
-                {resultMeta.pages} página{resultMeta.pages === 1 ? '' : 's'} ·{' '}
-                {formatFileSize(resultMeta.size)}
-              </p>
-            )}
-            <div className="flex flex-col justify-center gap-3 sm:flex-row">
-              <Button onClick={downloadOrganized} size="lg" className={accent.solid}>
-                <Download className="mr-2 h-5 w-5" />
-                Descargar PDF
-              </Button>
-              <Button variant="outline" onClick={resetAll} size="lg">
-                Organizar otros archivos
-              </Button>
-            </div>
           </CardContent>
         </Card>
       )}
