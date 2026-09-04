@@ -403,6 +403,7 @@ export const TOOLS: ToolDef[] = [
       'Genera un documento por cada rango',
     ],
     accent: TONES.amber,
+    nextSteps: ['comprimir', 'contrasena-pdf', 'firmar-pdf'],
   },
   {
     slug: 'comprimir',
@@ -469,6 +470,7 @@ export const TOOLS: ToolDef[] = [
       'No soporta Office (Word/Excel), TIFF ni HEIC: no se pueden procesar en el navegador',
     ],
     accent: TONES.indigo,
+    nextSteps: ['comprimir', 'contrasena-pdf', 'firmar-pdf'],
   },
   {
     slug: 'girar',
@@ -527,6 +529,7 @@ export const TOOLS: ToolDef[] = [
       'Las páginas PDF se copian sin pérdida: no se rasteriza el contenido',
     ],
     accent: TONES.violet,
+    nextSteps: ['comprimir', 'contrasena-pdf', 'firmar-pdf'],
   },
 
   // ---- Catálogo ampliado ----------------------------------------------------

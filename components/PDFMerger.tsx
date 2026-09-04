@@ -23,6 +23,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { cn } from '@/lib/utils';
 import { toastUndo } from '@/lib/toast';
+import { useHandoff, fileListFrom } from '@/lib/handoff';
 import { getTool } from '@/lib/tools';
 import { fileNameError, resolveFileName } from '@/lib/file-name';
 import {
@@ -256,6 +257,12 @@ export default function PDFMerger() {
       void hydratePreviews(newFiles);
     }
   };
+
+  // Recibe el archivo traspasado desde otra herramienta ("Continuar con…"),
+  // p. ej. un PDF recién comprimido, y lo agrega como si se hubiera elegido.
+  useHandoff((file) => {
+    handleFileSelect(fileListFrom([file]));
+  });
 
   // Eliminar con SALIDA: la fila se desvanece (opacidad + escala, GPU) y al
   // terminar se quita del estado; entonces el FLIP cierra el hueco deslizando
