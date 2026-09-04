@@ -45,7 +45,7 @@ export default function ToolCard({
       </div>
 
       <h2 className="mt-5 text-lg font-bold text-ink decoration-2 underline-offset-4 group-hover-fine:underline">
-        {tool.title}
+        {tool.name}
       </h2>
       <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
         {tool.tagline}

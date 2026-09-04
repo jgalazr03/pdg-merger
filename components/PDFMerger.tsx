@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
+import Link from 'next/link';
 import { PDFDocument } from 'pdf-lib';
 import {
   FileText,
@@ -8,7 +9,7 @@ import {
   Loader2,
   X,
   GripVertical,
-  Edit3,
+  ArrowDownAZ,
   Image as ImageIcon,
   Crop,
   ChevronUp,
@@ -19,12 +20,11 @@ import {
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { Progress } from '@/components/ui/progress';
 import { cn } from '@/lib/utils';
 import { toastUndo } from '@/lib/toast';
 import { getTool } from '@/lib/tools';
+import { fileNameError, resolveFileName } from '@/lib/file-name';
 import {
   previewPdf,
   imagePreviewUrl,
@@ -34,6 +34,7 @@ import ToolShell from '@/components/tools/ToolShell';
 import FileDropzone from '@/components/tools/FileDropzone';
 import ToolConstraints from '@/components/tools/ToolConstraints';
 import NextSteps from '@/components/tools/NextSteps';
+import FileNameField from '@/components/tools/FileNameField';
 import { useFlip } from '@/components/tools/useFlip';
 import ImageCropModal, { CropResult } from '@/components/ImageCropModal';
 
@@ -52,7 +53,21 @@ interface PDFFile {
   /** Portada: data URL (PDF, primera página) u object URL (imagen);
    *  `undefined` mientras se genera, `null` si no se pudo. */
   thumb?: string | null;
+  /** Mensaje si el archivo no se pudo abrir (contraseña o dañado). Sin
+   *  error, no cuenta para el resumen ni participa en la unión. */
+  error?: string;
 }
+
+/** Mensajes de error por archivo, compartidos entre `hydratePreviews` y
+ *  `mergePDFs` (el mismo archivo puede fallar en cualquiera de los dos). */
+const PASSWORD_ERROR = 'Protegido con contraseña. Quítala primero con Proteger PDF.';
+const GENERIC_FILE_ERROR = 'No se pudo abrir este archivo. Comprueba que no esté dañado.';
+
+/** Traduce el error de pdf.js / pdf-lib al mensaje que ve la persona usuaria. */
+const messageForFileError = (err: unknown): string =>
+  (err as { name?: string } | null)?.name === 'PasswordException'
+    ? PASSWORD_ERROR
+    : GENERIC_FILE_ERROR;
 
 /** Preferencia "mostrar portadas" (localStorage; por defecto, sí). */
 const COVERS_KEY = 'gainco:unir:portadas';
@@ -93,7 +108,7 @@ export default function PDFMerger() {
   const [overIndex, setOverIndex] = useState<number | null>(null);
   const [removingIds, setRemovingIds] = useState<Set<string>>(new Set());
   const [fileName, setFileName] = useState('');
-  const [fileNameError, setFileNameError] = useState('');
+  const [nameError, setNameError] = useState<string | null>(null);
   const [cropFileId, setCropFileId] = useState<string | null>(null);
 
   // El PDF generado es una foto de la lista en el momento de unir. Si la lista
@@ -137,41 +152,9 @@ export default function PDFMerger() {
     };
   }, [result]);
 
-  const validateFileName = (name: string): boolean => {
-    if (!name.trim()) return true; // Empty is allowed, will use default
-
-    // Check for invalid characters
-    const invalidChars = /[\/\\:*?"<>|]/;
-    if (invalidChars.test(name)) {
-      setFileNameError('El nombre no puede contener los caracteres: / \\ : * ? " < > |');
-      return false;
-    }
-
-    // Check for reserved names on Windows
-    const reservedNames = ['CON', 'PRN', 'AUX', 'NUL', 'COM1', 'COM2', 'COM3', 'COM4', 'COM5', 'COM6', 'COM7', 'COM8', 'COM9', 'LPT1', 'LPT2', 'LPT3', 'LPT4', 'LPT5', 'LPT6', 'LPT7', 'LPT8', 'LPT9'];
-    if (reservedNames.includes(name.toUpperCase())) {
-      setFileNameError('Este nombre está reservado por el sistema');
-      return false;
-    }
-
-    // Check length
-    if (name.length > 200) {
-      setFileNameError('El nombre es demasiado largo (máximo 200 caracteres)');
-      return false;
-    }
-
-    setFileNameError('');
-    return true;
-  };
-
   const handleFileNameChange = (value: string) => {
     setFileName(value);
-    validateFileName(value);
-  };
-
-  const getValidFileName = (): string => {
-    const trimmedName = fileName.trim();
-    return trimmedName || 'documento_final';
+    setNameError(fileNameError(value));
   };
 
   const isPdfFile = (file: File): boolean =>
@@ -190,15 +173,17 @@ export default function PDFMerger() {
       if (f.type !== 'pdf') continue;
       let pages: number | null = null;
       let thumb: string | null = null;
+      let error: string | undefined;
       try {
         const preview = await previewPdf(f.file, 120);
         pages = preview.pages;
         thumb = preview.thumbnail;
-      } catch {
-        // Cifrado o ilegible: se sabrá al unir; la fila queda con su icono.
+      } catch (err) {
+        // Cifrado o ilegible: se marca la fila; el resumen y "unir" lo excluyen.
+        error = messageForFileError(err);
       }
       setFiles((prev) =>
-        prev.map((x) => (x.id === f.id ? { ...x, pages, thumb } : x))
+        prev.map((x) => (x.id === f.id ? { ...x, pages, thumb, error } : x))
       );
     }
   };
@@ -370,13 +355,33 @@ export default function PDFMerger() {
     setFiles(newFiles);
   };
 
+  // Orden alfabético por nombre (numérico: "hoja2" antes que "hoja10"). El
+  // FLIP existente anima el movimiento; si el orden no cambia, no hace nada.
+  const sortFilesAZ = () => {
+    const previous = files;
+    const sorted = [...files].sort((a, b) =>
+      a.name.localeCompare(b.name, 'es', { numeric: true, sensitivity: 'base' })
+    );
+    const changed = sorted.some((f, i) => f.id !== previous[i].id);
+    if (!changed) return;
+    setFiles(sorted);
+    toastUndo('Lista ordenada', {
+      description: 'De la A a la Z por nombre.',
+      onUndo: () => setFiles(previous),
+    });
+  };
+
   const mergePDFs = async () => {
     if (files.length < 1) return;
-    if (!validateFileName(fileName)) return;
+    if (nameError) return;
 
     const signatureAtStart = filesSignature;
     const total = files.length;
     setIsProcessing(true);
+    // Fallos nuevos, detectados solo al unir (no en hydratePreviews): se
+    // aplican al estado al final, junto con el resto del resultado.
+    const newFailures: { id: string; error: string }[] = [];
+    let mergedCount = 0;
     try {
       const mergedPdf = await PDFDocument.create();
 
@@ -391,46 +396,72 @@ export default function PDFMerger() {
         setProgress({ done: i, total, label: `Uniendo ${i + 1} de ${total}…` });
         await yieldToPaint();
 
-        if (pdfFile.type === 'image' && pdfFile.cropped) {
-          // Imagen recortada: se coloca centrada en una hoja Carta auto-orientada
-          const bytes = dataUrlToBytes(pdfFile.cropped.dataUrl);
-          const image = await mergedPdf.embedJpg(bytes);
+        if (pdfFile.error) continue; // ya marcado (contraseña o dañado): se salta
 
-          // Orientar la hoja Carta según la proporción de la imagen recortada
-          const landscape = pdfFile.cropped.width > pdfFile.cropped.height;
-          const pageWidth = landscape ? LETTER_LONG : LETTER_SHORT;
-          const pageHeight = landscape ? LETTER_SHORT : LETTER_LONG;
+        try {
+          if (pdfFile.type === 'image' && pdfFile.cropped) {
+            // Imagen recortada: se coloca centrada en una hoja Carta auto-orientada
+            const bytes = dataUrlToBytes(pdfFile.cropped.dataUrl);
+            const image = await mergedPdf.embedJpg(bytes);
 
-          const page = mergedPdf.addPage([pageWidth, pageHeight]);
-          const scaled = image.scaleToFit(pageWidth, pageHeight);
-          page.drawImage(image, {
-            x: (pageWidth - scaled.width) / 2,
-            y: (pageHeight - scaled.height) / 2,
-            width: scaled.width,
-            height: scaled.height,
-          });
-        } else if (pdfFile.type === 'image') {
-          // Imagen sin recortar: página del tamaño exacto de la imagen (sin bordes)
-          const arrayBuffer = await pdfFile.file.arrayBuffer();
-          const isPng =
-            pdfFile.file.type === 'image/png' || /\.png$/i.test(pdfFile.file.name);
-          const image = isPng
-            ? await mergedPdf.embedPng(arrayBuffer)
-            : await mergedPdf.embedJpg(arrayBuffer);
+            // Orientar la hoja Carta según la proporción de la imagen recortada
+            const landscape = pdfFile.cropped.width > pdfFile.cropped.height;
+            const pageWidth = landscape ? LETTER_LONG : LETTER_SHORT;
+            const pageHeight = landscape ? LETTER_SHORT : LETTER_LONG;
 
-          const page = mergedPdf.addPage([image.width, image.height]);
-          page.drawImage(image, {
-            x: 0,
-            y: 0,
-            width: image.width,
-            height: image.height,
-          });
-        } else {
-          const arrayBuffer = await pdfFile.file.arrayBuffer();
-          const pdf = await PDFDocument.load(arrayBuffer);
-          const copiedPages = await mergedPdf.copyPages(pdf, pdf.getPageIndices());
-          copiedPages.forEach((page) => mergedPdf.addPage(page));
+            const page = mergedPdf.addPage([pageWidth, pageHeight]);
+            const scaled = image.scaleToFit(pageWidth, pageHeight);
+            page.drawImage(image, {
+              x: (pageWidth - scaled.width) / 2,
+              y: (pageHeight - scaled.height) / 2,
+              width: scaled.width,
+              height: scaled.height,
+            });
+          } else if (pdfFile.type === 'image') {
+            // Imagen sin recortar: página del tamaño exacto de la imagen (sin bordes)
+            const arrayBuffer = await pdfFile.file.arrayBuffer();
+            const isPng =
+              pdfFile.file.type === 'image/png' || /\.png$/i.test(pdfFile.file.name);
+            const image = isPng
+              ? await mergedPdf.embedPng(arrayBuffer)
+              : await mergedPdf.embedJpg(arrayBuffer);
+
+            const page = mergedPdf.addPage([image.width, image.height]);
+            page.drawImage(image, {
+              x: 0,
+              y: 0,
+              width: image.width,
+              height: image.height,
+            });
+          } else {
+            const arrayBuffer = await pdfFile.file.arrayBuffer();
+            const pdf = await PDFDocument.load(arrayBuffer);
+            const copiedPages = await mergedPdf.copyPages(pdf, pdf.getPageIndices());
+            copiedPages.forEach((page) => mergedPdf.addPage(page));
+          }
+          mergedCount++;
+        } catch (err) {
+          // Este archivo falla solo al unir (pasó hydratePreviews pero pdf-lib
+          // lo rechaza): se marca y se sigue con el resto del lote.
+          console.error('Error al procesar', pdfFile.name, err);
+          newFailures.push({ id: pdfFile.id, error: messageForFileError(err) });
         }
+      }
+
+      if (newFailures.length > 0) {
+        setFiles((prev) =>
+          prev.map((f) => {
+            const failed = newFailures.find((x) => x.id === f.id);
+            return failed ? { ...f, error: failed.error, pages: null, thumb: null } : f;
+          })
+        );
+      }
+
+      if (mergedCount === 0) {
+        toast.error('No se pudo generar el PDF', {
+          description: 'Revisa los archivos e inténtalo de nuevo.',
+        });
+        return;
       }
 
       setProgress({ done: total, total, label: 'Guardando el PDF…' });
@@ -451,7 +482,15 @@ export default function PDFMerger() {
         pages: mergedPdf.getPageCount(),
         blob,
       });
-      toast.success('¡PDF generado correctamente!');
+      // Aviso si quedó alguno fuera, tanto si falló ahora como si ya venía
+      // marcado al agregarlo: el resultado no es "todo lo que subiste".
+      if (mergedCount < total) {
+        toast(`Se unieron ${mergedCount} de ${total} archivos`, {
+          description: 'Revisa los marcados en rojo.',
+        });
+      } else {
+        toast.success('¡PDF generado correctamente!');
+      }
     } catch (error) {
       console.error('Error merging PDFs:', error);
       toast.error('No se pudo generar el PDF', {
@@ -466,7 +505,7 @@ export default function PDFMerger() {
   const downloadMergedPDF = () => {
     if (!result) return;
 
-    const finalFileName = `${getValidFileName()}.pdf`;
+    const finalFileName = `${resolveFileName(fileName, 'documento_final')}.pdf`;
     const link = document.createElement('a');
     link.href = result.url;
     link.download = finalFileName;
@@ -479,7 +518,7 @@ export default function PDFMerger() {
   // del blob guardado (no vuelve a generar el PDF).
   const resultFile = (): File | null =>
     result
-      ? new File([result.blob], `${getValidFileName()}.pdf`, {
+      ? new File([result.blob], `${resolveFileName(fileName, 'documento_final')}.pdf`, {
           type: 'application/pdf',
         })
       : null;
@@ -489,7 +528,7 @@ export default function PDFMerger() {
     setResult(null);
     setProgress(null);
     setFileName('');
-    setFileNameError('');
+    setNameError(null);
   };
 
   // "Crear otro PDF": sin deshacer, así que las portadas de imagen se liberan.
@@ -520,21 +559,30 @@ export default function PDFMerger() {
   const step: 1 | 2 | 3 = files.length === 0 ? 1 : result ? 3 : 2;
 
   // ---- Resumen para el panel de acción -------------------------------------
-  const totalBytes = files.reduce((sum, f) => sum + f.file.size, 0);
-  const pagesPending = files.some((f) => f.pages === undefined);
-  const pagesUnknown = files.some((f) => f.pages === null);
-  const pagesKnown = files.reduce((sum, f) => sum + (f.pages ?? 0), 0);
+  // Los archivos con error no cuentan para páginas ni peso, y no participan
+  // en la unión: el resumen los señala aparte ("N archivos (M con error)").
+  const validFiles = files.filter((f) => !f.error);
+  const errorCount = files.length - validFiles.length;
+  const totalBytes = validFiles.reduce((sum, f) => sum + f.file.size, 0);
+  const pagesPending = validFiles.some((f) => f.pages === undefined);
+  const pagesUnknown = validFiles.some((f) => f.pages === null);
+  const pagesKnown = validFiles.reduce((sum, f) => sum + (f.pages ?? 0), 0);
   const pagesLabel = pagesPending
     ? 'contando páginas…'
     : `${pagesUnknown ? 'al menos ' : ''}${pagesKnown} ${pagesKnown === 1 ? 'página' : 'páginas'}`;
-  const filesLabel = `${files.length} ${files.length === 1 ? 'archivo' : 'archivos'}`;
+  const filesLabel =
+    errorCount > 0
+      ? `${files.length} ${files.length === 1 ? 'archivo' : 'archivos'} (${errorCount} con error)`
+      : `${files.length} ${files.length === 1 ? 'archivo' : 'archivos'}`;
   const ctaLabel = isProcessing
     ? 'Procesando…'
     : files.length > 1
       ? 'Unir archivos'
       : 'Generar PDF';
-  const ctaDisabled = isProcessing || !!fileNameError;
-  const resultName = `${getValidFileName()}.pdf`;
+  // Si hay archivos y ninguno es válido, no hay nada que unir.
+  const noValidFiles = files.length > 0 && validFiles.length === 0;
+  const ctaDisabled = isProcessing || !!nameError || noValidFiles;
+  const resultName = `${resolveFileName(fileName, 'documento_final')}.pdf`;
 
   const progressBlock = progress && (
     <div className="mt-3" aria-live="polite">
@@ -596,44 +644,19 @@ export default function PDFMerger() {
             <p className="mb-3 text-xs font-bold uppercase tracking-[0.15em] text-muted-foreground lg:hidden">
               Opciones
             </p>
-            <Label
-              htmlFor="filename"
-              className="mb-2 block text-sm font-medium text-ink"
-            >
-              <Edit3 className="mr-2 inline h-4 w-4" />
-              Nombre del archivo final
-            </Label>
-            <div className="relative">
-              <Input
-                id="filename"
-                type="text"
-                placeholder="documento_final"
-                value={fileName}
-                onChange={(e) => handleFileNameChange(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' && !ctaDisabled) void mergePDFs();
-                }}
-                disabled={isProcessing}
-                aria-invalid={!!fileNameError}
-                aria-describedby="filename-help"
-                className={cn(
-                  'pr-12',
-                  fileNameError && 'border-brand-red focus-visible:ring-ink'
-                )}
-              />
-              <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3">
-                <span className="text-sm text-muted-foreground">.pdf</span>
-              </div>
-            </div>
-            {fileNameError ? (
-              <p className="mt-2 text-sm text-brand-red" id="filename-help">
-                {fileNameError}
-              </p>
-            ) : (
-              <p className="mt-2 text-xs text-muted-foreground" id="filename-help">
-                Si lo dejas vacío, se usará &quot;documento_final.pdf&quot;
-              </p>
-            )}
+            <FileNameField
+              id="filename"
+              label="Nombre del archivo final"
+              value={fileName}
+              onChange={handleFileNameChange}
+              error={nameError}
+              placeholder="documento_final"
+              extension=".pdf"
+              disabled={isProcessing}
+              onSubmit={() => {
+                if (!ctaDisabled) void mergePDFs();
+              }}
+            />
           </div>
 
           <div className="mt-4 hidden lg:block">
@@ -745,11 +768,23 @@ export default function PDFMerger() {
           <CardContent className="p-4 sm:p-6">
             {/* Encabezado + acción: apilados en móvil (el título mono envuelve
                 y chocaba con el botón); en una fila a partir de sm. */}
-            <div className="mb-6 flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:justify-between">
-              <h2 className="font-display text-lg font-bold text-ink">
+            {/* Con tres acciones, el título no se estruja: si no caben en la
+                fila, las acciones bajan a su propia línea, alineadas a la derecha. */}
+            <div className="mb-6 flex flex-col items-start gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
+              <h2 className="whitespace-nowrap font-display text-lg font-bold text-ink">
                 Archivos seleccionados ({files.length})
               </h2>
-              <div className="flex shrink-0 items-center gap-2">
+              <div className="flex shrink-0 flex-wrap items-center gap-2 sm:ml-auto">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={sortFilesAZ}
+                  disabled={isProcessing || files.length < 2}
+                  className="shrink-0"
+                >
+                  <ArrowDownAZ className="mr-2 h-4 w-4" />
+                  Ordenar A→Z
+                </Button>
                 <Button
                   variant="outline"
                   size="sm"
@@ -879,6 +914,19 @@ export default function PDFMerger() {
                           </span>
                         )}
                       </div>
+                      {file.error && (
+                        <p className="text-sm text-brand-red">
+                          {file.error}
+                          {file.error === PASSWORD_ERROR && (
+                            <Link
+                              href="/contrasena-pdf"
+                              className="ml-2 font-bold text-ink underline underline-offset-4"
+                            >
+                              Abrir Proteger PDF
+                            </Link>
+                          )}
+                        </p>
+                      )}
                     </div>
                     <span className="hidden shrink-0 text-sm text-muted-foreground sm:inline">
                       #{index + 1}
