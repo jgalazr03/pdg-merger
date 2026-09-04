@@ -17,9 +17,11 @@ import { Progress } from '@/components/ui/progress';
 import { cn, scrollIntoViewSafe } from '@/lib/utils';
 import { toastUndo } from '@/lib/toast';
 import { getTool } from '@/lib/tools';
+import { fileNameError, resolveFileName } from '@/lib/file-name';
 import ToolShell from '@/components/tools/ToolShell';
 import FileDropzone from '@/components/tools/FileDropzone';
 import ToolConstraints from '@/components/tools/ToolConstraints';
+import FileNameField from '@/components/tools/FileNameField';
 
 const tool = getTool('girar');
 const accent = tool.accent;
@@ -46,6 +48,12 @@ interface PageItem {
 
 const norm = (deg: number) => ((deg % 360) + 360) % 360;
 
+/** Páginas y peso del resultado, para el resumen de la tarjeta "¡Listo!". */
+interface ResultMeta {
+  pages: number;
+  size: number;
+}
+
 export default function PDFRotator() {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [pages, setPages] = useState<PageItem[]>([]);
@@ -53,6 +61,9 @@ export default function PDFRotator() {
   const [renderProgress, setRenderProgress] = useState(0);
   const [isProcessing, setIsProcessing] = useState(false);
   const [downloadUrl, setDownloadUrl] = useState<string | null>(null);
+  const [resultMeta, setResultMeta] = useState<ResultMeta | null>(null);
+  const [fileName, setFileName] = useState('');
+  const [nameError, setNameError] = useState<string | null>(null);
   const editorRef = useRef<HTMLDivElement>(null);
   const resultRef = useRef<HTMLDivElement>(null);
 
@@ -84,6 +95,14 @@ export default function PDFRotator() {
   const baseName = (): string =>
     selectedFile ? selectedFile.name.replace(/\.pdf$/i, '') : 'documento';
 
+  /** Nombre por defecto (sin extensión) si se deja el campo vacío. */
+  const defaultFileName = (): string => `${baseName()}_girado`;
+
+  const handleFileNameChange = (value: string) => {
+    setFileName(value);
+    setNameError(fileNameError(value));
+  };
+
   const handleFileSelect = async (file: File) => {
     if (file.type !== 'application/pdf' && !/\.pdf$/i.test(file.name)) {
       toast.error('Archivo no válido', {
@@ -94,6 +113,9 @@ export default function PDFRotator() {
 
     setSelectedFile(file);
     setDownloadUrl(null);
+    setResultMeta(null);
+    setFileName('');
+    setNameError(null);
     setPages([]);
     setIsRendering(true);
     setRenderProgress(0);
@@ -159,7 +181,7 @@ export default function PDFRotator() {
   const anyRotated = pages.some((p) => p.rotation !== 0);
 
   const applyRotation = async () => {
-    if (!selectedFile || !anyRotated) return;
+    if (!selectedFile || !anyRotated || nameError) return;
     setIsProcessing(true);
     try {
       const { PDFDocument, degrees } = await import('pdf-lib');
@@ -174,9 +196,11 @@ export default function PDFRotator() {
         page.setRotation(degrees(norm(current + item.rotation)));
       });
 
+      const pageCount = pdfDoc.getPageCount();
       const pdfBytes = await pdfDoc.save();
       const blob = new Blob([pdfBytes], { type: 'application/pdf' });
       setDownloadUrl(URL.createObjectURL(blob));
+      setResultMeta({ pages: pageCount, size: blob.size });
       toast.success('¡PDF girado correctamente!');
     } catch (error) {
       console.error('Error rotating PDF:', error);
@@ -192,7 +216,7 @@ export default function PDFRotator() {
     if (!downloadUrl) return;
     const link = document.createElement('a');
     link.href = downloadUrl;
-    link.download = `${baseName()}_girado.pdf`;
+    link.download = `${resolveFileName(fileName, defaultFileName())}.pdf`;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -202,21 +226,30 @@ export default function PDFRotator() {
     setSelectedFile(null);
     setPages([]);
     setDownloadUrl(null);
+    setResultMeta(null);
     setRenderProgress(0);
+    setFileName('');
+    setNameError(null);
   };
 
   const changeFileWithUndo = () => {
     if (!selectedFile) return;
-    const snap = { selectedFile, pages, downloadUrl };
+    const snap = { selectedFile, pages, downloadUrl, resultMeta, fileName, nameError };
     setSelectedFile(null);
     setPages([]);
     setDownloadUrl(null);
+    setResultMeta(null);
+    setFileName('');
+    setNameError(null);
     toastUndo('Archivo descartado', {
       description: 'Selecciona otro PDF, o recupéralo si fue un error.',
       onUndo: () => {
         setSelectedFile(snap.selectedFile);
         setPages(snap.pages);
         setDownloadUrl(snap.downloadUrl);
+        setResultMeta(snap.resultMeta);
+        setFileName(snap.fileName);
+        setNameError(snap.nameError);
       },
     });
   };
@@ -419,9 +452,24 @@ export default function PDFRotator() {
             </ul>
 
             <div className="mt-6 text-center">
+              <div className="mx-auto mb-4 max-w-md text-left">
+                <FileNameField
+                  id="rotator-filename"
+                  label="Nombre del archivo final"
+                  value={fileName}
+                  onChange={handleFileNameChange}
+                  error={nameError}
+                  placeholder={defaultFileName()}
+                  extension=".pdf"
+                  disabled={isProcessing}
+                  onSubmit={() => {
+                    if (!isProcessing && anyRotated && !nameError) void applyRotation();
+                  }}
+                />
+              </div>
               <Button
                 onClick={applyRotation}
-                disabled={isProcessing || !anyRotated}
+                disabled={isProcessing || !anyRotated || !!nameError}
                 aria-busy={isProcessing}
                 size="lg"
                 className={accent.solid}
@@ -450,9 +498,17 @@ export default function PDFRotator() {
               <Download className="h-8 w-8" />
             </div>
             <h2 className="mb-2 text-lg font-bold text-success">¡Listo!</h2>
-            <p className="mb-6 text-ink">
-              Tu PDF girado está listo para descargar como &quot;{baseName()}_girado.pdf&quot;.
+            <p className="mb-1 text-ink">
+              Tu PDF girado está listo para descargar como &quot;
+              {resolveFileName(fileName, defaultFileName())}.pdf&quot;.
             </p>
+            {resultMeta && (
+              <p className="mb-6 text-sm tabular-nums text-muted-foreground">
+                {resolveFileName(fileName, defaultFileName())}.pdf ·{' '}
+                {resultMeta.pages} página{resultMeta.pages === 1 ? '' : 's'} ·{' '}
+                {formatFileSize(resultMeta.size)}
+              </p>
+            )}
             <div className="flex flex-col justify-center gap-3 sm:flex-row">
               <Button onClick={downloadRotated} size="lg" className={accent.solid}>
                 <Download className="mr-2 h-5 w-5" />

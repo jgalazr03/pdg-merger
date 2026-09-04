@@ -23,9 +23,11 @@ import { Progress } from '@/components/ui/progress';
 import { cn, scrollIntoViewSafe } from '@/lib/utils';
 import { toastUndo } from '@/lib/toast';
 import { getTool } from '@/lib/tools';
+import { fileNameError, resolveFileName } from '@/lib/file-name';
 import ToolShell from '@/components/tools/ToolShell';
 import FileDropzone from '@/components/tools/FileDropzone';
 import ToolConstraints from '@/components/tools/ToolConstraints';
+import FileNameField from '@/components/tools/FileNameField';
 import { useFlip } from '@/components/tools/useFlip';
 
 const tool = getTool('organizar');
@@ -124,6 +126,12 @@ async function embedImage(doc: PDFDocType, file: File): Promise<PDFImage> {
   return doc.embedPng(new Uint8Array(await blob.arrayBuffer()));
 }
 
+/** Páginas y peso del resultado, para el resumen de la tarjeta "¡Listo!". */
+interface ResultMeta {
+  pages: number;
+  size: number;
+}
+
 export default function PDFOrganizer() {
   const [sources, setSources] = useState<SourceDoc[]>([]);
   const [pages, setPages] = useState<PageItem[]>([]);
@@ -131,6 +139,9 @@ export default function PDFOrganizer() {
   const [renderProgress, setRenderProgress] = useState(0);
   const [isProcessing, setIsProcessing] = useState(false);
   const [downloadUrl, setDownloadUrl] = useState<string | null>(null);
+  const [resultMeta, setResultMeta] = useState<ResultMeta | null>(null);
+  const [fileName, setFileName] = useState('');
+  const [nameError, setNameError] = useState<string | null>(null);
   // Estado de arrastre (solo escritorio; en táctil se usan los botones de mover).
   const [dragIndex, setDragIndex] = useState<number | null>(null);
   const [overIndex, setOverIndex] = useState<number | null>(null);
@@ -168,6 +179,14 @@ export default function PDFOrganizer() {
 
   const baseName = (): string =>
     sources.length > 0 ? stripExt(sources[0].file.name) : 'documento';
+
+  /** Nombre por defecto (sin extensión) si se deja el campo vacío. */
+  const defaultFileName = (): string => `${baseName()}_organizado`;
+
+  const handleFileNameChange = (value: string) => {
+    setFileName(value);
+    setNameError(fileNameError(value));
+  };
 
   const totalSize = sources.reduce((sum, s) => sum + s.file.size, 0);
 
@@ -281,7 +300,13 @@ export default function PDFOrganizer() {
       // "Restablecer" vuelve al orden de carga, conservando los archivos agregados.
       initialRef.current = [...initialRef.current, ...newPages.map((p) => ({ ...p }))];
       setDownloadUrl(null);
-      if (!firstLoad) {
+      setResultMeta(null);
+      if (firstLoad) {
+        // Nombre nuevo solo al empezar de cero: agregar más archivos a un
+        // documento ya en curso no debe borrar el nombre que la persona escribió.
+        setFileName('');
+        setNameError(null);
+      } else {
         toast.success(
           `${newPages.length} página${newPages.length !== 1 ? 's' : ''} agregada${
             newPages.length !== 1 ? 's' : ''
@@ -375,7 +400,7 @@ export default function PDFOrganizer() {
   };
 
   const applyOrganize = async () => {
-    if (pages.length === 0) return;
+    if (pages.length === 0 || nameError) return;
     setIsProcessing(true);
     try {
       const { PDFDocument, degrees } = await import('pdf-lib');
@@ -421,9 +446,11 @@ export default function PDFOrganizer() {
         }
       }
 
+      const pageCount = out.getPageCount();
       const pdfBytes = await out.save();
       const blob = new Blob([pdfBytes], { type: 'application/pdf' });
       setDownloadUrl(URL.createObjectURL(blob));
+      setResultMeta({ pages: pageCount, size: blob.size });
       toast.success('¡PDF organizado correctamente!');
     } catch (error) {
       console.error('Error organizing PDF:', error);
@@ -439,7 +466,7 @@ export default function PDFOrganizer() {
     if (!downloadUrl) return;
     const link = document.createElement('a');
     link.href = downloadUrl;
-    link.download = `${baseName()}_organizado.pdf`;
+    link.download = `${resolveFileName(fileName, defaultFileName())}.pdf`;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -449,16 +476,22 @@ export default function PDFOrganizer() {
     setSources([]);
     setPages([]);
     setDownloadUrl(null);
+    setResultMeta(null);
     setRenderProgress(0);
+    setFileName('');
+    setNameError(null);
     initialRef.current = [];
   };
 
   const clearAllWithUndo = () => {
     if (sources.length === 0) return;
-    const snap = { sources, pages, initial: initialRef.current };
+    const snap = { sources, pages, initial: initialRef.current, fileName, nameError };
     setSources([]);
     setPages([]);
     setDownloadUrl(null);
+    setResultMeta(null);
+    setFileName('');
+    setNameError(null);
     initialRef.current = [];
     toastUndo('Archivos descartados', {
       description: 'Agrega otros archivos, o recupéralos si fue un error.',
@@ -466,6 +499,8 @@ export default function PDFOrganizer() {
         initialRef.current = snap.initial;
         setSources(snap.sources);
         setPages(snap.pages);
+        setFileName(snap.fileName);
+        setNameError(snap.nameError);
       },
     });
   };
@@ -730,9 +765,24 @@ export default function PDFOrganizer() {
             </ul>
 
             <div className="mt-6 text-center">
+              <div className="mx-auto mb-4 max-w-md text-left">
+                <FileNameField
+                  id="organizer-filename"
+                  label="Nombre del archivo final"
+                  value={fileName}
+                  onChange={handleFileNameChange}
+                  error={nameError}
+                  placeholder={defaultFileName()}
+                  extension=".pdf"
+                  disabled={isProcessing}
+                  onSubmit={() => {
+                    if (!isProcessing && !isRendering && !nameError) void applyOrganize();
+                  }}
+                />
+              </div>
               <Button
                 onClick={applyOrganize}
-                disabled={isProcessing || isRendering}
+                disabled={isProcessing || isRendering || !!nameError}
                 aria-busy={isProcessing}
                 size="lg"
                 className={accent.solid}
@@ -761,9 +811,17 @@ export default function PDFOrganizer() {
               <Download className="h-8 w-8" />
             </div>
             <h2 className="mb-2 text-lg font-bold text-success">¡Listo!</h2>
-            <p className="mb-6 text-ink">
-              Tu PDF organizado está listo para descargar como &quot;{baseName()}_organizado.pdf&quot;.
+            <p className="mb-1 text-ink">
+              Tu PDF organizado está listo para descargar como &quot;
+              {resolveFileName(fileName, defaultFileName())}.pdf&quot;.
             </p>
+            {resultMeta && (
+              <p className="mb-6 text-sm tabular-nums text-muted-foreground">
+                {resolveFileName(fileName, defaultFileName())}.pdf ·{' '}
+                {resultMeta.pages} página{resultMeta.pages === 1 ? '' : 's'} ·{' '}
+                {formatFileSize(resultMeta.size)}
+              </p>
+            )}
             <div className="flex flex-col justify-center gap-3 sm:flex-row">
               <Button onClick={downloadOrganized} size="lg" className={accent.solid}>
                 <Download className="mr-2 h-5 w-5" />

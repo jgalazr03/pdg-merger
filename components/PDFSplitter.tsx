@@ -219,6 +219,8 @@ export default function PDFSplitter() {
     URL.revokeObjectURL(url);
   };
 
+  const totalSplitSize = splitPDFs.reduce((sum, pdf) => sum + pdf.blob.size, 0);
+
   const downloadAllPDFs = () => {
     splitPDFs.forEach((pdf) => {
       setTimeout(() => downloadPDF(pdf), 100);
@@ -392,8 +394,12 @@ export default function PDFSplitter() {
               <h2 className="mb-2 text-lg font-bold text-success">
                 ¡División completada!
               </h2>
-              <p className="mb-4 text-ink">
+              <p className="mb-1 text-ink">
                 Se han creado {splitPDFs.length} archivos PDF.
+              </p>
+              <p className="mb-4 text-sm tabular-nums text-muted-foreground">
+                {splitPDFs.length} documento{splitPDFs.length === 1 ? '' : 's'} ·{' '}
+                {formatFileSize(totalSplitSize)} en total
               </p>
               <Button onClick={downloadAllPDFs} size="lg" className={accent.solid}>
                 <Download className="mr-2 h-5 w-5" />
