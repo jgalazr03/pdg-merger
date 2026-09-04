@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
+import { useState } from 'react';
 // Las librerías pesadas (ExcelJS ~900 KB, pdfjs-dist, pdf-lib, JSZip) se cargan
 // con import() dinámico SOLO al comprimir/descargar, no al abrir la herramienta,
 // para que la pantalla aparezca al instante (ver loaders más abajo).
@@ -10,29 +10,17 @@ import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { performanceMonitor } from '@/lib/performance-monitor';
 import { Card, CardContent } from '@/components/ui/card';
-import { Label } from '@/components/ui/label';
 import { Progress } from '@/components/ui/progress';
 import { Skeleton } from '@/components/ui/skeleton';
-import { cn, scrollIntoViewSafe } from '@/lib/utils';
+import { cn } from '@/lib/utils';
 import { toastUndo } from '@/lib/toast';
 import { getTool } from '@/lib/tools';
+import { loadPdfjs } from '@/lib/pdf-thumbnails';
 import { useHandoff, fileListFrom } from '@/lib/handoff';
 import ToolShell from '@/components/tools/ToolShell';
 import FileDropzone from '@/components/tools/FileDropzone';
 import ToolConstraints from '@/components/tools/ToolConstraints';
 import NextSteps from '@/components/tools/NextSteps';
-
-// Carga perezosa y memoizada de pdfjs-dist; configura el worker una sola vez.
-let pdfjsPromise: Promise<typeof import('pdfjs-dist')> | null = null;
-const loadPdfjs = async () => {
-  if (!pdfjsPromise) {
-    pdfjsPromise = import('pdfjs-dist').then((mod) => {
-      mod.GlobalWorkerOptions.workerSrc = '/pdf.worker.min.js';
-      return mod;
-    });
-  }
-  return pdfjsPromise;
-};
 
 interface ProcessableFile {
   id: string;
@@ -85,22 +73,6 @@ export default function PDFCompressor() {
   const [compressionLevel, setCompressionLevel] = useState<CompressionLevel>('medium');
   const [isProcessing, setIsProcessing] = useState(false);
   const [isLoadingFiles, setIsLoadingFiles] = useState(false);
-  const filesListRef = useRef<HTMLDivElement>(null);
-  const resultRef = useRef<HTMLDivElement>(null);
-
-  // Al agregar archivos, baja a la lista.
-  useEffect(() => {
-    if (files.length > 0 && filesListRef.current) {
-      setTimeout(() => scrollIntoViewSafe(filesListRef.current), 100);
-    }
-  }, [files.length]);
-
-  // Al terminar de comprimir todos, baja al inicio de la sección de resultado.
-  useEffect(() => {
-    if (files.length > 0 && files.every((f) => f.compressedBlob)) {
-      setTimeout(() => scrollIntoViewSafe(resultRef.current), 100);
-    }
-  }, [files]);
 
   const formatFileSize = (bytes: number): string => {
     if (bytes < 1024) return `${bytes} B`;
@@ -498,7 +470,9 @@ export default function PDFCompressor() {
 
     for (let i = 0; i < files.length; i++) {
       const file = files[i];
-      if (file.compressedBlob) continue; // Skip already compressed
+      // Solo se comprimen los pendientes: ni los ya comprimidos ni los que ya
+      // fallaron antes (para reintentar uno con error, se quita y se vuelve a agregar).
+      if (file.compressedBlob || file.error) continue;
       
       // Estimate time remaining
       const avgTimePerFile = i > 0 ? (Date.now() - startTime) / i : 0;
@@ -684,8 +658,243 @@ export default function PDFCompressor() {
   const step: 1 | 2 | 3 =
     files.length === 0 ? 1 : compressedFilesCount > 0 ? 3 : 2;
 
+  // Cambiar el nivel no toca los archivos ya comprimidos (conservan su
+  // resultado): solo se aplicará a los que falten. Si ya no queda nada
+  // pendiente (resultado completo), se avisa una sola vez por cambio.
+  const handleLevelChange = (level: CompressionLevel) => {
+    if (level === compressionLevel) return;
+    setCompressionLevel(level);
+    if (allCompressed) {
+      toast('Nivel cambiado', {
+        description: 'Se aplicará a los archivos que agregues.',
+      });
+    }
+  };
+
+  // ---- Resumen para el panel de acción -------------------------------------
+  const levelLabel = compressionSettings[compressionLevel].label;
+  const errorFilesCount = files.filter((f) => f.error).length;
+  const pendingFilesCount = files.filter((f) => !f.compressedBlob && !f.error).length;
+  const filesCountLabel = `${files.length} ${files.length === 1 ? 'archivo' : 'archivos'}`;
+  const resultCountLabel = `${compressedFilesCount} ${compressedFilesCount === 1 ? 'archivo' : 'archivos'}`;
+  const noChangeLine =
+    compressedFilesCount === 1
+      ? 'Ya estaba optimizado; se conserva el original.'
+      : 'Ya estaban optimizados; se conservan los originales.';
+  const summarySecondLine =
+    compressedFilesCount > 0
+      ? `${compressedFilesCount} de ${files.length} ya comprimidos`
+      : errorFilesCount > 0
+        ? `${errorFilesCount} con error`
+        : `nivel ${levelLabel}`;
+  const ctaLabel = isProcessing ? 'Comprimiendo…' : 'Comprimir archivos';
+  const barCtaLabel = isProcessing ? 'Comprimiendo…' : 'Comprimir';
+  const ctaDisabled = isProcessing || pendingFilesCount === 0;
+
+  // Progreso agregado (varios archivos, uno a la vez): posición del que se
+  // está procesando ahora + su propio avance, sobre el total del lote.
+  const processingIndex = files.findIndex((f) => f.isProcessing);
+  const aggregatedProgressLabel =
+    processingIndex === -1
+      ? 'Preparando…'
+      : `Comprimiendo ${processingIndex + 1} de ${files.length}…`;
+  const aggregatedProgressValue =
+    processingIndex === -1
+      ? 0
+      : ((processingIndex + (files[processingIndex]?.progress ?? 0) / 100) / files.length) * 100;
+
+  const progressBlock = isProcessing && (
+    <div className="mt-3" aria-live="polite">
+      <p className="text-sm font-bold tabular-nums text-ink">{aggregatedProgressLabel}</p>
+      <Progress
+        value={aggregatedProgressValue}
+        className="mt-2 h-2"
+        aria-label="Progreso de la compresión"
+      />
+    </div>
+  );
+
+  // Panel de acción (lg+: columna derecha pegajosa; debajo: fluye tras la
+  // lista y deja el resumen y el botón a la barra inferior).
+  const aside = files.length > 0 && (
+    <div className="rounded-lg border-3 border-ink bg-card p-4 sm:p-5">
+      {allCompressed ? (
+        <>
+          <p className="text-xs font-bold uppercase tracking-[0.15em] text-success">
+            Listo
+          </p>
+          <p className="mt-2 break-words text-base font-bold text-ink">
+            {resultCountLabel} · {formatFileSize(totalCompressedSize)}
+          </p>
+          <p
+            className={cn(
+              'mt-1 text-sm tabular-nums',
+              reduced ? 'text-success' : 'text-muted-foreground'
+            )}
+          >
+            {reduced
+              ? `${totalReduction}% menos (${formatFileSize(totalOriginalSize - totalCompressedSize)} ahorrados)`
+              : noChangeLine}
+          </p>
+          <div className="mt-4 hidden flex-col gap-2 lg:flex">
+            <Button
+              onClick={downloadAllFiles}
+              size="lg"
+              className={cn('w-full', accent.solid)}
+            >
+              <Download className="mr-2 h-5 w-5" />
+              Descargar {compressedFilesCount > 1 ? 'todo (ZIP)' : 'archivo'}
+            </Button>
+            <Button variant="outline" onClick={resetAll} size="lg" className="w-full">
+              Comprimir otros archivos
+            </Button>
+          </div>
+          <NextSteps
+            tool={tool}
+            getFile={singleResultFile}
+            className="mt-4 border-t-3 border-ink pt-4"
+          />
+        </>
+      ) : (
+        <>
+          <div className="hidden lg:block">
+            <p className="text-xs font-bold uppercase tracking-[0.15em] text-muted-foreground">
+              Resumen
+            </p>
+            <p className="mt-2 text-sm font-bold tabular-nums text-ink" aria-live="polite">
+              {filesCountLabel} · {formatFileSize(totalOriginalSize)}
+            </p>
+            <p className="text-sm tabular-nums text-muted-foreground">{summarySecondLine}</p>
+          </div>
+
+          <div className="lg:mt-4">
+            <p className="mb-3 text-xs font-bold uppercase tracking-[0.15em] text-muted-foreground lg:hidden">
+              Opciones
+            </p>
+            <p className="mb-3 flex items-center gap-2 text-sm font-bold text-ink">
+              <Compress className="h-4 w-4" aria-hidden="true" />
+              Nivel de compresión
+            </p>
+            <div className="grid gap-2">
+              {Object.entries(compressionSettings).map(([level, settings]) => (
+                <button
+                  key={level}
+                  type="button"
+                  onClick={() => handleLevelChange(level as CompressionLevel)}
+                  aria-pressed={compressionLevel === level}
+                  className={cn(
+                    'rounded-lg border-3 border-ink p-3 text-left transition-[transform,background-color] duration-150 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink focus-visible:ring-offset-2',
+                    compressionLevel === level
+                      ? 'bg-highlight-soft'
+                      : 'bg-surface hover-fine:bg-muted'
+                  )}
+                >
+                  <div className="text-sm font-bold text-ink">{settings.label}</div>
+                  <div className="text-xs text-muted-foreground">{settings.description}</div>
+                </button>
+              ))}
+            </div>
+            <p className="mt-3 flex items-start gap-2 text-xs text-muted-foreground">
+              <Info className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+              Los PDF se guardan como imagen por página: el texto ya no se podrá buscar ni copiar. Ideal para escaneos y para enviar por correo.
+            </p>
+          </div>
+
+          <div className="mt-4 hidden lg:block">
+            <Button
+              onClick={compressFiles}
+              disabled={ctaDisabled}
+              aria-busy={isProcessing}
+              size="lg"
+              className={cn('w-full', accent.solid)}
+            >
+              {isProcessing ? (
+                <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+              ) : (
+                <Compress className="mr-2 h-5 w-5" />
+              )}
+              {ctaLabel}
+            </Button>
+            {progressBlock}
+          </div>
+        </>
+      )}
+    </div>
+  );
+
+  // Barra inferior fija (solo por debajo de lg): resumen compacto + acción.
+  const bar = files.length > 0 && (
+    <div className="border-t-3 border-ink bg-surface pl-[max(20px,env(safe-area-inset-left))] pr-[max(20px,env(safe-area-inset-right))] pb-[max(12px,env(safe-area-inset-bottom))] pt-3">
+      <div className="container mx-auto flex max-w-6xl items-center gap-3">
+        <div className="min-w-0 flex-1">
+          {allCompressed ? (
+            <>
+              <p className="truncate text-sm font-bold text-ink">
+                {resultCountLabel}
+              </p>
+              <p
+                className={cn(
+                  'truncate text-xs tabular-nums',
+                  reduced ? 'text-success' : 'text-muted-foreground'
+                )}
+              >
+                {formatFileSize(totalCompressedSize)} ·{' '}
+                {reduced ? `${totalReduction}% menos` : 'sin cambios'}
+              </p>
+            </>
+          ) : isProcessing ? (
+            <div aria-live="polite">
+              <p className="truncate text-sm font-bold tabular-nums text-ink">
+                {aggregatedProgressLabel}
+              </p>
+              <Progress
+                value={aggregatedProgressValue}
+                className="mt-1.5 h-2"
+                aria-label="Progreso de la compresión"
+              />
+            </div>
+          ) : (
+            <>
+              <p className="truncate text-sm font-bold tabular-nums text-ink">
+                {filesCountLabel}
+              </p>
+              <p className="truncate text-xs tabular-nums text-muted-foreground">
+                {formatFileSize(totalOriginalSize)} · {summarySecondLine}
+              </p>
+            </>
+          )}
+        </div>
+        {allCompressed ? (
+          <>
+            <Button variant="outline" onClick={resetAll} className="shrink-0">
+              Otros
+            </Button>
+            <Button onClick={downloadAllFiles} className={cn('shrink-0', accent.solid)}>
+              <Download className="mr-2 h-4 w-4" />
+              Descargar
+            </Button>
+          </>
+        ) : (
+          <Button
+            onClick={compressFiles}
+            disabled={ctaDisabled}
+            aria-busy={isProcessing}
+            className={cn('shrink-0', accent.solid)}
+          >
+            {isProcessing ? (
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            ) : (
+              <Compress className="mr-2 h-4 w-4" />
+            )}
+            {barCtaLabel}
+          </Button>
+        )}
+      </div>
+    </div>
+  );
+
   return (
-    <ToolShell tool={tool} step={step}>
+    <ToolShell tool={tool} step={step} aside={aside} bar={bar}>
       <FileDropzone
         className="mb-4"
         accent={accent}
@@ -720,7 +929,7 @@ export default function PDFCompressor() {
       )}
 
       {files.length > 0 && (
-        <Card className="mb-8" ref={filesListRef}>
+        <Card className="mb-8">
           <CardContent className="p-4 sm:p-6">
             {/* Encabezado + acción: apilados en móvil (el título mono envuelve
                 y chocaba con el botón); en una fila a partir de sm. */}
@@ -737,40 +946,6 @@ export default function PDFCompressor() {
                 <X className="w-4 h-4 mr-2" />
                 Limpiar todo
               </Button>
-            </div>
-
-            <div className="mb-6">
-              <Label className="mb-3 block text-sm font-medium text-ink">
-                <Compress className="mr-2 inline h-4 w-4" />
-                Nivel de compresión
-              </Label>
-              <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
-                {Object.entries(compressionSettings).map(([level, settings]) => (
-                  <button
-                    key={level}
-                    type="button"
-                    onClick={() => setCompressionLevel(level as CompressionLevel)}
-                    aria-pressed={compressionLevel === level}
-                    className={cn(
-                      'rounded-lg border-3 border-ink p-4 text-left transition-[transform,background-color] duration-150 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink focus-visible:ring-offset-2',
-                      compressionLevel === level
-                        ? 'bg-highlight-soft'
-                        : 'bg-surface hover-fine:bg-muted'
-                    )}
-                  >
-                    <div className="mb-1 font-bold text-ink">
-                      {settings.label}
-                    </div>
-                    <div className="text-sm text-muted-foreground">
-                      {settings.description}
-                    </div>
-                  </button>
-                ))}
-              </div>
-              <p className="mt-3 flex items-start gap-2 text-xs text-muted-foreground">
-                <Info className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-                Los PDF se guardan como imagen por página: el texto ya no se podrá buscar ni copiar. Ideal para escaneos y para enviar por correo.
-              </p>
             </div>
 
             <div className="space-y-4">
@@ -865,107 +1040,6 @@ export default function PDFCompressor() {
                 </div>
               ))}
             </div>
-
-            {totalOriginalSize > 0 && (
-              <div className="mt-6 rounded-lg border-3 border-ink bg-card p-4">
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-center">
-                  <div>
-                    <p className="text-sm font-medium text-muted-foreground">Tamaño original total</p>
-                    <p className="text-lg font-bold text-ink">{formatFileSize(totalOriginalSize)}</p>
-                  </div>
-                  {totalCompressedSize > 0 && (
-                    <>
-                      <div>
-                        <p className={cn('text-sm font-medium', reduced ? 'text-success' : 'text-muted-foreground')}>
-                          Tamaño final total
-                        </p>
-                        <p className={cn('text-lg font-bold', reduced ? 'text-success' : 'text-ink')}>
-                          {formatFileSize(totalCompressedSize)}
-                        </p>
-                      </div>
-                      <div>
-                        <p className={cn('text-sm font-medium', reduced ? 'text-success' : 'text-muted-foreground')}>
-                          Reducción total
-                        </p>
-                        <p className={cn('text-lg font-bold', reduced ? 'text-success' : 'text-ink')}>
-                          {totalReduction}%
-                        </p>
-                      </div>
-                    </>
-                  )}
-                </div>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      )}
-
-      {files.length > 0 && !allCompressed && (
-        <Card className="mb-8">
-          <CardContent className="p-4 text-center sm:p-6">
-            <h2 className="mb-4 font-display text-lg font-bold text-ink">
-              ¿Listo para comprimir?
-            </h2>
-            <p className="mb-6 text-muted-foreground">
-              Se comprimir{files.length !== 1 ? 'án' : 'á'} {files.length} archivo{files.length !== 1 ? 's' : ''} con nivel {compressionSettings[compressionLevel].label}.
-            </p>
-            <div className="text-center">
-              <Button
-                onClick={compressFiles}
-                disabled={isProcessing}
-                aria-busy={isProcessing}
-                size="lg"
-                className={accent.solid}
-              >
-                {isProcessing ? (
-                  <>
-                    <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                    Comprimiendo…
-                  </>
-                ) : (
-                  <>
-                    <Compress className="mr-2 h-5 w-5" />
-                    Comprimir archivos
-                  </>
-                )}
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {allCompressed && (
-        <Card
-          ref={resultRef}
-          className="motion-safe:animate-slide-up"
-        >
-          <CardContent className="p-4 text-center sm:p-6">
-            <div className="mb-4 inline-flex h-16 w-16 items-center justify-center rounded-full border-3 border-ink bg-success text-white">
-              <Download className="h-8 w-8" />
-            </div>
-            <h2 className="mb-2 text-lg font-bold text-success">
-              ¡Compresión completada!
-            </h2>
-            <p className="mb-6 text-ink">
-              {reduced
-                ? `Se ${compressedFilesCount === 1 ? 'redujo' : 'redujeron'} ${compressedFilesCount} archivo${compressedFilesCount !== 1 ? 's' : ''} un ${totalReduction}% (${formatFileSize(totalOriginalSize - totalCompressedSize)} menos).`
-                : `Tus archivo${compressedFilesCount !== 1 ? 's' : ''} ya ${compressedFilesCount !== 1 ? 'estaban' : 'estaba'} optimizado${compressedFilesCount !== 1 ? 's' : ''}; se ${compressedFilesCount !== 1 ? 'conservan los originales' : 'conserva el original'}.`}
-            </p>
-            <div className="flex flex-col justify-center gap-3 sm:flex-row">
-              <Button onClick={downloadAllFiles} size="lg" className={accent.solid}>
-                <Download className="mr-2 h-5 w-5" />
-                Descargar {compressedFilesCount > 1 ? 'todo (ZIP)' : 'archivo'}
-              </Button>
-              <Button variant="outline" onClick={resetAll} size="lg">
-                Comprimir otros archivos
-              </Button>
-            </div>
-
-            <NextSteps
-              tool={tool}
-              getFile={singleResultFile}
-              className="mt-6 border-t-3 border-ink pt-6 text-left"
-            />
           </CardContent>
         </Card>
       )}
