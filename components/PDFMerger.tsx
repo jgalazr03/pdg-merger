@@ -13,6 +13,8 @@ import {
   Crop,
   ChevronUp,
   ChevronDown,
+  Images,
+  ImageOff,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
@@ -23,6 +25,11 @@ import { Progress } from '@/components/ui/progress';
 import { cn } from '@/lib/utils';
 import { toastUndo } from '@/lib/toast';
 import { getTool } from '@/lib/tools';
+import {
+  previewPdf,
+  imagePreviewUrl,
+  revokeImagePreview,
+} from '@/lib/pdf-thumbnails';
 import ToolShell from '@/components/tools/ToolShell';
 import FileDropzone from '@/components/tools/FileDropzone';
 import ToolConstraints from '@/components/tools/ToolConstraints';
@@ -41,7 +48,13 @@ interface PDFFile {
   cropped?: CropResult;
   /** Páginas del archivo: `undefined` mientras se cuenta, `null` si no se pudo. */
   pages?: number | null;
+  /** Portada: data URL (PDF, primera página) u object URL (imagen);
+   *  `undefined` mientras se genera, `null` si no se pudo. */
+  thumb?: string | null;
 }
+
+/** Preferencia "mostrar portadas" (localStorage; por defecto, sí). */
+const COVERS_KEY = 'gainco:unir:portadas';
 
 interface MergeResult {
   url: string;
@@ -66,20 +79,6 @@ const yieldToPaint = () =>
   new Promise<void>((resolve) => {
     requestAnimationFrame(() => setTimeout(resolve, 0));
   });
-
-/** Cuenta páginas de un PDF sin conservarlo en memoria. `null` si no se pudo. */
-const countPages = async (file: File): Promise<number | null> => {
-  try {
-    const bytes = await file.arrayBuffer();
-    const doc = await PDFDocument.load(bytes, {
-      ignoreEncryption: true,
-      updateMetadata: false,
-    });
-    return doc.getPageCount();
-  } catch {
-    return null;
-  }
-};
 
 export default function PDFMerger() {
   const [files, setFiles] = useState<PDFFile[]>([]);
@@ -166,13 +165,56 @@ export default function PDFMerger() {
     file.type === 'image/png' ||
     /\.(jpe?g|png)$/i.test(file.name);
 
-  // Cuenta páginas de los PDFs recién agregados, uno a uno para no abrir varios
-  // a la vez. Si el archivo se quitó mientras tanto, el map no hace nada.
-  const hydratePages = async (added: PDFFile[]) => {
+  // Portada y páginas de los PDFs recién agregados, uno a uno (pdf.js en su
+  // worker) para no abrir varios a la vez. Si el archivo se quitó mientras
+  // tanto, el map no hace nada.
+  const hydratePreviews = async (added: PDFFile[]) => {
     for (const f of added) {
       if (f.type !== 'pdf') continue;
-      const pages = await countPages(f.file);
-      setFiles((prev) => prev.map((x) => (x.id === f.id ? { ...x, pages } : x)));
+      let pages: number | null = null;
+      let thumb: string | null = null;
+      try {
+        const preview = await previewPdf(f.file, 120);
+        pages = preview.pages;
+        thumb = preview.thumbnail;
+      } catch {
+        // Cifrado o ilegible: se sabrá al unir; la fila queda con su icono.
+      }
+      setFiles((prev) =>
+        prev.map((x) => (x.id === f.id ? { ...x, pages, thumb } : x))
+      );
+    }
+  };
+
+  // Las portadas de imagen son object URLs: se liberan al quitar la fila, al
+  // empezar de nuevo y al desmontar (no al "Limpiar todo", que tiene deshacer).
+  const filesRef = useRef(files);
+  useEffect(() => {
+    filesRef.current = files;
+  }, [files]);
+  useEffect(() => {
+    return () => {
+      filesRef.current.forEach((f) => {
+        if (f.type === 'image' && f.thumb) revokeImagePreview(f.thumb);
+      });
+    };
+  }, []);
+
+  const [showCovers, setShowCovers] = useState(true);
+  useEffect(() => {
+    try {
+      if (window.localStorage.getItem(COVERS_KEY) === '0') setShowCovers(false);
+    } catch {
+      // Sin almacenamiento: se queda el valor por defecto.
+    }
+  }, []);
+  const toggleCovers = () => {
+    const next = !showCovers;
+    setShowCovers(next);
+    try {
+      window.localStorage.setItem(COVERS_KEY, next ? '1' : '0');
+    } catch {
+      // Sin almacenamiento: la preferencia dura la sesión.
     }
   };
 
@@ -191,8 +233,10 @@ export default function PDFMerger() {
           name: file.name.replace(/\.(pdf|jpe?g|png)$/i, ''),
           size: formatFileSize(file.size),
           type,
-          // Una imagen siempre es una página; los PDFs se cuentan aparte.
+          // Una imagen siempre es una página y su portada es ella misma; los
+          // PDFs se cuentan y se dibujan aparte (hydratePreviews).
           pages: type === 'image' ? 1 : undefined,
+          thumb: type === 'image' ? imagePreviewUrl(file) : undefined,
         };
       });
 
@@ -207,7 +251,7 @@ export default function PDFMerger() {
       toast.success(
         `${newFiles.length} archivo${newFiles.length !== 1 ? 's' : ''} agregado${newFiles.length !== 1 ? 's' : ''}`
       );
-      void hydratePages(newFiles);
+      void hydratePreviews(newFiles);
     }
   };
 
@@ -215,8 +259,10 @@ export default function PDFMerger() {
   // terminar se quita del estado; entonces el FLIP cierra el hueco deslizando
   // las demás. Así la lista se siente "viva" igual que al reordenar.
   const removeFile = (id: string) => {
+    const gone = files.find((file) => file.id === id);
     setRemovingIds((prev) => new Set(prev).add(id));
     window.setTimeout(() => {
+      if (gone?.type === 'image' && gone.thumb) revokeImagePreview(gone.thumb);
       setFiles((prev) => prev.filter((file) => file.id !== id));
       setRemovingIds((prev) => {
         const next = new Set(prev);
@@ -401,6 +447,14 @@ export default function PDFMerger() {
     setFileNameError('');
   };
 
+  // "Crear otro PDF": sin deshacer, así que las portadas de imagen se liberan.
+  const startOver = () => {
+    files.forEach((f) => {
+      if (f.type === 'image' && f.thumb) revokeImagePreview(f.thumb);
+    });
+    resetAll();
+  };
+
   // Acción destructiva con red de seguridad: vacía la lista pero ofrece deshacer.
   // Se restauran archivos y nombre, no el PDF generado: su URL ya se liberó y
   // el usuario vuelve a "Unir archivos" con la lista recuperada.
@@ -471,7 +525,7 @@ export default function PDFMerger() {
               <Download className="mr-2 h-5 w-5" />
               Descargar PDF
             </Button>
-            <Button variant="outline" onClick={resetAll} size="lg" className="w-full">
+            <Button variant="outline" onClick={startOver} size="lg" className="w-full">
               Crear otro PDF
             </Button>
           </div>
@@ -591,7 +645,7 @@ export default function PDFMerger() {
         </div>
         {result ? (
           <>
-            <Button variant="outline" onClick={resetAll} className="shrink-0">
+            <Button variant="outline" onClick={startOver} className="shrink-0">
               Otro
             </Button>
             <Button onClick={downloadMergedPDF} className={cn('shrink-0', accent.solid)}>
@@ -645,16 +699,33 @@ export default function PDFMerger() {
               <h2 className="font-display text-lg font-bold text-ink">
                 Archivos seleccionados ({files.length})
               </h2>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={clearAll}
-                disabled={isProcessing}
-                className="shrink-0"
-              >
-                <X className="mr-2 h-4 w-4" />
-                Limpiar todo
-              </Button>
+              <div className="flex shrink-0 items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={toggleCovers}
+                  aria-pressed={showCovers}
+                  title={showCovers ? 'Ocultar portadas' : 'Mostrar portadas'}
+                  className="shrink-0"
+                >
+                  {showCovers ? (
+                    <Images className="mr-2 h-4 w-4" />
+                  ) : (
+                    <ImageOff className="mr-2 h-4 w-4" />
+                  )}
+                  Portadas
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={clearAll}
+                  disabled={isProcessing}
+                  className="shrink-0"
+                >
+                  <X className="mr-2 h-4 w-4" />
+                  Limpiar todo
+                </Button>
+              </div>
             </div>
 
             <ul ref={listRef} className="space-y-3">
@@ -690,7 +761,7 @@ export default function PDFMerger() {
                   />
 
                   {/* Controles de orden accesibles por teclado */}
-                  <div className="flex shrink-0 flex-col">
+                  <div className="flex shrink-0 flex-row sm:flex-col">
                     <button
                       type="button"
                       onClick={() => moveFile(index, index - 1)}
@@ -717,16 +788,31 @@ export default function PDFMerger() {
                     </button>
                   </div>
 
-                  <div className="flex min-w-0 flex-1 items-center gap-3">
-                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded border-2 border-ink bg-card">
-                      {file.type === 'image' ? (
+                  {/* Móvil: portada + nombre ocupan su propia línea (order-first,
+                      basis-full); desde sm comparten fila con flechas y acciones. */}
+                  <div className="order-first flex min-w-0 grow basis-full items-center gap-3 sm:order-none sm:basis-0">
+                    {/* Portada (primera página o la imagen, recortada si lo
+                        está): se reconoce el documento sin leer el nombre.
+                        draggable=false para que arrastre la fila, no la imagen. */}
+                    <div className="flex h-12 w-9 shrink-0 items-center justify-center overflow-hidden rounded border-2 border-ink bg-white sm:h-14 sm:w-11">
+                      {showCovers && (file.cropped?.dataUrl ?? file.thumb) ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          src={file.cropped?.dataUrl ?? file.thumb ?? undefined}
+                          alt=""
+                          draggable={false}
+                          className="h-full w-full object-contain"
+                        />
+                      ) : file.type === 'image' ? (
                         <ImageIcon className="h-5 w-5 text-ink" />
                       ) : (
                         <FileText className="h-5 w-5 text-ink" />
                       )}
                     </div>
                     <div className="min-w-0 flex-1">
-                      <p className="truncate font-medium text-ink">
+                      {/* Móvil: hasta dos líneas (la fila es estrecha y "contr…"
+                          no dice nada); desde sm, una línea con elipsis. */}
+                      <p className="line-clamp-2 break-words font-medium text-ink sm:line-clamp-1">
                         {file.name}
                       </p>
                       <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-sm tabular-nums text-muted-foreground">
@@ -755,8 +841,8 @@ export default function PDFMerger() {
                       la X cabe siempre inline. */}
                   <div
                     className={cn(
-                      'flex items-center justify-end gap-2',
-                      file.type === 'image' ? 'w-full xl:w-auto' : 'w-auto'
+                      'ml-auto flex items-center justify-end gap-2 sm:ml-0',
+                      file.type === 'image' ? 'w-auto sm:w-full xl:w-auto' : 'w-auto'
                     )}
                   >
                     {file.type === 'image' && (
