@@ -2,6 +2,7 @@
 
 import { Contrast } from 'lucide-react';
 import { getTool } from '@/lib/tools';
+import { loadPdfjs } from '@/lib/pdf-thumbnails';
 import { useBatchProcessor } from '@/hooks/use-batch-processor';
 import ToolShell from '@/components/tools/ToolShell';
 import FileDropzone from '@/components/tools/FileDropzone';
@@ -17,18 +18,6 @@ const JPEG_QUALITY = 0.85;
 
 const isPdf = (f: File) =>
   f.type === 'application/pdf' || /\.pdf$/i.test(f.name);
-
-// Carga perezosa y memoizada de pdfjs-dist; configura el worker una sola vez.
-let pdfjsPromise: Promise<typeof import('pdfjs-dist')> | null = null;
-const loadPdfjs = async () => {
-  if (!pdfjsPromise) {
-    pdfjsPromise = import('pdfjs-dist').then((mod) => {
-      mod.GlobalWorkerOptions.workerSrc = '/pdf.worker.min.js';
-      return mod;
-    });
-  }
-  return pdfjsPromise;
-};
 
 async function grayscalePdf(
   file: File,

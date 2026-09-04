@@ -11,21 +11,10 @@ import { Progress } from '@/components/ui/progress';
 import { cn, scrollIntoViewSafe } from '@/lib/utils';
 import { toastUndo } from '@/lib/toast';
 import { getTool } from '@/lib/tools';
+import { loadPdfjs } from '@/lib/pdf-thumbnails';
 import ToolShell from '@/components/tools/ToolShell';
 import FileDropzone from '@/components/tools/FileDropzone';
 import ToolConstraints from '@/components/tools/ToolConstraints';
-
-// Carga perezosa y memoizada de pdfjs-dist; configura el worker una sola vez.
-let pdfjsPromise: Promise<typeof import('pdfjs-dist')> | null = null;
-const loadPdfjs = async () => {
-  if (!pdfjsPromise) {
-    pdfjsPromise = import('pdfjs-dist').then((mod) => {
-      mod.GlobalWorkerOptions.workerSrc = '/pdf.worker.min.js';
-      return mod;
-    });
-  }
-  return pdfjsPromise;
-};
 
 const tool = getTool('extraer-texto');
 const accent = tool.accent;

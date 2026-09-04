@@ -17,6 +17,7 @@ import { Progress } from '@/components/ui/progress';
 import { cn, scrollIntoViewSafe } from '@/lib/utils';
 import { toastUndo } from '@/lib/toast';
 import { getTool } from '@/lib/tools';
+import { loadPdfjs } from '@/lib/pdf-thumbnails';
 import { fileNameError, resolveFileName } from '@/lib/file-name';
 import ToolShell from '@/components/tools/ToolShell';
 import FileDropzone from '@/components/tools/FileDropzone';
@@ -25,20 +26,6 @@ import FileNameField from '@/components/tools/FileNameField';
 
 const tool = getTool('girar');
 const accent = tool.accent;
-
-// Carga perezosa y memoizada de pdfjs-dist (solo para las miniaturas); configura
-// el worker una sola vez. pdf-lib (el giro real, sin pérdida) se importa aparte
-// al aplicar. Así la herramienta abre al instante.
-let pdfjsPromise: Promise<typeof import('pdfjs-dist')> | null = null;
-const loadPdfjs = async () => {
-  if (!pdfjsPromise) {
-    pdfjsPromise = import('pdfjs-dist').then((mod) => {
-      mod.GlobalWorkerOptions.workerSrc = '/pdf.worker.min.js';
-      return mod;
-    });
-  }
-  return pdfjsPromise;
-};
 
 interface PageItem {
   pageNumber: number;

@@ -16,6 +16,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { cn, scrollIntoViewSafe } from '@/lib/utils';
 import { getTool } from '@/lib/tools';
+import { loadPdfjs } from '@/lib/pdf-thumbnails';
 import ToolShell from '@/components/tools/ToolShell';
 import FileDropzone from '@/components/tools/FileDropzone';
 import ToolConstraints from '@/components/tools/ToolConstraints';
@@ -33,18 +34,6 @@ const MIN_BOX = 0.012;
 
 const isPdf = (f: File) =>
   f.type === 'application/pdf' || /\.pdf$/i.test(f.name);
-
-// Carga perezosa y memoizada de pdfjs-dist; configura el worker una sola vez.
-let pdfjsPromise: Promise<typeof import('pdfjs-dist')> | null = null;
-const loadPdfjs = async () => {
-  if (!pdfjsPromise) {
-    pdfjsPromise = import('pdfjs-dist').then((mod) => {
-      mod.GlobalWorkerOptions.workerSrc = '/pdf.worker.min.js';
-      return mod;
-    });
-  }
-  return pdfjsPromise;
-};
 
 // Caja de censura en coordenadas normalizadas (0..1), origen arriba-izquierda.
 interface Box {

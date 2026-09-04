@@ -4,6 +4,8 @@
 // BUSCABLE (imagen + capa de texto invisible, vía el renderer nativo de
 // Tesseract en WASM) y el texto plano, en una sola pasada por página.
 
+import { loadPdfjs } from '@/lib/pdf-thumbnails';
+
 const TESS_OPTS = {
   workerPath: '/tesseract/worker.min.js',
   corePath: '/tesseract/core', // directorio con las variantes *.wasm.js
@@ -15,17 +17,6 @@ const RENDER_SCALE = 2;
 
 const isPdf = (file: File) =>
   file.type === 'application/pdf' || /\.pdf$/i.test(file.name);
-
-let pdfjsPromise: Promise<typeof import('pdfjs-dist')> | null = null;
-async function loadPdfjs() {
-  if (!pdfjsPromise) {
-    pdfjsPromise = import('pdfjs-dist').then((mod) => {
-      mod.GlobalWorkerOptions.workerSrc = '/pdf.worker.min.js';
-      return mod;
-    });
-  }
-  return pdfjsPromise;
-}
 
 export interface OcrResult {
   pdfBlob: Blob;
