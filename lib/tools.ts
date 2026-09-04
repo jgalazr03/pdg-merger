@@ -410,7 +410,7 @@ export const TOOLS: ToolDef[] = [
     category: 'optimizar',
     name: 'Comprimir PDF',
     title: 'Comprimir PDFs y Excel',
-    tagline: 'Reduce el peso de archivos PDF y Excel manteniendo la calidad.',
+    tagline: 'Reduce el peso de PDFs y Excel para enviarlos por correo.',
     keywords: [
       'reducir',
       'peso',
@@ -425,11 +425,12 @@ export const TOOLS: ToolDef[] = [
       'xlsx',
     ],
     description:
-      'Disminuye el tamaño de tus PDFs y hojas de Excel comprimiendo imágenes sin afectar los datos. Ideal para enviar por correo.',
+      'Disminuye el tamaño de tus PDFs convirtiendo cada página en imagen, y el de tus hojas de Excel comprimiendo las imágenes embebidas sin tocar los datos. Ideal para enviar por correo.',
     Icon: Minimize2,
     constraints: [
-      'Formatos: PDF y Excel (.xlsx, .xls)',
+      'Formatos: PDF y Excel (.xlsx)',
       'Tamaño máximo total: 500 MB',
+      'PDF: cada página se convierte en imagen; el texto ya no se podrá buscar ni copiar',
       'Excel: comprime imágenes embebidas sin afectar los datos',
       'Archivos grandes (más de 100 MB) pueden tardar varios minutos',
       'Sin archivos duplicados',
@@ -503,7 +504,7 @@ export const TOOLS: ToolDef[] = [
     category: 'organizar',
     name: 'Organizar PDF',
     title: 'Organizar PDF',
-    tagline: 'Combina PDF e imágenes, reordena sus páginas y guárdalo.',
+    tagline: 'Reordena, gira o elimina páginas, y combina PDF e imágenes.',
     keywords: [
       'reordenar',
       'mover páginas',
@@ -926,12 +927,12 @@ export const TOOLS: ToolDef[] = [
   {
     slug: 'info-pdf',
     href: '/info-pdf',
-    category: 'optimizar',
-    name: 'Información',
-    title: 'Información de un PDF',
+    category: 'seguridad',
+    name: 'Inspeccionar PDF',
+    title: 'Inspeccionar un PDF',
     tagline: 'Analiza páginas, tamaño, metadatos y cifrado.',
     keywords: [
-      'inspeccionar',
+      'información',
       'analizar',
       'propiedades',
       'cuántas páginas',
