@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 // Las librerías pesadas (ExcelJS ~900 KB, pdfjs-dist, pdf-lib, JSZip) se cargan
 // con import() dinámico SOLO al comprimir/descargar, no al abrir la herramienta,
 // para que la pantalla aparezca al instante (ver loaders más abajo).
@@ -18,6 +18,7 @@ import { getTool } from '@/lib/tools';
 import { loadPdfjs } from '@/lib/pdf-thumbnails';
 import { useHandoff, fileListFrom } from '@/lib/handoff';
 import ToolShell from '@/components/tools/ToolShell';
+import { useScrollOnAppear } from '@/components/tools/useScrollOnAppear';
 import FileDropzone from '@/components/tools/FileDropzone';
 import ToolConstraints from '@/components/tools/ToolConstraints';
 import NextSteps from '@/components/tools/NextSteps';
@@ -655,6 +656,11 @@ export default function PDFCompressor() {
   // paso "Listo" y la tarjeta de acción pasa a un estado de finalización.
   const allCompressed = files.length > 0 && compressedFilesCount === files.length;
 
+  // En móvil, bajar a la lista cuando aparece: el botón vive en la barra
+  // inferior fija y, sin esto, la lista queda tapada por ella.
+  const listRef = useRef<HTMLDivElement>(null);
+  useScrollOnAppear(listRef, files.length > 0);
+
   const step: 1 | 2 | 3 =
     files.length === 0 ? 1 : compressedFilesCount > 0 ? 3 : 2;
 
@@ -929,7 +935,7 @@ export default function PDFCompressor() {
       )}
 
       {files.length > 0 && (
-        <Card className="mb-8">
+        <Card ref={listRef} className="mb-8">
           <CardContent className="p-4 sm:p-6">
             {/* Encabezado + acción: apilados en móvil (el título mono envuelve
                 y chocaba con el botón); en una fila a partir de sm. */}

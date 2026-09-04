@@ -27,6 +27,7 @@ import { loadPdfjs } from '@/lib/pdf-thumbnails';
 import { fileNameError, resolveFileName } from '@/lib/file-name';
 import { useHandoff } from '@/lib/handoff';
 import ToolShell from '@/components/tools/ToolShell';
+import { useScrollOnAppear } from '@/components/tools/useScrollOnAppear';
 import FileDropzone from '@/components/tools/FileDropzone';
 import ToolConstraints from '@/components/tools/ToolConstraints';
 import NextSteps from '@/components/tools/NextSteps';
@@ -535,6 +536,11 @@ export default function PDFOrganizer() {
     });
   };
 
+  // En móvil, bajar a la lista cuando aparece: el botón vive en la barra
+  // inferior fija y, sin esto, la lista queda tapada por ella.
+  const listRef = useRef<HTMLDivElement>(null);
+  useScrollOnAppear(listRef, pages.length > 0);
+
   const step: 1 | 2 | 3 =
     sources.length === 0 && !isRendering ? 1 : downloadUrl ? 3 : 2;
 
@@ -770,7 +776,7 @@ export default function PDFOrganizer() {
       )}
 
       {pages.length > 0 && (
-        <Card className="mb-8 motion-safe:animate-slide-up">
+        <Card ref={listRef} className="mb-8 motion-safe:animate-slide-up">
           <CardContent className="p-4 sm:p-6">
             {/* Encabezado + agregar/quitar: apilado en móvil. */}
             <div className="mb-5 flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:justify-between">

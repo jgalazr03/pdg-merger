@@ -24,6 +24,7 @@ import { toastUndo } from '@/lib/toast';
 import { getTool } from '@/lib/tools';
 import { loadPdfjs } from '@/lib/pdf-thumbnails';
 import ToolShell from '@/components/tools/ToolShell';
+import { useScrollOnAppear } from '@/components/tools/useScrollOnAppear';
 import FileDropzone from '@/components/tools/FileDropzone';
 import ToolConstraints from '@/components/tools/ToolConstraints';
 import NextSteps from '@/components/tools/NextSteps';
@@ -506,6 +507,11 @@ export default function FileConverter() {
       ? new File([results[0].blob], results[0].name, { type: 'application/pdf' })
       : null;
 
+  // En móvil, bajar a la lista cuando aparece: el botón vive en la barra
+  // inferior fija y, sin esto, la lista queda tapada por ella.
+  const listRef = useRef<HTMLDivElement>(null);
+  useScrollOnAppear(listRef, files.length > 0);
+
   const step: 1 | 2 | 3 = files.length === 0 ? 1 : results.length > 0 ? 3 : 2;
 
   // ---- Resumen para el panel de acción -------------------------------------
@@ -740,7 +746,7 @@ export default function FileConverter() {
       <ToolConstraints items={tool.constraints} />
 
       {files.length > 0 && (
-        <Card className="mb-8 motion-safe:animate-slide-up">
+        <Card ref={listRef} className="mb-8 motion-safe:animate-slide-up">
           <CardContent className="p-4 sm:p-6">
             {/* Encabezado + acción: apilados en móvil (el título mono envuelve
                 y chocaría con el botón); en una fila a partir de sm. */}

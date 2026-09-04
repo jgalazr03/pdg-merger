@@ -32,6 +32,7 @@ import {
   revokeImagePreview,
 } from '@/lib/pdf-thumbnails';
 import ToolShell from '@/components/tools/ToolShell';
+import { useScrollOnAppear } from '@/components/tools/useScrollOnAppear';
 import FileDropzone from '@/components/tools/FileDropzone';
 import ToolConstraints from '@/components/tools/ToolConstraints';
 import NextSteps from '@/components/tools/NextSteps';
@@ -563,6 +564,11 @@ export default function PDFMerger() {
     });
   };
 
+  // En móvil, bajar a la lista cuando aparece: el botón vive en la barra
+  // inferior fija y, sin esto, la lista queda tapada por ella.
+  const listCardRef = useRef<HTMLDivElement>(null);
+  useScrollOnAppear(listCardRef, files.length > 0);
+
   const step: 1 | 2 | 3 = files.length === 0 ? 1 : result ? 3 : 2;
 
   // ---- Resumen para el panel de acción -------------------------------------
@@ -771,7 +777,7 @@ export default function PDFMerger() {
       <ToolConstraints items={tool.constraints} />
 
       {files.length > 0 && (
-        <Card className="motion-safe:animate-slide-up">
+        <Card ref={listCardRef} className="motion-safe:animate-slide-up">
           <CardContent className="p-4 sm:p-6">
             {/* Encabezado + acción: apilados en móvil (el título mono envuelve
                 y chocaba con el botón); en una fila a partir de sm. */}

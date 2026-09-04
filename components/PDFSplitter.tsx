@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { PDFDocument } from 'pdf-lib';
 import { FileText, Download, Loader2, X, Scissors, AlertCircle } from 'lucide-react';
 import { toast } from 'sonner';
@@ -12,6 +12,7 @@ import { cn } from '@/lib/utils';
 import { toastUndo } from '@/lib/toast';
 import { getTool } from '@/lib/tools';
 import ToolShell from '@/components/tools/ToolShell';
+import { useScrollOnAppear } from '@/components/tools/useScrollOnAppear';
 import FileDropzone from '@/components/tools/FileDropzone';
 import ToolConstraints from '@/components/tools/ToolConstraints';
 import NextSteps from '@/components/tools/NextSteps';
@@ -245,6 +246,11 @@ export default function PDFSplitter() {
     });
   };
 
+  // En móvil, bajar a la lista cuando aparece: el botón vive en la barra
+  // inferior fija y, sin esto, la lista queda tapada por ella.
+  const listRef = useRef<HTMLDivElement>(null);
+  useScrollOnAppear(listRef, !!selectedFile);
+
   const step: 1 | 2 | 3 = !selectedFile ? 1 : splitPDFs.length > 0 ? 3 : 2;
 
   // ---- Derivados para el panel de acción -----------------------------------
@@ -433,7 +439,7 @@ export default function PDFSplitter() {
       <ToolConstraints items={tool.constraints} />
 
       {selectedFile && (
-        <Card className="mb-8 motion-safe:animate-slide-up">
+        <Card ref={listRef} className="mb-8 motion-safe:animate-slide-up">
           <CardContent className="p-4 sm:p-6">
             {/* Encabezado + acción: apilados en móvil (el título mono envuelve
                 y chocaba con el botón); en una fila a partir de sm. */}
