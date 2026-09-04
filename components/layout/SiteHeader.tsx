@@ -46,6 +46,15 @@ export default function SiteHeader() {
   const modules = toolsByModule();
   const byModule = modules.length > 1;
 
+  // Separación del contenido solo al desplazarse (ver las clases del <header>).
+  const [scrolled, setScrolled] = useState(false);
+  useEffect(() => {
+    const update = () => setScrolled(window.scrollY > 4);
+    update();
+    window.addEventListener('scroll', update, { passive: true });
+    return () => window.removeEventListener('scroll', update);
+  }, []);
+
   const [megaOpen, setMegaOpen] = useState(false);
   const megaRef = useRef<HTMLDivElement>(null);
 
@@ -297,7 +306,17 @@ export default function SiteHeader() {
   );
 
   return (
-    <header className="sticky top-0 z-40 w-full border-b-4 border-ink bg-surface">
+    <header
+      className={cn(
+        // Sin separador fijo: arriba, el header es parte de la página. Al hacer
+        // scroll gana fondo translúcido con desenfoque y una línea de 1px muy
+        // tenue (patrón Linear / Vercel / Raycast). Solo cambia la opacidad de
+        // la línea: nada de layout ni de altura.
+        'sticky top-0 z-40 w-full bg-surface/95 backdrop-blur-lg supports-[backdrop-filter]:bg-surface/85',
+        'after:pointer-events-none after:absolute after:inset-x-0 after:bottom-0 after:h-px after:bg-ink/10 after:opacity-0 after:transition-opacity after:duration-200 after:ease-out',
+        scrolled && 'after:opacity-100'
+      )}
+    >
       <div className="container mx-auto flex h-16 max-w-6xl items-center justify-between pl-[max(20px,env(safe-area-inset-left))] pr-[max(20px,env(safe-area-inset-right))]">
         {/*
          * Lockup nativo al sistema: el icono de herramientas + "Herramientas"
