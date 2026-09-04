@@ -9,7 +9,6 @@ import {
   TOOLS,
   toolsByCategory,
   toolsByModule,
-  MODULE_HREF,
   type ToolDef,
   type CategoryGroup,
 } from '@/lib/tools';
@@ -25,12 +24,15 @@ import {
 } from '@/components/ui/sheet';
 
 /**
- * Cabecera. Con el catálogo ampliado (25+ herramientas) una barra de tabs en
+ * Cabecera. Con el catálogo ampliado (34 herramientas) una barra de tabs en
  * línea no cabe: se sustituye por un disparador "Todas las herramientas" que
  * abre un panel categorizado.
  *  - Escritorio (lg+): mega-menú propio (estado + clic-fuera + Escape), sin
- *    Radix extra; junto a un chip con la herramienta activa.
- *  - Móvil/tablet (<lg): el Sheet de marca, con las herramientas por categoría.
+ *    Radix extra. Decisión de producto: paridad con iLovePDF, el menú
+ *    enumera el catálogo completo por módulo y categoría (no solo los
+ *    módulos); Buscar (⌘K) sigue siendo el atajo principal de descubrimiento.
+ *  - Móvil/tablet (<lg): el Sheet de marca, con las herramientas por
+ *    categoría, y un disparador de búsqueda (⌘K) junto al hamburguesa.
  */
 export default function SiteHeader() {
   const pathname = usePathname();
@@ -261,6 +263,39 @@ export default function SiteHeader() {
     );
   };
 
+  // Categoría del mega-menú de escritorio: etiqueta mono + lista de enlaces,
+  // pensada para fluir en columnas CSS (`columns-3`/`xl:columns-4`). A
+  // diferencia del panel móvil no es colapsable: en escritorio hay sitio para
+  // el catálogo completo de una vez (paridad con iLovePDF).
+  const renderMegaCategory = (group: CategoryGroup) => (
+    <div key={group.category} className="mb-4 break-inside-avoid">
+      <p className="mb-1.5 px-2 text-xs font-bold uppercase tracking-[0.15em] text-muted-foreground">
+        {group.label}
+      </p>
+      <div className="flex flex-col">
+        {group.tools.map((tool) => {
+          const active = isActive(tool.href);
+          return (
+            <Link
+              key={tool.slug}
+              href={tool.href}
+              role="menuitem"
+              aria-current={active ? 'page' : undefined}
+              onClick={() => setMegaOpen(false)}
+              className="flex items-center gap-2 rounded-lg px-2 py-1 text-sm font-bold text-ink transition-colors duration-150 hover-fine:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink focus-visible:ring-offset-2"
+            >
+              <tool.Icon
+                className={cn('h-4 w-4 shrink-0', tool.accent.text)}
+                aria-hidden="true"
+              />
+              <span className="truncate">{tool.name}</span>
+            </Link>
+          );
+        })}
+      </div>
+    </div>
+  );
+
   return (
     <header className="sticky top-0 z-40 w-full border-b-4 border-ink bg-surface">
       <div className="container mx-auto flex h-16 max-w-6xl items-center justify-between pl-[max(20px,env(safe-area-inset-left))] pr-[max(20px,env(safe-area-inset-right))]">
@@ -334,7 +369,7 @@ export default function SiteHeader() {
               role="menu"
               aria-label="Herramientas"
               className={cn(
-                'absolute right-0 top-full z-50 mt-2 w-[min(24rem,90vw)] origin-top-right rounded-lg border-4 border-ink bg-surface p-3 transition duration-150 ease-out motion-reduce:transition-none',
+                'absolute right-0 top-full z-50 mt-2 w-[min(64rem,92vw)] origin-top-right rounded-lg border-4 border-ink bg-surface p-3 transition duration-150 ease-out motion-reduce:transition-none max-h-[calc(100vh-6rem)] overflow-y-auto',
                 megaVisible
                   ? 'translate-y-0 scale-100 opacity-100'
                   : 'pointer-events-none -translate-y-1 scale-95 opacity-0'
@@ -366,31 +401,28 @@ export default function SiteHeader() {
                 </kbd>
               </button>
 
-              {/* Módulos (nivel superior); el detalle se explora dentro de cada
-                  uno o por ⌘K. Escala al crecer el catálogo. */}
-              <div className="mt-2 grid gap-1.5">
-                {modules.map((m) => {
-                  const count = m.categories.reduce(
-                    (n, c) => n + c.tools.length,
-                    0
-                  );
-                  return (
-                    <Link
-                      key={m.module}
-                      href={MODULE_HREF[m.module]}
-                      onClick={() => setMegaOpen(false)}
-                      className="flex items-center justify-between gap-3 rounded-lg border-3 border-ink/15 px-3 py-2.5 transition-colors duration-150 hover-fine:border-ink hover-fine:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink"
-                    >
-                      <span className="text-sm font-bold text-ink">
-                        {m.label}
-                      </span>
-                      <span className="text-xs text-muted-foreground">
-                        {count}{' '}
-                        {count === 1 ? 'herramienta' : 'herramientas'}
-                      </span>
-                    </Link>
-                  );
-                })}
+              {/* Catálogo completo por categoría (y por módulo si hay 2+):
+                  paridad con iLovePDF. Columnas CSS para que quepa en una
+                  pantalla de escritorio típica sin cortar contenido. */}
+              <div className="mt-3">
+                {byModule ? (
+                  modules.map((m) => (
+                    <div key={m.module} className="mb-4 last:mb-0">
+                      <div className="mb-2 flex px-2">
+                        <p className="rounded-lg bg-ink px-3 py-1.5 text-xs font-bold uppercase tracking-[0.2em] text-white">
+                          {m.label}
+                        </p>
+                      </div>
+                      <div className="columns-3 gap-x-6 xl:columns-4">
+                        {m.categories.map(renderMegaCategory)}
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <div className="columns-3 gap-x-6 xl:columns-4">
+                    {groups.map(renderMegaCategory)}
+                  </div>
+                )}
               </div>
 
               {/* Índice global: la página /herramientas (buscador + filtros). */}
@@ -411,8 +443,21 @@ export default function SiteHeader() {
           )}
         </div>
 
-        {/* Móvil / tablet (hasta lg): Sheet con buscador + categorías colapsables */}
-        <div className="lg:hidden">
+        {/* Móvil / tablet (hasta lg): disparador de búsqueda (⌘K) + Sheet con
+            buscador interno y categorías colapsables. El botón de búsqueda
+            vive fuera del Sheet: abre el command palette sin depender de que
+            el panel esté abierto o cerrado. */}
+        <div className="flex items-center gap-2 lg:hidden">
+          <button
+            type="button"
+            onClick={() =>
+              window.dispatchEvent(new Event('gainco:open-command-palette'))
+            }
+            aria-label="Buscar herramienta"
+            className="inline-flex h-11 w-11 items-center justify-center rounded-lg border-3 border-ink bg-surface text-ink transition-[background-color,transform] duration-150 ease-out hover-fine:bg-muted active:scale-[0.98] active:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink focus-visible:ring-offset-2"
+          >
+            <Search className="h-5 w-5" />
+          </button>
           <Sheet
             open={sheetOpen}
             onOpenChange={(o) => {
