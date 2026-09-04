@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
+import { useState } from 'react';
 import { PDFDocument } from 'pdf-lib';
 import { FileText, Download, Loader2, X, Scissors, AlertCircle } from 'lucide-react';
 import { toast } from 'sonner';
@@ -8,12 +8,13 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { cn, scrollIntoViewSafe } from '@/lib/utils';
+import { cn } from '@/lib/utils';
 import { toastUndo } from '@/lib/toast';
 import { getTool } from '@/lib/tools';
 import ToolShell from '@/components/tools/ToolShell';
 import FileDropzone from '@/components/tools/FileDropzone';
 import ToolConstraints from '@/components/tools/ToolConstraints';
+import NextSteps from '@/components/tools/NextSteps';
 
 const tool = getTool('dividir');
 const accent = tool.accent;
@@ -32,22 +33,6 @@ export default function PDFSplitter() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [splitPDFs, setSplitPDFs] = useState<SplitPDF[]>([]);
   const [rangeError, setRangeError] = useState<string>('');
-  const fileInfoRef = useRef<HTMLDivElement>(null);
-  const resultRef = useRef<HTMLDivElement>(null);
-
-  // Al seleccionar el archivo, baja a su información.
-  useEffect(() => {
-    if (selectedFile && fileInfoRef.current) {
-      setTimeout(() => scrollIntoViewSafe(fileInfoRef.current), 100);
-    }
-  }, [selectedFile]);
-
-  // Al completarse la división, baja al inicio de la sección de resultado.
-  useEffect(() => {
-    if (splitPDFs.length > 0) {
-      setTimeout(() => scrollIntoViewSafe(resultRef.current), 100);
-    }
-  }, [splitPDFs.length]);
 
   const formatFileSize = (bytes: number): string => {
     if (bytes < 1024) return `${bytes} B`;
@@ -146,7 +131,16 @@ export default function PDFSplitter() {
     }
   };
 
+  // Si ya había resultados y el usuario edita los rangos, ese resultado ya no
+  // corresponde: se descarta y se avisa. No aplica al cargar/cambiar archivo
+  // (eso pasa por `handleFileSelect`/`resetAll`, que ya limpian sin avisar).
   const handleRangeChange = (value: string) => {
+    if (splitPDFs.length > 0) {
+      setSplitPDFs([]);
+      toast('Los rangos cambiaron', {
+        description: 'Vuelve a dividir para incluir los cambios.',
+      });
+    }
     setSplitRanges(value);
     if (value.trim() && totalPages > 0) {
       validateRanges(value);
@@ -253,8 +247,176 @@ export default function PDFSplitter() {
 
   const step: 1 | 2 | 3 = !selectedFile ? 1 : splitPDFs.length > 0 ? 3 : 2;
 
+  // ---- Derivados para el panel de acción -----------------------------------
+  let rangeCount = 0;
+  if (splitRanges.trim() && !rangeError) {
+    try {
+      rangeCount = parseRanges(splitRanges).length;
+    } catch {
+      rangeCount = 0;
+    }
+  }
+  const ctaLabel = isProcessing ? 'Dividiendo…' : 'Dividir PDF';
+  const ctaDisabled = isProcessing || !splitRanges.trim() || !!rangeError;
+  const rangesPreview = !splitRanges.trim()
+    ? 'Escribe qué páginas quieres'
+    : !rangeError
+      ? `Se crearán ${rangeCount} ${rangeCount === 1 ? 'documento' : 'documentos'}`
+      : null;
+
+  // Archivo a traspasar a "Continuar con…": solo tiene sentido cuando la
+  // división produjo un único documento (con varios, no hay uno que elegir).
+  const getResultFile = (): File | null =>
+    splitPDFs.length === 1
+      ? new File([splitPDFs[0].blob], splitPDFs[0].name, { type: 'application/pdf' })
+      : null;
+
+  // Panel de acción (lg+: columna derecha pegajosa; debajo: fluye tras el
+  // contenido y deja el resumen y el botón a la barra inferior).
+  const aside = !!selectedFile && (
+    <div
+      className={cn(
+        'rounded-lg border-3 border-ink bg-card p-4 sm:p-5',
+        // Sin resultado no hay opciones en el panel: bajo lg la barra inferior
+        // basta y así no queda una tarjeta vacía tras el contenido.
+        splitPDFs.length === 0 && 'hidden lg:block'
+      )}
+    >
+      {splitPDFs.length > 0 ? (
+        <>
+          <p className="text-xs font-bold uppercase tracking-[0.15em] text-success">
+            Listo
+          </p>
+          <p className="mt-2 break-words text-base font-bold text-ink">
+            {splitPDFs.length} {splitPDFs.length === 1 ? 'documento' : 'documentos'}
+          </p>
+          <p className="mt-1 text-sm tabular-nums text-muted-foreground">
+            {formatFileSize(totalSplitSize)} en total
+          </p>
+          <div className="mt-4 hidden flex-col gap-2 lg:flex">
+            <Button
+              onClick={downloadAllPDFs}
+              size="lg"
+              className={cn('w-full', accent.solid)}
+            >
+              <Download className="mr-2 h-5 w-5" />
+              Descargar todo
+            </Button>
+            <Button variant="outline" onClick={resetAll} size="lg" className="w-full">
+              Dividir otro PDF
+            </Button>
+          </div>
+          {splitPDFs.length === 1 && (
+            <NextSteps
+              tool={tool}
+              getFile={getResultFile}
+              className="mt-4 border-t-3 border-ink pt-4"
+            />
+          )}
+        </>
+      ) : (
+        <>
+          <div className="hidden lg:block">
+            <p className="text-xs font-bold uppercase tracking-[0.15em] text-muted-foreground">
+              Resumen
+            </p>
+            <p
+              className="mt-2 break-words text-sm font-bold text-ink"
+              aria-live="polite"
+            >
+              {selectedFile.name}
+            </p>
+            <p className="text-sm tabular-nums text-muted-foreground">
+              {formatFileSize(selectedFile.size)} · {totalPages}{' '}
+              {totalPages === 1 ? 'página' : 'páginas'}
+            </p>
+            {rangesPreview && (
+              <p className="mt-2 text-sm tabular-nums text-muted-foreground" aria-live="polite">
+                {rangesPreview}
+              </p>
+            )}
+          </div>
+
+          <div className="mt-4 hidden lg:block">
+            <Button
+              onClick={splitPDF}
+              disabled={ctaDisabled}
+              aria-busy={isProcessing}
+              size="lg"
+              className={cn('w-full', accent.solid)}
+            >
+              {isProcessing ? (
+                <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+              ) : (
+                <Scissors className="mr-2 h-5 w-5" />
+              )}
+              {ctaLabel}
+            </Button>
+          </div>
+        </>
+      )}
+    </div>
+  );
+
+  // Barra inferior fija (solo por debajo de lg): resumen compacto + acción.
+  const bar = !!selectedFile && (
+    <div className="border-t-3 border-ink bg-surface pl-[max(20px,env(safe-area-inset-left))] pr-[max(20px,env(safe-area-inset-right))] pb-[max(12px,env(safe-area-inset-bottom))] pt-3">
+      <div className="container mx-auto flex max-w-6xl items-center gap-3">
+        <div className="min-w-0 flex-1">
+          {splitPDFs.length > 0 ? (
+            <>
+              <p className="truncate text-sm font-bold tabular-nums text-ink">
+                {splitPDFs.length} {splitPDFs.length === 1 ? 'documento' : 'documentos'}
+              </p>
+              <p className="truncate text-xs tabular-nums text-muted-foreground">
+                {formatFileSize(totalSplitSize)} en total
+              </p>
+            </>
+          ) : (
+            <>
+              <p className="truncate text-sm font-bold text-ink">
+                {selectedFile.name}
+              </p>
+              <p className="truncate text-xs tabular-nums text-muted-foreground">
+                {totalPages} {totalPages === 1 ? 'página' : 'páginas'}
+                {rangeCount > 0
+                  ? ` · ${rangeCount} ${rangeCount === 1 ? 'documento' : 'documentos'}`
+                  : ''}
+              </p>
+            </>
+          )}
+        </div>
+        {splitPDFs.length > 0 ? (
+          <>
+            <Button variant="outline" onClick={resetAll} className="shrink-0">
+              Otro
+            </Button>
+            <Button onClick={downloadAllPDFs} className={cn('shrink-0', accent.solid)}>
+              <Download className="mr-2 h-4 w-4" />
+              Descargar
+            </Button>
+          </>
+        ) : (
+          <Button
+            onClick={splitPDF}
+            disabled={ctaDisabled}
+            aria-busy={isProcessing}
+            className={cn('shrink-0', accent.solid)}
+          >
+            {isProcessing ? (
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            ) : (
+              <Scissors className="mr-2 h-4 w-4" />
+            )}
+            {isProcessing ? 'Dividiendo…' : 'Dividir'}
+          </Button>
+        )}
+      </div>
+    </div>
+  );
+
   return (
-    <ToolShell tool={tool} step={step}>
+    <ToolShell tool={tool} step={step} aside={aside} bar={bar}>
       <FileDropzone
         className="mb-4"
         accent={accent}
@@ -271,7 +433,7 @@ export default function PDFSplitter() {
       <ToolConstraints items={tool.constraints} />
 
       {selectedFile && (
-        <Card className="mb-8 motion-safe:animate-slide-up" ref={fileInfoRef}>
+        <Card className="mb-8 motion-safe:animate-slide-up">
           <CardContent className="p-4 sm:p-6">
             {/* Encabezado + acción: apilados en móvil (el título mono envuelve
                 y chocaba con el botón); en una fila a partir de sm. */}
@@ -304,13 +466,11 @@ export default function PDFSplitter() {
               </div>
             </div>
 
+            {/* Rangos: en el contenido, no en el panel, para que sigan editables
+                cuando ya hay resultado (cambiarlos lo invalida con aviso). */}
             <div className="mt-6">
-              <Label
-                htmlFor="ranges"
-                className="mb-2 block text-sm font-medium text-ink"
-              >
-                <Scissors className="mr-2 inline h-4 w-4" />
-                Especifica las páginas o rangos a extraer
+              <Label htmlFor="ranges" className="mb-2 block text-sm font-bold text-ink">
+                Páginas o rangos a extraer
               </Label>
               <Input
                 id="ranges"
@@ -318,8 +478,15 @@ export default function PDFSplitter() {
                 placeholder="Ej: 1-3, 5, 7-10"
                 value={splitRanges}
                 onChange={(e) => handleRangeChange(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && !ctaDisabled) {
+                    e.preventDefault();
+                    void splitPDF();
+                  }
+                }}
+                disabled={isProcessing}
                 aria-invalid={!!rangeError}
-                aria-describedby="ranges-help"
+                aria-describedby={rangeError ? 'ranges-help' : undefined}
                 className={cn(
                   rangeError && 'border-brand-red focus-visible:ring-ink'
                 )}
@@ -333,82 +500,26 @@ export default function PDFSplitter() {
                   <span>{rangeError}</span>
                 </div>
               )}
-              <div className={cn('mt-3 rounded-lg border-3 border-ink p-3', accent.soft)}>
-                <p className={cn('text-sm font-bold', accent.softText)}>
-                  Ejemplos:
+              <p className="mt-2 text-xs text-muted-foreground">
+                Ejemplos: 1-3 · 1, 3, 5 · 1-2, 5, 8-10
+              </p>
+              {rangesPreview && (
+                <p className="mt-2 text-sm tabular-nums text-muted-foreground lg:hidden">
+                  {rangesPreview}
                 </p>
-                <ul className={cn('mt-1 space-y-1 text-sm', accent.softText)}>
-                  <li>• <code>1-3</code> — Páginas de la 1 a la 3</li>
-                  <li>• <code>1, 3, 5</code> — Páginas individuales 1, 3 y 5</li>
-                  <li>• <code>1-2, 5, 8-10</code> — Combina rangos y páginas</li>
-                </ul>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {selectedFile && splitRanges && !rangeError && splitPDFs.length === 0 && (
-        <Card className="mb-8">
-          <CardContent className="p-4 text-center sm:p-6">
-            <h2 className="mb-4 font-display text-lg font-bold text-ink">
-              ¿Listo para dividir?
-            </h2>
-            <p className="mb-6 text-muted-foreground">
-              Se crearán {parseRanges(splitRanges).length} archivos PDF según los
-              rangos especificados.
-            </p>
-            <Button
-              onClick={splitPDF}
-              disabled={isProcessing}
-              aria-busy={isProcessing}
-              size="lg"
-              className={accent.solid}
-            >
-              {isProcessing ? (
-                <>
-                  <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                  Dividiendo…
-                </>
-              ) : (
-                <>
-                  <Scissors className="mr-2 h-5 w-5" />
-                  Dividir PDF
-                </>
               )}
-            </Button>
+            </div>
           </CardContent>
         </Card>
       )}
 
-      {splitPDFs.length > 0 && (
-        <Card
-          ref={resultRef}
-          className="motion-safe:animate-slide-up"
-        >
+      {splitPDFs.length > 1 && (
+        <Card className="motion-safe:animate-slide-up">
           <CardContent className="p-4 sm:p-6">
-            <div className="mb-6 text-center">
-              <div className="mb-4 inline-flex h-16 w-16 items-center justify-center rounded-full border-3 border-ink bg-success text-white">
-                <Download className="h-8 w-8" />
-              </div>
-              <h2 className="mb-2 text-lg font-bold text-success">
-                ¡División completada!
-              </h2>
-              <p className="mb-1 text-ink">
-                Se han creado {splitPDFs.length} archivos PDF.
-              </p>
-              <p className="mb-4 text-sm tabular-nums text-muted-foreground">
-                {splitPDFs.length} documento{splitPDFs.length === 1 ? '' : 's'} ·{' '}
-                {formatFileSize(totalSplitSize)} en total
-              </p>
-              <Button onClick={downloadAllPDFs} size="lg" className={accent.solid}>
-                <Download className="mr-2 h-5 w-5" />
-                Descargar todo
-              </Button>
-            </div>
-
-            <div className="space-y-3">
-              <h3 className="mb-3 font-display font-bold text-ink">Archivos generados:</h3>
+            <h2 className="font-display text-lg font-bold text-ink">
+              Archivos generados ({splitPDFs.length})
+            </h2>
+            <div className="mt-4 space-y-3">
               {splitPDFs.map((pdf) => (
                 <div
                   key={pdf.id}
@@ -437,12 +548,6 @@ export default function PDFSplitter() {
                   </Button>
                 </div>
               ))}
-            </div>
-
-            <div className="mt-6 text-center">
-              <Button variant="outline" onClick={resetAll} size="lg">
-                Dividir otro PDF
-              </Button>
             </div>
           </CardContent>
         </Card>
