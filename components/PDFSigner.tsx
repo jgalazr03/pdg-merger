@@ -20,9 +20,11 @@ import { Label } from '@/components/ui/label';
 import { cn, scrollIntoViewSafe } from '@/lib/utils';
 import { toastUndo } from '@/lib/toast';
 import { getTool } from '@/lib/tools';
+import { useHandoff } from '@/lib/handoff';
 import ToolShell from '@/components/tools/ToolShell';
 import FileDropzone from '@/components/tools/FileDropzone';
 import ToolConstraints from '@/components/tools/ToolConstraints';
+import NextSteps from '@/components/tools/NextSteps';
 
 const tool = getTool('firmar-pdf');
 const accent = tool.accent;
@@ -219,6 +221,12 @@ export default function PDFSigner() {
     }
   };
 
+  // Recibe el archivo traspasado desde otra herramienta ("Continuar con…"),
+  // si lo hay, y lo carga igual que si se hubiera seleccionado a mano.
+  useHandoff((file) => {
+    void handleFileSelect(file);
+  });
+
   const handlePngUpload = (file: File) => {
     if (file.type !== 'image/png' && !/\.png$/i.test(file.name)) {
       toast.error('Imagen no válida', {
@@ -371,6 +379,16 @@ export default function PDFSigner() {
     setAnchor('bottom-right');
     setSizePct(30);
     setPageError('');
+  };
+
+  // Archivo del resultado para el traspaso "Continuar con…".
+  const resultFile = (): File | null => {
+    if (!resultBlob || !selectedFile) return null;
+    return new File(
+      [resultBlob],
+      `${selectedFile.name.replace(/\.pdf$/i, '')}_firmado.pdf`,
+      { type: 'application/pdf' }
+    );
   };
 
   const changeFileWithUndo = () => {
@@ -643,6 +661,12 @@ export default function PDFSigner() {
                 Firmar otro PDF
               </Button>
             </div>
+
+            <NextSteps
+              tool={tool}
+              getFile={resultFile}
+              className="mt-6 border-t-3 border-ink pt-6 text-left"
+            />
           </CardContent>
         </Card>
       )}

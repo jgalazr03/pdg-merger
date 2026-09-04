@@ -15,9 +15,11 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { cn, scrollIntoViewSafe } from '@/lib/utils';
 import { toastUndo } from '@/lib/toast';
 import { getTool } from '@/lib/tools';
+import { useHandoff, fileListFrom } from '@/lib/handoff';
 import ToolShell from '@/components/tools/ToolShell';
 import FileDropzone from '@/components/tools/FileDropzone';
 import ToolConstraints from '@/components/tools/ToolConstraints';
+import NextSteps from '@/components/tools/NextSteps';
 
 // Carga perezosa y memoizada de pdfjs-dist; configura el worker una sola vez.
 let pdfjsPromise: Promise<typeof import('pdfjs-dist')> | null = null;
@@ -177,6 +179,12 @@ export default function PDFCompressor() {
       setIsLoadingFiles(false);
     }
   };
+
+  // Recibe el archivo traspasado desde otra herramienta ("Continuar con…"),
+  // si lo hay, y lo agrega igual que si se hubiera seleccionado a mano.
+  useHandoff((file) => {
+    void handleFileSelect(fileListFrom([file]));
+  });
 
   const removeFile = (id: string) => {
     setFiles(prev => prev.filter(file => file.id !== id));
@@ -595,6 +603,18 @@ export default function PDFCompressor() {
     URL.revokeObjectURL(url);
   };
 
+  // Archivo del resultado para el traspaso "Continuar con…": solo cuando hay
+  // UN solo archivo de salida y es un PDF (los próximos pasos curados de esta
+  // herramienta son herramientas de PDF; un Excel comprimido no encaja ahí).
+  const singleResultFile = (): File | null => {
+    if (files.length !== 1) return null;
+    const f = files[0];
+    if (!f.compressedBlob || f.type !== 'pdf') return null;
+    return new File([f.compressedBlob], `${f.name}_comprimido.pdf`, {
+      type: 'application/pdf',
+    });
+  };
+
   const resetAll = () => {
     setFiles([]);
   };
@@ -887,6 +907,12 @@ export default function PDFCompressor() {
                 Comprimir otros archivos
               </Button>
             </div>
+
+            <NextSteps
+              tool={tool}
+              getFile={singleResultFile}
+              className="mt-6 border-t-3 border-ink pt-6 text-left"
+            />
           </CardContent>
         </Card>
       )}

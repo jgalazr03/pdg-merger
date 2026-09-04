@@ -33,6 +33,7 @@ import {
 import ToolShell from '@/components/tools/ToolShell';
 import FileDropzone from '@/components/tools/FileDropzone';
 import ToolConstraints from '@/components/tools/ToolConstraints';
+import NextSteps from '@/components/tools/NextSteps';
 import { useFlip } from '@/components/tools/useFlip';
 import ImageCropModal, { CropResult } from '@/components/ImageCropModal';
 
@@ -60,6 +61,9 @@ interface MergeResult {
   url: string;
   size: number;
   pages: number;
+  /** El blob detrás de `url`: se conserva para poder traspasarlo ("Continuar
+   *  con…") como un `File` nuevo sin volver a generar el PDF. */
+  blob: Blob;
 }
 
 interface MergeProgress {
@@ -103,7 +107,20 @@ export default function PDFMerger() {
         : f.id
     )
     .join('|');
+  // Último resultado visto (no en las dependencias del efecto: si lo
+  // metiéramos, el propio setResult(null) volvería a dispararlo). Así el
+  // aviso de abajo solo suena cuando SÍ había un PDF generado.
+  const lastResultRef = useRef<MergeResult | null>(null);
   useEffect(() => {
+    lastResultRef.current = result;
+  }, [result]);
+
+  useEffect(() => {
+    if (lastResultRef.current) {
+      toast('La lista cambió', {
+        description: 'Vuelve a pulsar "Unir archivos" para actualizar el PDF.',
+      });
+    }
     setResult(null);
   }, [filesSignature]);
   // Última firma vista: la unión es asíncrona y la lista puede cambiar mientras
@@ -259,15 +276,33 @@ export default function PDFMerger() {
   // terminar se quita del estado; entonces el FLIP cierra el hueco deslizando
   // las demás. Así la lista se siente "viva" igual que al reordenar.
   const removeFile = (id: string) => {
-    const gone = files.find((file) => file.id === id);
+    const index = files.findIndex((file) => file.id === id);
+    if (index === -1) return;
+    const gone = files[index];
     setRemovingIds((prev) => new Set(prev).add(id));
     window.setTimeout(() => {
-      if (gone?.type === 'image' && gone.thumb) revokeImagePreview(gone.thumb);
+      if (gone.type === 'image' && gone.thumb) revokeImagePreview(gone.thumb);
       setFiles((prev) => prev.filter((file) => file.id !== id));
       setRemovingIds((prev) => {
         const next = new Set(prev);
         next.delete(id);
         return next;
+      });
+      toastUndo('Archivo quitado', {
+        description: gone.name,
+        onUndo: () => {
+          // La portada de imagen (object URL) ya se liberó al quitar: se
+          // regenera para poder mostrarla de nuevo.
+          const restored: PDFFile =
+            gone.type === 'image'
+              ? { ...gone, thumb: imagePreviewUrl(gone.file) }
+              : gone;
+          setFiles((prev) => {
+            const next = [...prev];
+            next.splice(Math.min(index, next.length), 0, restored);
+            return next;
+          });
+        },
       });
     }, 160);
   };
@@ -414,6 +449,7 @@ export default function PDFMerger() {
         url: URL.createObjectURL(blob),
         size: blob.size,
         pages: mergedPdf.getPageCount(),
+        blob,
       });
       toast.success('¡PDF generado correctamente!');
     } catch (error) {
@@ -438,6 +474,15 @@ export default function PDFMerger() {
     link.click();
     document.body.removeChild(link);
   };
+
+  // Archivo del resultado para el traspaso "Continuar con…": se reconstruye
+  // del blob guardado (no vuelve a generar el PDF).
+  const resultFile = (): File | null =>
+    result
+      ? new File([result.blob], `${getValidFileName()}.pdf`, {
+          type: 'application/pdf',
+        })
+      : null;
 
   const resetAll = () => {
     setFiles([]);
@@ -529,6 +574,11 @@ export default function PDFMerger() {
               Crear otro PDF
             </Button>
           </div>
+          <NextSteps
+            tool={tool}
+            getFile={resultFile}
+            className="mt-4 border-t-3 border-ink pt-4"
+          />
         </>
       ) : (
         <>

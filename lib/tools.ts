@@ -342,6 +342,9 @@ export interface ToolDef {
   accent: ToolAccent;
   /** Formatos y límites, en divulgación progresiva (componente ToolConstraints). */
   constraints: string[];
+  /** Herramientas típicas a las que seguir con el resultado (chips "Continuar
+   *  con…"); curadas a mano, 3 o 4, en orden de frecuencia. */
+  nextSteps?: ToolSlug[];
 }
 
 export const TOOLS: ToolDef[] = [
@@ -374,6 +377,7 @@ export const TOOLS: ToolDef[] = [
       'Las imágenes se ajustan a tamaño Carta (recorte opcional)',
     ],
     accent: TONES.ocean,
+    nextSteps: ['comprimir', 'contrasena-pdf', 'firmar-pdf', 'organizar'],
   },
   {
     slug: 'dividir',
@@ -431,6 +435,7 @@ export const TOOLS: ToolDef[] = [
       'Sin archivos duplicados',
     ],
     accent: TONES.teal,
+    nextSteps: ['contrasena-pdf', 'firmar-pdf', 'unir'],
   },
   {
     slug: 'convertir',
@@ -706,6 +711,7 @@ export const TOOLS: ToolDef[] = [
       'Coloca la firma en la página y posición que prefieras',
     ],
     accent: TONES.purple,
+    nextSteps: ['contrasena-pdf', 'comprimir'],
   },
   {
     slug: 'recortar-pdf',
@@ -1108,6 +1114,7 @@ export const TOOLS: ToolDef[] = [
       'El archivo nunca sale de tu dispositivo',
     ],
     accent: TONES.rose,
+    nextSteps: ['firmar-pdf', 'comprimir'],
   },
   {
     slug: 'censurar-pdf',

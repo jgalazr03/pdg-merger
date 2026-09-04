@@ -20,10 +20,12 @@ import { Input } from '@/components/ui/input';
 import { cn, scrollIntoViewSafe } from '@/lib/utils';
 import { toastUndo } from '@/lib/toast';
 import { getTool } from '@/lib/tools';
+import { useHandoff } from '@/lib/handoff';
 import { protectPdf, unlockPdf, WrongPasswordError } from '@/lib/qpdf';
 import ToolShell from '@/components/tools/ToolShell';
 import FileDropzone from '@/components/tools/FileDropzone';
 import ToolConstraints from '@/components/tools/ToolConstraints';
+import NextSteps from '@/components/tools/NextSteps';
 
 const tool = getTool('contrasena-pdf');
 const accent = tool.accent;
@@ -88,6 +90,12 @@ export default function PDFPassword() {
       setIsEncrypted(/encrypt/i.test(String((err as Error)?.message)));
     }
   };
+
+  // Recibe el archivo traspasado desde otra herramienta ("Continuar con…"),
+  // si lo hay, y lo carga igual que si se hubiera seleccionado a mano.
+  useHandoff((file) => {
+    void handleFileSelect(file);
+  });
 
   const switchMode = (next: Mode) => {
     setMode(next);
@@ -154,6 +162,16 @@ export default function PDFPassword() {
     setSelectedFile(null);
     setIsEncrypted(null);
     resetInputs();
+  };
+
+  // Archivo del resultado para el traspaso "Continuar con…".
+  const resultFile = (): File | null => {
+    if (!resultBlob || !selectedFile) return null;
+    const base = selectedFile.name.replace(/\.pdf$/i, '');
+    const suffix = mode === 'proteger' ? '_protegido' : '_sin-contrasena';
+    return new File([resultBlob], `${base}${suffix}.pdf`, {
+      type: 'application/pdf',
+    });
   };
 
   const changeFileWithUndo = () => {
@@ -424,6 +442,12 @@ export default function PDFPassword() {
                 {mode === 'proteger' ? 'Proteger otro PDF' : 'Quitar a otro PDF'}
               </Button>
             </div>
+
+            <NextSteps
+              tool={tool}
+              getFile={resultFile}
+              className="mt-6 border-t-3 border-ink pt-6"
+            />
           </CardContent>
         </Card>
       )}
