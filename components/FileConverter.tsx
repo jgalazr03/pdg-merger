@@ -1,7 +1,6 @@
 'use client';
 
 import { useState, useRef, useEffect, useMemo } from 'react';
-import * as pdfjsLib from 'pdfjs-dist';
 import { PDFDocument } from 'pdf-lib';
 import JSZip from 'jszip';
 import {
@@ -11,7 +10,6 @@ import {
   X,
   Repeat,
   ImageIcon,
-  Settings2,
   ArrowRight,
   ArrowDown,
   ChevronDown,
@@ -20,18 +18,15 @@ import {
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { Label } from '@/components/ui/label';
 import { Progress } from '@/components/ui/progress';
-import { cn, scrollIntoViewSafe } from '@/lib/utils';
+import { cn } from '@/lib/utils';
 import { toastUndo } from '@/lib/toast';
 import { getTool } from '@/lib/tools';
+import { loadPdfjs } from '@/lib/pdf-thumbnails';
 import ToolShell from '@/components/tools/ToolShell';
 import FileDropzone from '@/components/tools/FileDropzone';
 import ToolConstraints from '@/components/tools/ToolConstraints';
-
-if (typeof window !== 'undefined') {
-  pdfjsLib.GlobalWorkerOptions.workerSrc = '/pdf.worker.min.js';
-}
+import NextSteps from '@/components/tools/NextSteps';
 
 const tool = getTool('convertir');
 const accent = tool.accent;
@@ -202,20 +197,29 @@ export default function FileConverter() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [progress, setProgress] = useState(0);
   const [results, setResults] = useState<ResultFile[]>([]);
-  const listRef = useRef<HTMLDivElement>(null);
-  const resultRef = useRef<HTMLDivElement>(null);
+
+  // El resultado convertido es una foto de la lista, el destino y el nivel en
+  // el momento de convertir. Si algo de eso cambia después (agregar/quitar
+  // archivos, cambiar destino o nivel), ese resultado ya no corresponde: se
+  // descarta para que vuelva "Convertir" y se regenere. Se detecta por firma
+  // (no por cada mutador) para no olvidar ninguno.
+  const filesSignature = files.map((f) => f.id).join('|');
+  // Último resultado visto (no en las dependencias del efecto: si lo
+  // metiéramos, el propio setResults([]) volvería a dispararlo). Así el
+  // aviso de abajo solo suena cuando SÍ había archivos generados.
+  const hadResultRef = useRef(false);
+  useEffect(() => {
+    hadResultRef.current = results.length > 0;
+  }, [results]);
 
   useEffect(() => {
-    if (files.length > 0 && results.length === 0 && listRef.current) {
-      setTimeout(() => scrollIntoViewSafe(listRef.current), 100);
+    if (hadResultRef.current) {
+      toast('La lista cambió', {
+        description: 'Vuelve a convertir para incluir los cambios.',
+      });
     }
-  }, [files.length, results.length]);
-
-  useEffect(() => {
-    if (results.length > 0) {
-      setTimeout(() => scrollIntoViewSafe(resultRef.current), 100);
-    }
-  }, [results.length]);
+    setResults([]);
+  }, [filesSignature, target, level]);
 
   const hasPdf = files.some((f) => f.kind === 'pdf');
   const hasImage = files.some((f) => f.kind === 'image');
@@ -300,7 +304,6 @@ export default function FileConverter() {
       });
     }
     if (accepted.length > 0) {
-      setResults([]);
       setFiles((prev) => [...prev, ...accepted]);
       toast.success(
         `${accepted.length} archivo${accepted.length !== 1 ? 's' : ''} agregado${accepted.length !== 1 ? 's' : ''}`
@@ -311,7 +314,6 @@ export default function FileConverter() {
   const handleInputFormatChange = (value: string) => {
     const fmt = value as InputFormat;
     setInputFormat(fmt);
-    setResults([]);
     // Mantén la lista coherente con el nuevo formato: quita lo que ya no encaje.
     if (fmt !== 'auto') {
       setFiles((prev) => {
@@ -395,6 +397,8 @@ export default function FileConverter() {
 
   const convertPdfToImages = async (src: SourceFile, t: ImageTarget): Promise<ResultFile[]> => {
     const { scale, quality } = LEVELS[level];
+    // pdf.js se carga de forma perezosa y compartida (solo al convertir un PDF).
+    const pdfjsLib = await loadPdfjs();
     const arrayBuffer = await src.file.arrayBuffer();
     const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
     const out: ResultFile[] = [];
@@ -494,10 +498,200 @@ export default function FileConverter() {
     setProgress(0);
   };
 
+  // Archivo del resultado para el traspaso "Continuar con…": solo cuando hay
+  // exactamente un PDF generado (el destino de esas herramientas). Con varios
+  // archivos o una imagen, `NextSteps` no tiene nada que ofrecer y no pinta.
+  const resultFile = () =>
+    results.length === 1 && results[0].kind === 'pdf'
+      ? new File([results[0].blob], results[0].name, { type: 'application/pdf' })
+      : null;
+
   const step: 1 | 2 | 3 = files.length === 0 ? 1 : results.length > 0 ? 3 : 2;
 
+  // ---- Resumen para el panel de acción -------------------------------------
+  const totalInputBytes = files.reduce((sum, f) => sum + f.file.size, 0);
+  const totalResultBytes = results.reduce((sum, r) => sum + r.blob.size, 0);
+  const filesLabel = `${files.length} ${files.length === 1 ? 'archivo' : 'archivos'}`;
+  const resultsLabel = `${results.length} ${results.length === 1 ? 'archivo' : 'archivos'} ${TARGET_META[target].label}`;
+  const outputLine = `Salida: ${TARGET_META[target].label}${
+    hasPdf && target !== 'pdf' ? ' · una imagen por página' : ''
+  }`;
+  const ctaLabel = isProcessing ? 'Convirtiendo…' : `Convertir a ${TARGET_META[target].label}`;
+  const ctaDisabled = isProcessing || files.length === 0;
+
+  const progressBlock = isProcessing && (
+    <div className="mt-3" aria-live="polite">
+      <p className="text-sm font-bold tabular-nums text-ink">Convirtiendo… {progress}%</p>
+      <Progress
+        value={progress}
+        className="mt-2 h-2"
+        aria-label="Progreso de la conversión"
+      />
+    </div>
+  );
+
+  // Panel de acción (lg+: columna derecha pegajosa; debajo: fluye tras la
+  // lista y deja el resumen y el botón a la barra inferior).
+  const aside = files.length > 0 && (
+    <div
+      className={cn(
+        'rounded-lg border-3 border-ink bg-card p-4 sm:p-5',
+        // Sin resultado y sin selector de nivel el panel no tiene opciones: bajo
+        // lg la barra inferior basta y así no queda una tarjeta vacía.
+        results.length === 0 && !showLevel && 'hidden lg:block'
+      )}
+    >
+      {results.length > 0 ? (
+        <>
+          <p className="text-xs font-bold uppercase tracking-[0.15em] text-success">
+            Listo
+          </p>
+          <p className="mt-2 break-words text-base font-bold text-ink">{resultsLabel}</p>
+          <p className="mt-1 text-sm tabular-nums text-muted-foreground">
+            {formatFileSize(totalResultBytes)} en total
+          </p>
+          <div className="mt-4 hidden flex-col gap-2 lg:flex">
+            <Button
+              onClick={downloadAll}
+              size="lg"
+              className={cn('w-full', accent.solid)}
+            >
+              <Download className="mr-2 h-5 w-5" />
+              {results.length > 1 ? 'Descargar todo (ZIP)' : 'Descargar archivo'}
+            </Button>
+            <Button variant="outline" onClick={resetAll} size="lg" className="w-full">
+              Convertir otros archivos
+            </Button>
+          </div>
+          <NextSteps
+            tool={tool}
+            getFile={resultFile}
+            className="mt-4 border-t-3 border-ink pt-4"
+          />
+        </>
+      ) : (
+        <>
+          <div className="hidden lg:block">
+            <p className="text-xs font-bold uppercase tracking-[0.15em] text-muted-foreground">
+              Resumen
+            </p>
+            <p className="mt-2 text-sm font-bold tabular-nums text-ink" aria-live="polite">
+              {filesLabel} · {formatFileSize(totalInputBytes)}
+            </p>
+            <p className="text-sm tabular-nums text-muted-foreground">{outputLine}</p>
+          </div>
+
+          {showLevel && (
+            <div className="lg:mt-4">
+              <p className="mb-3 text-xs font-bold uppercase tracking-[0.15em] text-muted-foreground">
+                {hasPdf ? 'Resolución y calidad' : 'Calidad'}
+              </p>
+              <div className="grid gap-2">
+                {(Object.keys(LEVELS) as Level[]).map((lv) => (
+                  <button
+                    key={lv}
+                    type="button"
+                    onClick={() => setLevel(lv)}
+                    aria-pressed={level === lv}
+                    disabled={isProcessing}
+                    className={cn(
+                      'rounded-lg border-3 border-ink p-3 text-left transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink focus-visible:ring-offset-2 disabled:opacity-50',
+                      level === lv ? 'bg-indigo-soft' : 'bg-surface hover-fine:bg-muted'
+                    )}
+                  >
+                    <div className="text-sm font-bold text-ink">{LEVELS[lv].label}</div>
+                    <div className="text-xs text-muted-foreground">{LEVELS[lv].description}</div>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          <div className="mt-4 hidden lg:block">
+            <Button
+              onClick={convert}
+              disabled={ctaDisabled}
+              aria-busy={isProcessing}
+              size="lg"
+              className={cn('w-full', accent.solid)}
+            >
+              {isProcessing ? (
+                <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+              ) : (
+                <Repeat className="mr-2 h-5 w-5" />
+              )}
+              {ctaLabel}
+            </Button>
+            {progressBlock}
+          </div>
+        </>
+      )}
+    </div>
+  );
+
+  // Barra inferior fija (solo por debajo de lg): resumen compacto + acción.
+  const bar = files.length > 0 && (
+    <div className="border-t-3 border-ink bg-surface pl-[max(20px,env(safe-area-inset-left))] pr-[max(20px,env(safe-area-inset-right))] pb-[max(12px,env(safe-area-inset-bottom))] pt-3">
+      <div className="container mx-auto flex max-w-6xl items-center gap-3">
+        <div className="min-w-0 flex-1">
+          {results.length > 0 ? (
+            <>
+              <p className="truncate text-sm font-bold text-ink">{resultsLabel}</p>
+              <p className="truncate text-xs tabular-nums text-muted-foreground">
+                {formatFileSize(totalResultBytes)}
+              </p>
+            </>
+          ) : isProcessing ? (
+            <div aria-live="polite">
+              <p className="truncate text-sm font-bold tabular-nums text-ink">
+                Convirtiendo… {progress}%
+              </p>
+              <Progress
+                value={progress}
+                className="mt-1.5 h-2"
+                aria-label="Progreso de la conversión"
+              />
+            </div>
+          ) : (
+            <>
+              <p className="truncate text-sm font-bold tabular-nums text-ink">{filesLabel}</p>
+              <p className="truncate text-xs tabular-nums text-muted-foreground">
+                {formatFileSize(totalInputBytes)} · a {TARGET_META[target].label}
+              </p>
+            </>
+          )}
+        </div>
+        {results.length > 0 ? (
+          <>
+            <Button variant="outline" onClick={resetAll} className="shrink-0">
+              Otros
+            </Button>
+            <Button onClick={downloadAll} className={cn('shrink-0', accent.solid)}>
+              <Download className="mr-2 h-4 w-4" />
+              Descargar
+            </Button>
+          </>
+        ) : (
+          <Button
+            onClick={convert}
+            disabled={ctaDisabled}
+            aria-busy={isProcessing}
+            className={cn('shrink-0', accent.solid)}
+          >
+            {isProcessing ? (
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            ) : (
+              <Repeat className="mr-2 h-4 w-4" />
+            )}
+            Convertir
+          </Button>
+        )}
+      </div>
+    </div>
+  );
+
   return (
-    <ToolShell tool={tool} step={step}>
+    <ToolShell tool={tool} step={step} aside={aside} bar={bar}>
       {/* Barra de conversión "De → A": el usuario fija formato de entrada
           (o lo deja en automático) y el de salida ANTES de subir. */}
       <div className="mb-4 rounded-lg border-3 border-ink bg-card p-4">
@@ -545,8 +739,8 @@ export default function FileConverter() {
 
       <ToolConstraints items={tool.constraints} />
 
-      {files.length > 0 && results.length === 0 && (
-        <Card className="mb-8 motion-safe:animate-slide-up" ref={listRef}>
+      {files.length > 0 && (
+        <Card className="mb-8 motion-safe:animate-slide-up">
           <CardContent className="p-4 sm:p-6">
             {/* Encabezado + acción: apilados en móvil (el título mono envuelve
                 y chocaría con el botón); en una fila a partir de sm. */}
@@ -599,37 +793,9 @@ export default function FileConverter() {
               ))}
             </ul>
 
-            {/* Nivel (calidad / resolución) cuando influye en el resultado */}
-            {showLevel && (
-              <div className="mt-6">
-                <Label className="mb-3 block text-sm font-medium text-ink">
-                  <Settings2 className="mr-2 inline h-4 w-4" />
-                  {hasPdf ? 'Resolución y calidad' : 'Calidad'}
-                </Label>
-                <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-                  {(Object.keys(LEVELS) as Level[]).map((lv) => (
-                    <button
-                      key={lv}
-                      type="button"
-                      onClick={() => setLevel(lv)}
-                      aria-pressed={level === lv}
-                      disabled={isProcessing}
-                      className={cn(
-                        'rounded-lg border-3 border-ink p-4 text-left transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink focus-visible:ring-offset-2 disabled:opacity-50',
-                        level === lv ? 'bg-indigo-soft' : 'bg-surface hover-fine:bg-muted'
-                      )}
-                    >
-                      <div className="mb-1 font-bold text-ink">{LEVELS[lv].label}</div>
-                      <div className="text-sm text-muted-foreground">{LEVELS[lv].description}</div>
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
-
             {/* Nota informativa NEUTRA (arena + ícono), no el tinte de la
-                herramienta: el índigo ya marca la opción seleccionada y usarlo
-                aquí también se confundía con una selección. */}
+                herramienta: el índigo ya marca la opción seleccionada (en el
+                panel) y usarlo aquí también se confundía con una selección. */}
             <div className="mt-6 flex items-start gap-2.5 rounded-lg border-3 border-ink bg-muted p-4">
               <Info className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true" />
               <p className="text-sm text-ink">
@@ -644,77 +810,13 @@ export default function FileConverter() {
         </Card>
       )}
 
-      {files.length > 0 && results.length === 0 && (
-        <Card className="mb-8">
-          <CardContent className="p-4 text-center sm:p-6">
-            <h2 className="mb-4 font-display text-lg font-bold text-ink">
-              ¿Listo para convertir?
-            </h2>
-            <p className="mb-6 text-muted-foreground">
-              Se convertir{files.length !== 1 ? 'án' : 'á'} {files.length} archivo
-              {files.length !== 1 ? 's' : ''} a {TARGET_META[target].label}.
-            </p>
-
-            {isProcessing && (
-              <div className="mx-auto mb-6 max-w-md space-y-2" aria-live="polite">
-                <div className="flex items-center justify-between text-sm">
-                  <span className={accent.text}>Convirtiendo…</span>
-                  <span className="text-muted-foreground">{progress}%</span>
-                </div>
-                <Progress value={progress} className="h-2" />
-              </div>
-            )}
-
-            <Button
-              onClick={convert}
-              disabled={isProcessing}
-              aria-busy={isProcessing}
-              size="lg"
-              className={accent.solid}
-            >
-              {isProcessing ? (
-                <>
-                  <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                  Convirtiendo…
-                </>
-              ) : (
-                <>
-                  <Repeat className="mr-2 h-5 w-5" />
-                  Convertir a {TARGET_META[target].label}
-                </>
-              )}
-            </Button>
-          </CardContent>
-        </Card>
-      )}
-
       {results.length > 0 && (
-        <Card ref={resultRef} className="motion-safe:animate-slide-up">
+        <Card className="mb-8 motion-safe:animate-slide-up">
           <CardContent className="p-4 sm:p-6">
-            <div className="mb-6 text-center">
-              <div className="mb-4 inline-flex h-16 w-16 items-center justify-center rounded-full border-3 border-ink bg-success text-white">
-                <Download className="h-8 w-8" />
-              </div>
-              <h2 className="mb-2 text-lg font-bold text-success">
-                ¡Conversión completada!
-              </h2>
-              <p className="mb-6 text-ink">
-                Se {results.length === 1 ? 'generó' : 'generaron'} {results.length} archivo
-                {results.length !== 1 ? 's' : ''} {TARGET_META[target].label}.
-              </p>
-              <Button onClick={downloadAll} size="lg" className={accent.solid}>
-                <Download className="mr-2 h-5 w-5" />
-                Descargar {results.length > 1 ? 'todo (ZIP)' : 'archivo'}
-              </Button>
-            </div>
-
-            {/* Lista de resultados: mismo patrón que Dividir/Comprimir (ícono +
-                nombre + descargar), sin preview, para ser consistente con el
-                resto del sistema. */}
+            <h2 className="mb-4 font-display text-lg font-bold text-ink">
+              Archivos generados ({results.length})
+            </h2>
             <div className="space-y-3">
-              <h3 className="mb-3 font-display font-bold text-ink">
-                Archivos generados:
-              </h3>
               {results.map((r) => (
                 <div
                   key={r.id}
@@ -749,12 +851,6 @@ export default function FileConverter() {
                   </Button>
                 </div>
               ))}
-            </div>
-
-            <div className="mt-6 text-center">
-              <Button variant="outline" onClick={resetAll} size="lg">
-                Convertir otros archivos
-              </Button>
             </div>
           </CardContent>
         </Card>
