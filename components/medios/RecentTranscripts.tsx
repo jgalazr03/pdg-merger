@@ -194,9 +194,21 @@ export default function RecentTranscripts({
                   <span className="block truncate text-sm font-bold text-ink">
                     {s.title}
                   </span>
-                  <span className="mt-0.5 block text-xs tabular-nums text-muted-foreground">
-                    {dateFmt.format(new Date(s.updatedAt))} · {clock(s.duration)}
-                    {s.speakerCount > 1 && ` · ${s.speakerCount} hablantes`}
+                  {/* «·» solo desde sm: en móvil los datos pasan de línea y un
+                      separador al inicio de renglón se lee como error. */}
+                  <span className="mt-0.5 flex flex-wrap gap-x-3 text-xs tabular-nums text-muted-foreground sm:gap-x-0">
+                    {[
+                      dateFmt.format(new Date(s.updatedAt)),
+                      clock(s.duration),
+                      s.speakerCount > 1 ? `${s.speakerCount} hablantes` : null,
+                    ]
+                      .filter(Boolean)
+                      .map((m, i) => (
+                        <span key={i}>
+                          {i > 0 && <span aria-hidden className="hidden sm:inline">{' · '}</span>}
+                          {m}
+                        </span>
+                      ))}
                   </span>
                   {s.aiKinds.some((k) => KIND_LABEL[k]) && (
                     <span className="mt-1.5 flex flex-wrap gap-1">

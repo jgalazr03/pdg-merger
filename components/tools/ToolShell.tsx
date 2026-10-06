@@ -84,10 +84,12 @@ export default function ToolShell({
                   {tool.name}
                 </Link>
               </li>
-              <li aria-hidden="true">
+              {/* En móvil el nombre no cabe y el h1 de justo abajo ya lo
+                  muestra: se oculta con su separador (no queda un «›» suelto). */}
+              <li aria-hidden="true" className="hidden sm:block">
                 <ChevronRight className="h-3.5 w-3.5 shrink-0" />
               </li>
-              <li aria-current="page" className="min-w-0 truncate font-bold text-ink">
+              <li aria-current="page" className="hidden min-w-0 truncate font-bold text-ink sm:block">
                 {resultCrumb}
               </li>
             </>

@@ -1,9 +1,9 @@
-"use client";
+'use client';
 
-import { useEffect, useRef, useState } from "react";
-import { Download, ChevronDown, type LucideIcon } from "lucide-react";
-import { cn } from "@/lib/utils";
-import { Button } from "@/components/ui/button";
+import { useEffect, useRef, useState } from 'react';
+import { Download, ChevronDown, type LucideIcon } from 'lucide-react';
+import { cn } from '@/lib/utils';
+import { Button } from '@/components/ui/button';
 
 export type DownloadItem = {
   label: string;
@@ -21,15 +21,16 @@ export type DownloadItem = {
 export default function DownloadMenu({
   items,
   className,
-  label = "Descargar",
-  placement = "auto",
+  label = 'Descargar',
+  placement = 'auto',
 }: {
   items: DownloadItem[];
   className?: string;
   label?: string;
   /** 'auto': hacia arriba en sm+ (al pie de un panel); 'down': siempre hacia
-   *  abajo y alineado a la derecha (en un encabezado). */
-  placement?: "auto" | "down";
+   *  abajo (en un encabezado), alineado a la izquierda hasta lg y a la derecha
+   *  desde lg (cuando el encabezado pasa a fila y el botón queda a la derecha). */
+  placement?: 'auto' | 'down';
 }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -37,17 +38,16 @@ export default function DownloadMenu({
   useEffect(() => {
     if (!open) return;
     const onDown = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node))
-        setOpen(false);
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
     };
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setOpen(false);
+      if (e.key === 'Escape') setOpen(false);
     };
-    document.addEventListener("mousedown", onDown);
-    document.addEventListener("keydown", onKey);
+    document.addEventListener('mousedown', onDown);
+    document.addEventListener('keydown', onKey);
     return () => {
-      document.removeEventListener("mousedown", onDown);
-      document.removeEventListener("keydown", onKey);
+      document.removeEventListener('mousedown', onDown);
+      document.removeEventListener('keydown', onKey);
     };
   }, [open]);
 
@@ -64,8 +64,8 @@ export default function DownloadMenu({
         {label}
         <ChevronDown
           className={cn(
-            "ml-2 h-4 w-4 transition-transform duration-150",
-            open && "rotate-180",
+            'ml-2 h-4 w-4 transition-transform duration-150',
+            open && 'rotate-180'
           )}
         />
       </Button>
@@ -74,10 +74,12 @@ export default function DownloadMenu({
         <div
           role="menu"
           className={cn(
-            "absolute z-20 min-w-[15rem] overflow-hidden rounded-lg border-3 border-ink bg-card",
-            placement === "down"
-              ? "right-0 mt-2"
-              : "left-0 mt-2 sm:bottom-full sm:left-auto sm:right-0 sm:mb-2 sm:mt-0",
+            'absolute z-20 min-w-[15rem] overflow-hidden rounded-lg border-3 border-ink bg-card',
+            placement === 'down'
+              ? // Por debajo de lg el botón va a la izquierda: anclar a la
+                // derecha sacaba el menú de la pantalla.
+                'left-0 mt-2 lg:left-auto lg:right-0'
+              : 'left-0 mt-2 sm:bottom-full sm:left-auto sm:right-0 sm:mb-2 sm:mt-0'
           )}
         >
           {items.map((it, i) => {

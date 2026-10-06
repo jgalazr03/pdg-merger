@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { Fragment, useEffect, useRef, useState } from 'react';
 import {
   AudioLines,
   FileAudio,
@@ -85,6 +85,18 @@ const resultDateFmt = new Intl.DateTimeFormat('es-MX', {
   hour: '2-digit',
   minute: '2-digit',
 });
+
+/** Nombre de archivo con puntos de corte tras «_», «-» y «.»: los nombres sin
+ *  espacios (Reunion_obra_semana_40.mov) se parten por ahí y no letra a letra. */
+function withSoftBreaks(name: string): React.ReactNode {
+  // Sin lookbehind (`(?<=…)`): rompe el parseo en Safari < 16.4.
+  return name.replace(/([_\-.])/g, '$1\u0000').split('\u0000').map((part, i) => (
+    <Fragment key={i}>
+      {i > 0 && <wbr />}
+      {part}
+    </Fragment>
+  ));
+}
 
 const reportCorrupt = (store: string) =>
   trackHistory('history_corrupt_record', { store });
@@ -833,30 +845,36 @@ export default function Transcriber({
         <div ref={resultRef} className="motion-safe:animate-slide-up">
           {/* Encabezado de la grabación: qué es (título y datos) y las acciones
               principales (exportar, empezar otra), siempre en la primera pantalla. */}
-          <div className="mb-5 flex flex-col gap-3 border-b-2 border-ink/10 pb-4 sm:flex-row sm:items-end sm:justify-between">
-            <div className="min-w-0">
+          {/* En fila solo desde lg: en tablet el título necesita el ancho completo
+              (los nombres de archivo largos se partían letra a letra). */}
+          <div className="mb-5 flex flex-col gap-3 border-b-2 border-ink/10 pb-4 lg:flex-row lg:items-end lg:justify-between">
+            <div className="min-w-0 flex-1">
               {/* La grabación es el título principal de la página: el hero de
                   la herramienta se oculta y la herramienta queda en la ruta. */}
               <h1 className="break-words text-[clamp(1.6rem,6vw,2.25rem)] font-bold leading-[1.1] tracking-tight text-ink">
-                {baseName}
+                {withSoftBreaks(baseName)}
               </h1>
-              <p className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs tabular-nums text-muted-foreground sm:text-sm">
+              {/* Separadores «·» solo desde sm: en móvil los datos pasan de
+                  línea y un «·» al inicio de renglón se lee como error. «Guardada»
+                  no lleva separador: su ícono ya lo delimita. */}
+              <p className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs tabular-nums text-muted-foreground sm:gap-x-2 sm:text-sm">
                 {resultMeta.map((m, i) => (
                   <span key={m} className="inline-flex items-center gap-2">
-                    {i > 0 && <span aria-hidden>·</span>}
+                    {i > 0 && (
+                      <span aria-hidden className="hidden sm:inline">
+                        ·
+                      </span>
+                    )}
                     {m}
                   </span>
                 ))}
                 {sessionId && (
-                  <span className="inline-flex items-center gap-2">
-                    <span aria-hidden>·</span>
-                    <span
-                      title="Guardada en este equipo; nada se sube"
-                      className="inline-flex items-center gap-1 text-success"
-                    >
-                      <Check className="h-3.5 w-3.5" strokeWidth={3} />
-                      Guardada
-                    </span>
+                  <span
+                    title="Guardada en este equipo; nada se sube"
+                    className="inline-flex items-center gap-1 text-success sm:ml-1"
+                  >
+                    <Check className="h-3.5 w-3.5" strokeWidth={3} />
+                    Guardada
                   </span>
                 )}
               </p>
@@ -894,18 +912,20 @@ export default function Transcriber({
                     isVideo={isVideo}
                     onRequestMedia={(t) => setReconnectAsk({ time: t })}
                     mediaPlaceholder={
-                      <div className="flex flex-col gap-2 px-3 py-2.5 sm:flex-row sm:items-center sm:justify-between">
-                        <p className="text-sm text-muted-foreground">
+                      // flex-wrap: el botón baja de renglón antes que recortarse
+                      // cuando el nombre del archivo es largo.
+                      <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2 px-3 py-2.5">
+                        <p className="min-w-0 flex-1 basis-[15rem] text-sm text-muted-foreground">
                           Para escuchar, vuelve a seleccionar{' '}
                           <span className="break-words font-bold text-ink">
-                            {restored?.media.name ?? 'el archivo original'}
+                            {withSoftBreaks(restored?.media.name ?? 'el archivo original')}
                           </span>
                           . El audio no se guarda.
                         </p>
                         <Button
                           variant="outline"
                           size="sm"
-                          className="shrink-0"
+                          className="w-full shrink-0 sm:w-auto"
                           onClick={() => {
                             pendingSeekRef.current = null;
                             reconnectInputRef.current?.click();
