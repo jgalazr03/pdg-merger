@@ -62,45 +62,59 @@ export function HistoryProvider({
     [chunks, names, text]
   );
 
-  // El id puede llegar después de montar (la sesión se crea al terminar de
-  // transcribir); se lee por ref para no recrear `save` en cada cambio.
+  // El id llega después de montar: la sesión se crea al terminar de
+  // transcribir, en paralelo con lo primero que piden los paneles (p. ej. las
+  // sugerencias). Lo generado antes de tener id se encola y se escribe al
+  // llegar; sin historial (id null para siempre) se queda solo en memoria.
   const sessionRef = useRef(sessionId);
   sessionRef.current = sessionId;
+  const queueRef = useRef(new Map<string, AiResult>());
+
+  const persist = useCallback((id: string, r: AiResult) => {
+    void getHistoryRepo().then(async (repo) => {
+      if (!repo) return;
+      try {
+        await repo.saveResult(id, r.kind, r.variant, r.payload, r.sourceHash);
+        notifyHistoryChanged();
+      } catch (e) {
+        if (isQuotaError(e)) {
+          trackHistory('history_quota_error', {});
+          toast.error('No hay espacio para guardar este resultado', {
+            description: 'Borra transcripciones antiguas del historial para liberar espacio.',
+          });
+        }
+        // Otros fallos (sesión borrada en otra pestaña): el resultado sigue
+        // visible en memoria; no vale la pena interrumpir al usuario.
+      }
+    });
+  }, []);
+
+  useEffect(() => {
+    if (!sessionId || queueRef.current.size === 0) return;
+    const queued = Array.from(queueRef.current.values());
+    queueRef.current.clear();
+    for (const r of queued) persist(sessionId, r);
+  }, [sessionId, persist]);
 
   const save = useCallback(
     <K extends AiKind>(kind: K, variant: string, payload: AiPayload<K>) => {
-      const sourceHash = sourceHashFor(kind, chunks, names, text);
-      const optimistic = {
+      const key = resultKey(kind, variant);
+      const result = {
         schemaVersion: 1,
         sessionId: sessionRef.current ?? '',
         kind,
         variant,
-        sourceHash,
+        sourceHash: sourceHashFor(kind, chunks, names, text),
         createdAt: new Date().toISOString(),
         payload,
       } as AiResult;
-      setResults((prev) => new Map(prev).set(resultKey(kind, variant), optimistic));
+      setResults((prev) => new Map(prev).set(key, result));
 
       const id = sessionRef.current;
-      if (!id) return;
-      void getHistoryRepo().then(async (repo) => {
-        if (!repo) return;
-        try {
-          await repo.saveResult(id, kind, variant, payload, sourceHash);
-          notifyHistoryChanged();
-        } catch (e) {
-          if (isQuotaError(e)) {
-            trackHistory('history_quota_error', {});
-            toast.error('No hay espacio para guardar este resultado', {
-              description: 'Borra transcripciones antiguas del historial para liberar espacio.',
-            });
-          }
-          // Otros fallos (sesión borrada en otra pestaña): el resultado sigue
-          // visible en memoria; no vale la pena interrumpir al usuario.
-        }
-      });
+      if (id) persist(id, result);
+      else queueRef.current.set(key, result);
     },
-    [chunks, names, text]
+    [chunks, names, text, persist]
   );
 
   const value = useMemo(() => ({ results, hashFor, save }), [results, hashFor, save]);
