@@ -186,6 +186,32 @@ assert.equal(after, before, 'una transcripción vacía no debe guardarse');
 await emptyPage.close();
 step('transcripción sin voz: error explicado y nada guardado');
 
+// 8. Archivo que el navegador no puede decodificar (como un .mov en iPhone):
+// se ofrece el servidor con un botón (consentimiento explícito) y el modo
+// elegido se recuerda al volver.
+const movPage = await context.newPage();
+await movPage.route('**/api/blob-upload', (r) => r.fulfill({ status: 500, json: { error: 'sin blob en e2e' } }));
+await movPage.goto(`${BASE}/transcribir`, { waitUntil: 'networkidle' });
+await movPage.evaluate(() => localStorage.removeItem('gainco:transcribe-mode'));
+await movPage.reload({ waitUntil: 'networkidle' });
+await movPage.setInputFiles('input[type=file]', {
+  name: 'Act02video.mov', mimeType: 'video/quicktime', buffer: Buffer.from('no es un video de verdad'),
+});
+await movPage.getByRole('button', { name: /En tu navegador/ }).click();
+await movPage.getByRole('button', { name: 'Transcribir', exact: true }).click();
+await movPage.getByText(/no puede leer el audio de este archivo/).waitFor({ timeout: 30000 });
+await movPage.getByRole('button', { name: 'Transcribir en el servidor' }).click();
+await movPage.waitForFunction(() =>
+  [...document.querySelectorAll('button[aria-pressed="true"]')].some((b) => b.textContent.includes('En el servidor'))
+);
+await movPage.reload({ waitUntil: 'networkidle' });
+await movPage.setInputFiles('input[type=file]', { name: 'otro.wav', mimeType: 'audio/wav', buffer: silentWav() });
+await movPage.waitForFunction(() =>
+  [...document.querySelectorAll('button[aria-pressed="true"]')].some((b) => b.textContent.includes('En el servidor'))
+);
+await movPage.close();
+step('archivo ilegible en el navegador: botón al servidor y modo recordado');
+
 await page.screenshot({ path: process.env.E2E_SHOT ?? 'e2e-medios-history.png' });
 await browser.close();
 console.log('OK: historial de Medios');

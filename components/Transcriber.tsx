@@ -99,6 +99,8 @@ function withSoftBreaks(name: string): React.ReactNode {
   ));
 }
 
+const MODE_KEY = 'gainco:transcribe-mode';
+
 const reportCorrupt = (store: string) =>
   trackHistory('history_corrupt_record', { store });
 
@@ -150,6 +152,26 @@ export default function Transcriber({
   const [speakerNames, setSpeakerNames] = useState<SpeakerNames>({});
   const [errorMsg, setErrorMsg] = useState('');
   const [mode, setMode] = useState<Mode>('local');
+  // Tras un fallo de lectura en modo navegador se ofrece el modo servidor.
+  const [offerServer, setOfferServer] = useState(false);
+  // El modo elegido se recuerda en este equipo (si no, en cada visita volvía a
+  // «En tu navegador», que en iPhone no lee algunos videos).
+  const chooseMode = (m: Mode) => {
+    setMode(m);
+    try {
+      window.localStorage.setItem(MODE_KEY, m);
+    } catch {
+      /* almacenamiento bloqueado: el modo no se recuerda, sin más. */
+    }
+  };
+  useEffect(() => {
+    try {
+      const saved = window.localStorage.getItem(MODE_KEY);
+      if (saved === 'local' || saved === 'server') setMode(saved);
+    } catch {
+      /* idem */
+    }
+  }, []);
   const [uploadPct, setUploadPct] = useState(0);
   // Vocabulario del despacho (clientes/siglas) para el keyterm boosting del modo
   // servidor; persiste en localStorage (se carga tras montar, no en SSR).
@@ -508,6 +530,7 @@ export default function Transcriber({
 
   const handleTranscribe = () => {
     if (!selectedFile) return;
+    setOfferServer(false);
     clearSession();
     saveOnDoneRef.current = true;
     setErrorMsg('');
@@ -527,9 +550,15 @@ export default function Transcriber({
     try {
       audio = await decodeAudioTo16kMono(selectedFile);
     } catch {
+      // Safari (sobre todo en iPhone) no decodifica el audio de algunos videos,
+      // p. ej. QuickTime .mov. El servidor sí: se ofrece pasar a ese modo con un
+      // botón (nunca en automático: subiría la grabación sin consentimiento).
       setErrorMsg(
-        'No se pudo leer el audio de este archivo. Prueba con MP3, WAV o M4A.'
+        isIOS()
+          ? 'Tu iPhone no puede leer el audio de este archivo en el navegador. Transcríbelo en el servidor: ahí sí se lee.'
+          : 'Tu navegador no puede leer el audio de este archivo. Transcríbelo en el servidor, o conviértelo a MP3, WAV o M4A.'
       );
+      setOfferServer(true);
       setPhase('error');
       return;
     }
@@ -780,7 +809,7 @@ export default function Transcriber({
                         <button
                           key={opt.key}
                           type="button"
-                          onClick={() => setMode(opt.key)}
+                          onClick={() => chooseMode(opt.key)}
                           disabled={busy}
                           aria-pressed={active}
                           className={cn(
@@ -870,9 +899,27 @@ export default function Transcriber({
                 )}
 
                 {phase === 'error' && errorMsg && (
-                  <div className="mt-4 flex items-start gap-2 rounded-lg border-3 border-destructive bg-destructive/5 p-3">
-                    <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-destructive" />
-                    <p className="text-sm text-destructive">{errorMsg}</p>
+                  <div className="mt-4 rounded-lg border-3 border-destructive bg-destructive/5 p-3">
+                    <div className="flex items-start gap-2">
+                      <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-destructive" />
+                      <p className="text-sm text-destructive">{errorMsg}</p>
+                    </div>
+                    {offerServer && (
+                      <Button
+                        onClick={() => {
+                          chooseMode('server');
+                          setOfferServer(false);
+                          clearSession();
+                          saveOnDoneRef.current = true;
+                          setErrorMsg('');
+                          void transcribeServer();
+                        }}
+                        className={cn('mt-3 w-full sm:ml-7 sm:w-auto', accent.solid)}
+                      >
+                        <AudioLines className="mr-2 h-5 w-5" />
+                        Transcribir en el servidor
+                      </Button>
+                    )}
                   </div>
                 )}
             </div>
