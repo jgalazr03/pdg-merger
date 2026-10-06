@@ -69,15 +69,23 @@ export default function AiWorkspace({
   variant = 'general',
 }: Props) {
   const [active, setActive] = useState<WorkspaceTab>(defaultTab);
+  // La pestaña principal de cada herramienta va primero (en Analizar reunión,
+  // Análisis): lo que justifica la herramienta nunca queda al final.
+  const tabs = [
+    ...TABS.filter((t) => t.key === defaultTab),
+    ...TABS.filter((t) => t.key !== defaultTab),
+  ];
 
   return (
     <div className="overflow-hidden rounded-lg border-3 border-ink bg-card">
       <div
         role="tablist"
         aria-label="Herramientas de la grabación"
-        className="flex gap-1 overflow-x-auto border-b-3 border-ink bg-surface p-1.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        // Las pestañas pasan a otra fila en vez de desbordarse: con scroll
+        // horizontal oculto, las que no cabían eran invisibles.
+        className="flex flex-wrap gap-1 border-b-3 border-ink bg-surface p-1.5"
       >
-        {TABS.map((t) => {
+        {tabs.map((t) => {
           const isActive = active === t.key;
           const Icon = t.icon;
           return (

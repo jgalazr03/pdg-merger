@@ -37,7 +37,7 @@ export default function SpeakerNamer({ chunks, names, onChange, accent }: Props)
   };
 
   return (
-    <div className="rounded-lg border-3 border-ink bg-surface p-3 sm:p-4">
+    <div className="rounded-lg border-2 border-ink/15 bg-surface p-3 sm:p-4">
       <div className="mb-1 flex items-center gap-2">
         <Users className={cn('h-4 w-4', accent.text)} strokeWidth={2.5} />
         <h3 className="text-sm font-bold text-ink">¿Quién es quién?</h3>
@@ -64,7 +64,7 @@ export default function SpeakerNamer({ chunks, names, onChange, accent }: Props)
                 type="text"
                 value={names[s.speaker] ?? ''}
                 onChange={(e) => set(s.speaker, e.target.value)}
-                placeholder={`Hablante ${s.speaker + 1}`}
+                placeholder={`Nombre de Hablante ${s.speaker + 1}`}
                 aria-label={`Nombre del Hablante ${s.speaker + 1}`}
                 maxLength={40}
                 className="min-w-0 flex-1 bg-transparent text-sm text-ink outline-none placeholder:text-muted-foreground/70"

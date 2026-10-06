@@ -9,7 +9,7 @@ import {
   useRef,
   useState,
 } from 'react';
-import { Play, Search, ChevronUp, ChevronDown, X } from 'lucide-react';
+import { Play, Pencil, Search, ChevronUp, ChevronDown, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { ToolAccent } from '@/lib/tools';
 import {
@@ -28,6 +28,9 @@ type Props = {
   mediaUrl: string | null;
   isVideo: boolean;
   mediaPlaceholder?: React.ReactNode;
+  /** Sin audio, tocar un tiempo (o una cita) pide reconectarlo en vez de no
+   *  hacer nada. */
+  onRequestMedia?: () => void;
   accent: ToolAccent;
   /** Nombres personalizados de los hablantes (vacío = etiquetas genéricas). */
   names?: SpeakerNames;
@@ -95,7 +98,16 @@ function highlightHTML(raw: string, foldedRaw: string, foldedQuery: string): str
  * sobrevive al resaltado durante la reproducción).
  */
 function TranscriptPlayer(
-  { chunks, mediaUrl, isVideo, mediaPlaceholder, accent, names, onChange }: Props,
+  {
+    chunks,
+    mediaUrl,
+    isVideo,
+    mediaPlaceholder,
+    onRequestMedia,
+    accent,
+    names,
+    onChange,
+  }: Props,
   ref: React.Ref<TranscriptPlayerHandle>
 ) {
   const mediaRef = useRef<HTMLMediaElement | null>(null);
@@ -111,8 +123,6 @@ function TranscriptPlayer(
   // Búsqueda dentro de la transcripción (resalta y navega coincidencias).
   const [query, setQuery] = useState('');
   const [cursor, setCursor] = useState(0);
-
-  const hasSpeakers = chunks.some((c) => c.speaker != null);
 
   // Centra una línea en el panel de la transcripción (reutilizable: seguimiento
   // de la reproducción y salto entre coincidencias de búsqueda).
@@ -217,11 +227,14 @@ function TranscriptPlayer(
 
   const seek = useCallback((start: number, index: number) => {
     const m = mediaRef.current;
-    if (!m) return;
+    if (!m) {
+      onRequestMedia?.();
+      return;
+    }
     m.currentTime = start;
     setActiveIndex(index);
     void m.play();
-  }, []);
+  }, [onRequestMedia]);
 
   // Salto desde fuera (panel de preguntas): mueve el audio al momento citado,
   // resalta la línea y trae el reproductor a la vista.
@@ -230,14 +243,17 @@ function TranscriptPlayer(
     () => ({
       seekTo(time: number) {
         const m = mediaRef.current;
-        if (!m) return;
+        if (!m) {
+          onRequestMedia?.();
+          return;
+        }
         m.currentTime = time;
         setActiveIndex(activeIndexAt(chunks, time));
         void m.play();
         m.scrollIntoView?.({ behavior: 'smooth', block: 'center' });
       },
     }),
-    [chunks]
+    [chunks, onRequestMedia]
   );
 
   const commit = useCallback(() => {
@@ -252,7 +268,16 @@ function TranscriptPlayer(
   return (
     <div>
       {/* Reproductor */}
-      <div className="overflow-hidden rounded-lg border-3 border-ink bg-surface">
+      {/* Sin audio, el aviso de reconectar es un estado secundario: borde
+          ligero, no el marco fuerte del reproductor. */}
+      <div
+        className={cn(
+          'overflow-hidden rounded-lg',
+          mediaUrl
+            ? 'border-3 border-ink bg-surface'
+            : 'border-2 border-dashed border-ink/30'
+        )}
+      >
         {!mediaUrl ? (
           mediaPlaceholder
         ) : isVideo ? (
@@ -274,7 +299,11 @@ function TranscriptPlayer(
       </div>
 
       <p className="mb-2 mt-3 flex items-center gap-2 text-xs text-muted-foreground">
-        <Play className={cn('h-3.5 w-3.5', accent.text)} strokeWidth={2.5} />
+        {mediaUrl ? (
+          <Play className={cn('h-3.5 w-3.5', accent.text)} strokeWidth={2.5} />
+        ) : (
+          <Pencil className={cn('h-3.5 w-3.5', accent.text)} strokeWidth={2.5} />
+        )}
         {mediaUrl
           ? 'Toca una marca de tiempo para reproducir desde ahí. Toca el texto para corregirlo.'
           : 'Toca el texto para corregirlo.'}
@@ -439,12 +468,6 @@ function TranscriptPlayer(
         })}
       </div>
 
-      {hasSpeakers && (
-        <p className="mt-2 text-xs text-muted-foreground">
-          Hablantes detectados automáticamente; puedes corregir el texto de cada
-          línea.
-        </p>
-      )}
     </div>
   );
 }

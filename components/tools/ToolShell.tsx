@@ -15,6 +15,12 @@ import StepIndicator from './StepIndicator';
  *    barra, p. ej. el nombre del archivo).
  *  - `bar`: barra inferior FIJA solo por debajo de lg (resumen compacto + CTA).
  *    Cuando existe, el contenido reserva sitio abajo para no quedar tapado.
+ *
+ * `resultMode`: con el resultado listo, la página pasa a ser un espacio de
+ * trabajo: sin tagline ni riel de pasos (ya no orientan), el contenido ocupa el
+ * ancho completo y empieza más arriba.
+ * `privacyNote`: frase de privacidad junto al tagline. Por defecto «Todo se
+ * procesa en tu navegador»; las herramientas que usan servidor pasan la suya.
  */
 export default function ToolShell({
   tool,
@@ -22,12 +28,16 @@ export default function ToolShell({
   children,
   aside,
   bar,
+  resultMode = false,
+  privacyNote = 'Todo se procesa en tu navegador.',
 }: {
   tool: ToolDef;
   step: 1 | 2 | 3;
   children: React.ReactNode;
   aside?: React.ReactNode;
   bar?: React.ReactNode;
+  resultMode?: boolean;
+  privacyNote?: string;
 }) {
   return (
     // Móvil: preludio comprimido (la tarea primero — el dropzone debe asomar
@@ -67,7 +77,12 @@ export default function ToolShell({
       </nav>
 
       {/* Hero asimétrico: tile a la izquierda, título a la derecha */}
-      <header className="mb-5 flex items-start gap-4 motion-safe:animate-fade-in sm:mb-10 sm:gap-5">
+      <header
+        className={cn(
+          'flex items-start gap-4 motion-safe:animate-fade-in sm:gap-5',
+          resultMode ? 'mb-5 sm:mb-6' : 'mb-5 sm:mb-10'
+        )}
+      >
         <div
           className={cn(
             'flex h-12 w-12 shrink-0 items-center justify-center rounded-lg border-3 border-ink sm:h-16 sm:w-16',
@@ -81,10 +96,12 @@ export default function ToolShell({
           <h1 className="text-[clamp(1.6rem,6vw,2.25rem)] font-bold leading-[1.1] tracking-tight text-ink">
             {tool.title}
           </h1>
-          <p className="mt-2 max-w-xl text-sm text-muted-foreground sm:text-base md:text-lg">
-            {tool.tagline}{' '}
-            <span className="text-ink/60">Todo se procesa en tu navegador.</span>
-          </p>
+          {!resultMode && (
+            <p className="mt-2 max-w-xl text-sm text-muted-foreground sm:text-base md:text-lg">
+              {tool.tagline}{' '}
+              <span className="text-ink/60">{privacyNote}</span>
+            </p>
+          )}
         </div>
       </header>
 
@@ -92,16 +109,18 @@ export default function ToolShell({
           Con `aside`, en lg+ aparece una tercera columna pegajosa a la derecha. */}
       <div
         className={cn(
-          'md:grid md:grid-cols-[auto_1fr] md:gap-10',
+          !resultMode && 'md:grid md:grid-cols-[auto_1fr] md:gap-10',
           aside && 'lg:grid-cols-[auto_1fr_minmax(260px,300px)] lg:gap-8',
           bar && 'pb-24 lg:pb-0'
         )}
       >
-        <StepIndicator
-          current={step}
-          accent={tool.accent}
-          className="mb-5 md:mb-0 md:sticky md:top-24 md:self-start"
-        />
+        {!resultMode && (
+          <StepIndicator
+            current={step}
+            accent={tool.accent}
+            className="mb-5 md:mb-0 md:sticky md:top-24 md:self-start"
+          />
+        )}
         <div className="min-w-0">{children}</div>
         {aside && (
           <aside

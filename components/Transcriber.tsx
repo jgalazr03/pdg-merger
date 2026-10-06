@@ -28,7 +28,7 @@ import { upload } from '@vercel/blob/client';
 import TranscriptPlayer, {
   type TranscriptPlayerHandle,
 } from '@/components/medios/TranscriptPlayer';
-import DownloadMenu from '@/components/medios/DownloadMenu';
+import DownloadMenu, { type DownloadItem } from '@/components/medios/DownloadMenu';
 import AiWorkspace, { type WorkspaceTab } from '@/components/medios/AiWorkspace';
 import SpeakerNamer from '@/components/medios/SpeakerNamer';
 import VocabEditor from '@/components/medios/VocabEditor';
@@ -37,6 +37,8 @@ import { loadVocab, saveVocab } from '@/lib/customVocab';
 import {
   type Chunk,
   type SpeakerNames,
+  clock,
+  endOf,
   plainText,
   timedText,
   toSrt,
@@ -75,6 +77,13 @@ function formatFileSize(bytes: number): string {
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
+
+const resultDateFmt = new Intl.DateTimeFormat('es-MX', {
+  day: 'numeric',
+  month: 'short',
+  hour: '2-digit',
+  minute: '2-digit',
+});
 
 const reportCorrupt = (store: string) =>
   trackHistory('history_corrupt_record', { store });
@@ -553,11 +562,58 @@ export default function Transcriber({
   // El loader es uno solo y abarca todas las fases: barra con porcentaje cuando
   // lo conocemos (subida, descarga del modelo) e indeterminada cuando no
   // (preparando, transcribiendo). Solo cambia el texto.
+  // Datos de la grabación para el encabezado del resultado.
+  const durationSec = chunks.length ? endOf(chunks, chunks.length - 1) : 0;
+  const speakerCount = new Set(
+    chunks.filter((c) => c.speaker != null).map((c) => c.speaker)
+  ).size;
+  const resultMeta = [
+    restored && resultDateFmt.format(new Date(restored.createdAt)),
+    durationSec > 0 && clock(durationSec),
+    speakerCount > 1 && `${speakerCount} hablantes`,
+    mode === 'server' ? 'Transcrita en el servidor' : 'Transcrita en tu navegador',
+  ].filter((m): m is string => !!m);
+
+  const copyText = (value: string, msg: string) => {
+    void navigator.clipboard.writeText(value).then(() => toast.success(msg));
+  };
+  const exportItems: DownloadItem[] = [
+    { label: 'Copiar texto', icon: Copy, onSelect: () => copyText(text, 'Texto copiado') },
+    ...(chunks.length > 0
+      ? [
+          {
+            label: 'Copiar con tiempos',
+            icon: Copy,
+            onSelect: () =>
+              copyText(timedText(chunks, speakerNames), 'Copiado con marcas de tiempo'),
+          },
+        ]
+      : []),
+    { label: 'Texto (.txt)', onSelect: () => triggerDownload(text, `${baseName}.txt`) },
+    ...(chunks.length > 0
+      ? [
+          {
+            label: 'Subtítulos (.srt)',
+            onSelect: () => triggerDownload(toSrt(chunks), `${baseName}.srt`),
+          },
+          {
+            label: 'Subtítulos (.vtt)',
+            onSelect: () => triggerDownload(toVtt(chunks), `${baseName}.vtt`),
+          },
+        ]
+      : []),
+  ];
+
   const hasPct = phase === 'uploading' || (phase === 'loading' && modelPct > 0);
   const loaderPct = phase === 'uploading' ? uploadPct : modelPct;
 
   return (
-    <ToolShell tool={tool} step={step}>
+    <ToolShell
+      tool={tool}
+      step={step}
+      resultMode={phase === 'done'}
+      privacyNote="Tú eliges si se transcribe en tu navegador o en el servidor."
+    >
       <FileDropzone
         className="mb-4"
         accent={accent}
@@ -571,13 +627,15 @@ export default function Transcriber({
         onFiles={(files) => handleFileSelect(files[0])}
       />
 
-      <ToolConstraints items={tool.constraints} />
+      {/* Lo que orienta antes de subir (límites, consentimiento) sobra con el
+          resultado a la vista: empujaría el trabajo fuera de la primera pantalla. */}
+      {phase !== 'done' && <ToolConstraints items={tool.constraints} />}
 
       {!selectedFile && phase !== 'done' && (
         <RecentTranscripts accent={accent} onOpen={(id) => void openSession(id)} />
       )}
 
-      {contable && <ConsentKit accent={accent} />}
+      {contable && phase !== 'done' && <ConsentKit accent={accent} />}
 
       {selectedFile && phase !== 'done' && (
         <Card className="mb-8 motion-safe:animate-slide-up" ref={fileInfoRef}>
@@ -758,24 +816,44 @@ export default function Transcriber({
 
       {phase === 'done' && (
         <div ref={resultRef} className="motion-safe:animate-slide-up">
-          {/* Estado + acción de reinicio claramente separada del recurso actual */}
-          <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-            <div className="flex items-center gap-2">
-              <span className="inline-flex h-8 w-8 items-center justify-center rounded-full border-3 border-ink bg-success text-white">
-                <Check className="h-5 w-5" strokeWidth={3} />
-              </span>
-              <h2 className="font-display text-lg font-bold text-ink">
-                {restored ? 'Transcripción guardada' : 'Transcripción lista'}
+          {/* Encabezado de la grabación: qué es (título y datos) y las acciones
+              principales (exportar, empezar otra), siempre en la primera pantalla. */}
+          <div className="mb-5 flex flex-col gap-3 border-b-2 border-ink/10 pb-4 sm:flex-row sm:items-end sm:justify-between">
+            <div className="min-w-0">
+              <h2 className="break-words font-display text-xl font-bold leading-tight text-ink sm:text-2xl">
+                {baseName}
               </h2>
+              <p className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs tabular-nums text-muted-foreground sm:text-sm">
+                {resultMeta.map((m, i) => (
+                  <span key={m} className="inline-flex items-center gap-2">
+                    {i > 0 && <span aria-hidden>·</span>}
+                    {m}
+                  </span>
+                ))}
+                {sessionId && (
+                  <span className="inline-flex items-center gap-1 text-success">
+                    <Check className="h-3.5 w-3.5" strokeWidth={3} />
+                    Guardada en este equipo
+                  </span>
+                )}
+              </p>
             </div>
-            <Button variant="outline" size="sm" onClick={reset}>
-              <RotateCcw className="mr-2 h-4 w-4" />
-              Transcribir otro
-            </Button>
+            <div className="flex shrink-0 flex-wrap items-center gap-2">
+              <DownloadMenu
+                label="Exportar"
+                placement="down"
+                className={accent.solid}
+                items={exportItems}
+              />
+              <Button variant="outline" onClick={reset}>
+                <RotateCcw className="mr-2 h-4 w-4" />
+                Nueva grabación
+              </Button>
+            </div>
           </div>
 
           <div className="grid grid-cols-1 items-start gap-5 lg:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)]">
-            {/* Izquierda: reproductor + transcripción + exportar */}
+            {/* Izquierda: hablantes + reproductor + transcripción */}
             <div className="min-w-0 space-y-4">
               {chunks.length > 0 ? (
                 <ErrorBoundary label="el reproductor de la transcripción">
@@ -791,14 +869,15 @@ export default function Transcriber({
                     chunks={chunks}
                     mediaUrl={previewUrl}
                     isVideo={isVideo}
+                    onRequestMedia={() => reconnectInputRef.current?.click()}
                     mediaPlaceholder={
-                      <div className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
-                        <p className="text-sm text-ink">
+                      <div className="flex flex-col gap-2 px-3 py-2.5 sm:flex-row sm:items-center sm:justify-between">
+                        <p className="text-sm text-muted-foreground">
                           Para escuchar, vuelve a seleccionar{' '}
-                          <span className="break-words font-bold">
+                          <span className="break-words font-bold text-ink">
                             {restored?.media.name ?? 'el archivo original'}
                           </span>
-                          . El audio no se guarda en el historial.
+                          . El audio no se guarda.
                         </p>
                         <Button
                           variant="outline"
@@ -837,57 +916,6 @@ export default function Transcriber({
                 />
               )}
 
-              <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-start">
-                <Button
-                  onClick={() => {
-                    void navigator.clipboard
-                      .writeText(text)
-                      .then(() => toast.success('Texto copiado'));
-                  }}
-                  variant="outline"
-                >
-                  <Copy className="mr-2 h-4 w-4" />
-                  Copiar
-                </Button>
-                {chunks.length > 0 && (
-                  <Button
-                    onClick={() => {
-                      void navigator.clipboard
-                        .writeText(timedText(chunks, speakerNames))
-                        .then(() =>
-                          toast.success('Copiado con marcas de tiempo')
-                        );
-                    }}
-                    variant="outline"
-                  >
-                    <Copy className="mr-2 h-4 w-4" />
-                    Copiar con tiempos
-                  </Button>
-                )}
-                <DownloadMenu
-                  className={accent.solid}
-                  items={[
-                    {
-                      label: 'Texto (.txt)',
-                      onSelect: () => triggerDownload(text, `${baseName}.txt`),
-                    },
-                    ...(chunks.length > 0
-                      ? [
-                          {
-                            label: 'Subtítulos (.srt)',
-                            onSelect: () =>
-                              triggerDownload(toSrt(chunks), `${baseName}.srt`),
-                          },
-                          {
-                            label: 'Subtítulos (.vtt)',
-                            onSelect: () =>
-                              triggerDownload(toVtt(chunks), `${baseName}.vtt`),
-                          },
-                        ]
-                      : []),
-                  ]}
-                />
-              </div>
             </div>
 
             {/* Derecha: workspace de herramientas AI (pestañas, no pila de cards) */}

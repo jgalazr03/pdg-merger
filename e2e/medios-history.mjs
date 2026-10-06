@@ -71,7 +71,7 @@ await page.setInputFiles('input[type=file]', {
   name: 'junta-obra.wav', mimeType: 'audio/wav', buffer: silentWav(),
 });
 await page.getByRole('button', { name: 'Transcribir', exact: true }).click();
-await page.getByText('Transcripción lista').waitFor({ timeout: 30000 });
+await page.getByText('Guardada en este equipo').waitFor({ timeout: 30000 });
 await page.waitForFunction(() => new URL(location.href).searchParams.has('s'));
 const sessionId = new URL(page.url()).searchParams.get('s');
 step(`sesión creada ${sessionId}`);
@@ -89,12 +89,28 @@ step('resumen y capítulos generados');
 // 3. Recargar: la sesión se reabre con sus resultados y SIN llamadas a la API.
 apiCalls.length = 0;
 await page.reload({ waitUntil: 'networkidle' });
-await page.getByText('Transcripción guardada').waitFor({ timeout: 10000 });
+await page.getByText('Guardada en este equipo').waitFor({ timeout: 10000 });
+// Jerarquía: en el resultado no quedan los elementos de antes de subir, y las
+// 6 pestañas de IA son visibles completas (no recortadas por el panel).
+assert.equal(await page.getByText('Formatos y límites').count(), 0, 'sobra «Formatos y límites»');
+const tablist = page.getByRole('tablist', { name: 'Herramientas de la grabación' });
+const listBox = await tablist.boundingBox();
+for (const tab of await tablist.getByRole('tab').all()) {
+  const b = await tab.boundingBox();
+  assert.ok(b && b.x + b.width <= listBox.x + listBox.width + 1, 'pestaña recortada');
+}
+assert.equal(await tablist.getByRole('tab').count(), 6);
 await page.getByRole('tab', { name: /Resumen/ }).click();
 await page.getByText('Revisión de obra').waitFor();
 await page.getByRole('tab', { name: /Capítulos/ }).click();
 await page.getByText('Arranque').waitFor();
 await page.getByRole('button', { name: 'Reconectar audio' }).waitFor();
+// Sin audio, tocar un tiempo pide reconectarlo (abre el selector de archivo).
+const [chooser] = await Promise.all([
+  page.waitForEvent('filechooser'),
+  page.getByRole('button', { name: /0:00/ }).first().click(),
+]);
+assert.ok(chooser, 'tocar un tiempo sin audio debía abrir el selector');
 assert.deepEqual(apiCalls, [], `no debía llamar a la API: ${apiCalls.join(', ')}`);
 step('recarga: resultados reutilizados sin API');
 
@@ -121,7 +137,7 @@ await page.locator('audio').waitFor();
 step('audio reconectado');
 
 // 6. Lista de recientes: aparece con insignias; borrar y deshacer.
-await page.getByRole('button', { name: 'Transcribir otro' }).click();
+await page.getByRole('button', { name: 'Nueva grabación' }).click();
 const recent = page.getByRole('region', { name: 'Transcripciones recientes' });
 await recent.getByText('junta-obra').waitFor();
 await recent.getByText('Resumen').waitFor();

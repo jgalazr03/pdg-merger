@@ -1,11 +1,16 @@
-'use client';
+"use client";
 
-import { useEffect, useRef, useState } from 'react';
-import { Download, ChevronDown } from 'lucide-react';
-import { cn } from '@/lib/utils';
-import { Button } from '@/components/ui/button';
+import { useEffect, useRef, useState } from "react";
+import { Download, ChevronDown, type LucideIcon } from "lucide-react";
+import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
 
-export type DownloadItem = { label: string; onSelect: () => void };
+export type DownloadItem = {
+  label: string;
+  onSelect: () => void;
+  /** Ícono propio (p. ej. copiar); por defecto, descargar. */
+  icon?: LucideIcon;
+};
 
 /**
  * Botón "Descargar" con menú desplegable de formatos. Propio (sin Radix) para
@@ -16,9 +21,15 @@ export type DownloadItem = { label: string; onSelect: () => void };
 export default function DownloadMenu({
   items,
   className,
+  label = "Descargar",
+  placement = "auto",
 }: {
   items: DownloadItem[];
   className?: string;
+  label?: string;
+  /** 'auto': hacia arriba en sm+ (al pie de un panel); 'down': siempre hacia
+   *  abajo y alineado a la derecha (en un encabezado). */
+  placement?: "auto" | "down";
 }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -26,16 +37,17 @@ export default function DownloadMenu({
   useEffect(() => {
     if (!open) return;
     const onDown = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+      if (ref.current && !ref.current.contains(e.target as Node))
+        setOpen(false);
     };
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setOpen(false);
+      if (e.key === "Escape") setOpen(false);
     };
-    document.addEventListener('mousedown', onDown);
-    document.addEventListener('keydown', onKey);
+    document.addEventListener("mousedown", onDown);
+    document.addEventListener("keydown", onKey);
     return () => {
-      document.removeEventListener('mousedown', onDown);
-      document.removeEventListener('keydown', onKey);
+      document.removeEventListener("mousedown", onDown);
+      document.removeEventListener("keydown", onKey);
     };
   }, [open]);
 
@@ -49,11 +61,11 @@ export default function DownloadMenu({
         aria-expanded={open}
       >
         <Download className="mr-2 h-4 w-4" />
-        Descargar
+        {label}
         <ChevronDown
           className={cn(
-            'ml-2 h-4 w-4 transition-transform duration-150',
-            open && 'rotate-180'
+            "ml-2 h-4 w-4 transition-transform duration-150",
+            open && "rotate-180",
           )}
         />
       </Button>
@@ -61,23 +73,31 @@ export default function DownloadMenu({
       {open && (
         <div
           role="menu"
-          className="absolute left-0 z-20 mt-2 min-w-[15rem] overflow-hidden rounded-lg border-3 border-ink bg-card sm:bottom-full sm:left-auto sm:right-0 sm:mb-2 sm:mt-0"
+          className={cn(
+            "absolute z-20 min-w-[15rem] overflow-hidden rounded-lg border-3 border-ink bg-card",
+            placement === "down"
+              ? "right-0 mt-2"
+              : "left-0 mt-2 sm:bottom-full sm:left-auto sm:right-0 sm:mb-2 sm:mt-0",
+          )}
         >
-          {items.map((it, i) => (
-            <button
-              key={i}
-              role="menuitem"
-              type="button"
-              onClick={() => {
-                it.onSelect();
-                setOpen(false);
-              }}
-              className="flex w-full items-center gap-2 border-b-2 border-ink/10 px-3 py-2.5 text-left text-sm font-medium text-ink transition-colors duration-150 last:border-b-0 hover-fine:bg-muted focus-visible:bg-muted focus-visible:outline-none"
-            >
-              <Download className="h-4 w-4 shrink-0 text-muted-foreground" />
-              {it.label}
-            </button>
-          ))}
+          {items.map((it, i) => {
+            const Icon = it.icon ?? Download;
+            return (
+              <button
+                key={i}
+                role="menuitem"
+                type="button"
+                onClick={() => {
+                  it.onSelect();
+                  setOpen(false);
+                }}
+                className="flex w-full items-center gap-2 border-b-2 border-ink/10 px-3 py-2.5 text-left text-sm font-medium text-ink transition-colors duration-150 last:border-b-0 hover-fine:bg-muted focus-visible:bg-muted focus-visible:outline-none"
+              >
+                <Icon className="h-4 w-4 shrink-0 text-muted-foreground" />
+                {it.label}
+              </button>
+            );
+          })}
         </div>
       )}
     </div>
