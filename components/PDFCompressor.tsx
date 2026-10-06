@@ -745,13 +745,13 @@ export default function PDFCompressor() {
           <div className="mt-4 hidden flex-col gap-2 lg:flex">
             <Button
               onClick={downloadAllFiles}
-              size="lg"
-              className={cn('w-full', accent.solid)}
+              size="block"
+              className={accent.solid}
             >
               <Download className="mr-2 h-5 w-5" />
               Descargar {compressedFilesCount > 1 ? 'todo (ZIP)' : 'archivo'}
             </Button>
-            <Button variant="outline" onClick={resetAll} size="lg" className="w-full">
+            <Button variant="outline" onClick={resetAll} size="block">
               Comprimir otros archivos
             </Button>
           </div>
@@ -811,8 +811,8 @@ export default function PDFCompressor() {
               onClick={compressFiles}
               disabled={ctaDisabled}
               aria-busy={isProcessing}
-              size="lg"
-              className={cn('w-full', accent.solid)}
+              size="block"
+              className={accent.solid}
             >
               {isProcessing ? (
                 <Loader2 className="mr-2 h-5 w-5 animate-spin" />

@@ -302,13 +302,13 @@ export default function PDFSplitter() {
           <div className="mt-4 hidden flex-col gap-2 lg:flex">
             <Button
               onClick={downloadAllPDFs}
-              size="lg"
-              className={cn('w-full', accent.solid)}
+              size="block"
+              className={accent.solid}
             >
               <Download className="mr-2 h-5 w-5" />
               Descargar todo
             </Button>
-            <Button variant="outline" onClick={resetAll} size="lg" className="w-full">
+            <Button variant="outline" onClick={resetAll} size="block">
               Dividir otro PDF
             </Button>
           </div>
@@ -348,8 +348,8 @@ export default function PDFSplitter() {
               onClick={splitPDF}
               disabled={ctaDisabled}
               aria-busy={isProcessing}
-              size="lg"
-              className={cn('w-full', accent.solid)}
+              size="block"
+              className={accent.solid}
             >
               {isProcessing ? (
                 <Loader2 className="mr-2 h-5 w-5 animate-spin" />

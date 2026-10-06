@@ -7,7 +7,7 @@ import { cn } from '@/lib/utils';
 const buttonVariants = cva(
   // Firma del sistema: borde navy grueso (3px), radius 5px, color plano, sin
   // sombras. Foco por teclado en ink (ring-ring = navy).
-  'inline-flex items-center justify-center whitespace-nowrap rounded-lg border-3 border-ink text-sm font-bold ring-offset-background transition-[transform,opacity,background-color,border-color,color] duration-150 ease-out active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50',
+  'inline-flex items-center justify-center whitespace-nowrap rounded-lg border-3 border-ink text-sm font-bold ring-offset-background transition-[transform,opacity,background-color,border-color,color] duration-150 ease-out active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 [&_svg]:shrink-0',
   {
     variants: {
       variant: {
@@ -28,6 +28,10 @@ const buttonVariants = cva(
         sm: 'h-9 px-3',
         lg: 'h-11 px-6 text-base',
         icon: 'h-11 w-11',
+        // Ancho completo en columnas estrechas (panel fijo de herramientas):
+        // padding contenido y el texto puede partirse en dos líneas en vez de
+        // desbordar el borde.
+        block: 'h-auto min-h-11 w-full whitespace-normal px-3 py-2 text-center text-base leading-tight [text-wrap:balance]',
       },
     },
     defaultVariants: {
