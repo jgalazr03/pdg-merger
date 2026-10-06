@@ -23,8 +23,11 @@ import { speakerColor } from '@/lib/speakers';
 
 type Props = {
   chunks: Chunk[];
-  mediaUrl: string;
+  /** null al reabrir del historial sin el archivo: la transcripción se lee y
+   *  edita igual, y en lugar del reproductor va `mediaPlaceholder`. */
+  mediaUrl: string | null;
   isVideo: boolean;
+  mediaPlaceholder?: React.ReactNode;
   accent: ToolAccent;
   /** Nombres personalizados de los hablantes (vacío = etiquetas genéricas). */
   names?: SpeakerNames;
@@ -92,7 +95,7 @@ function highlightHTML(raw: string, foldedRaw: string, foldedQuery: string): str
  * sobrevive al resaltado durante la reproducción).
  */
 function TranscriptPlayer(
-  { chunks, mediaUrl, isVideo, accent, names, onChange }: Props,
+  { chunks, mediaUrl, isVideo, mediaPlaceholder, accent, names, onChange }: Props,
   ref: React.Ref<TranscriptPlayerHandle>
 ) {
   const mediaRef = useRef<HTMLMediaElement | null>(null);
@@ -250,7 +253,9 @@ function TranscriptPlayer(
     <div>
       {/* Reproductor */}
       <div className="overflow-hidden rounded-lg border-3 border-ink bg-surface">
-        {isVideo ? (
+        {!mediaUrl ? (
+          mediaPlaceholder
+        ) : isVideo ? (
           <video
             ref={(el) => (mediaRef.current = el)}
             src={mediaUrl}
@@ -270,8 +275,9 @@ function TranscriptPlayer(
 
       <p className="mb-2 mt-3 flex items-center gap-2 text-xs text-muted-foreground">
         <Play className={cn('h-3.5 w-3.5', accent.text)} strokeWidth={2.5} />
-        Toca una marca de tiempo para reproducir desde ahí. Toca el texto para
-        corregirlo.
+        {mediaUrl
+          ? 'Toca una marca de tiempo para reproducir desde ahí. Toca el texto para corregirlo.'
+          : 'Toca el texto para corregirlo.'}
       </p>
 
       {/* Buscar dentro de la transcripción (resalta y navega coincidencias). */}

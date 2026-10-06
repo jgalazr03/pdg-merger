@@ -11,6 +11,7 @@ import {
   Check,
   AlertCircle,
   RotateCcw,
+  Upload,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { getTool, type ToolDef } from '@/lib/tools';
@@ -42,6 +43,13 @@ import {
   toVtt,
 } from '@/lib/transcript';
 import { decodeAudioTo16kMono, prepareForUpload } from '@/lib/audio';
+import RecentTranscripts from '@/components/medios/RecentTranscripts';
+import { HistoryProvider } from '@/components/medios/HistoryContext';
+import { HistoryLimitError, getHistoryRepo } from '@/lib/medios-history/repo';
+import type { AiResult, SessionMeta } from '@/lib/medios-history/schema';
+import { consumeFirstSaveNotice, isHistoryEnabled } from '@/lib/medios-history/settings';
+import { notifyHistoryChanged } from '@/lib/medios-history/sync';
+import { isQuotaError, trackHistory } from '@/lib/medios-history/telemetry';
 
 
 const ACCEPT = '.mp3,.wav,.m4a,.ogg,.mp4,.webm,audio/*,video/*';
@@ -66,6 +74,18 @@ function formatFileSize(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+const reportCorrupt = (store: string) =>
+  trackHistory('history_corrupt_record', { store });
+
+/** Refleja la sesión abierta en la URL (`?s=<id>`) para poder recargar o
+ *  compartir el enlace dentro del mismo equipo sin perderla. */
+function setUrlSession(id: string | null) {
+  const url = new URL(window.location.href);
+  if (id) url.searchParams.set('s', id);
+  else url.searchParams.delete('s');
+  window.history.replaceState(window.history.state, '', url);
 }
 
 function triggerDownload(content: string, filename: string) {
@@ -115,6 +135,19 @@ export default function Transcriber({
   // Cambia con cada transcripción terminada: fuerza el remonte de
   // TranscriptPlayer para reinicializar el texto editable.
   const [runId, setRunId] = useState(0);
+
+  // Historial local: id de la sesión guardada (null = no se guarda), sus
+  // resultados de IA al abrirla y los metadatos si se reabrió del historial.
+  const [sessionId, setSessionId] = useState<string | null>(null);
+  const [sessionResults, setSessionResults] = useState<AiResult[]>([]);
+  const [restored, setRestored] = useState<SessionMeta | null>(null);
+  // Marca que la próxima transcripción terminada debe crear una sesión.
+  const saveOnDoneRef = useRef(false);
+  // Último estado ya persistido: evita reescribir lo recién creado o abierto.
+  const savedRef = useRef<{ chunks: Chunk[]; text: string; names: SpeakerNames } | null>(null);
+  // Escritura pendiente (debounce) para forzarla al salir o cambiar de sesión.
+  const pendingWriteRef = useRef<(() => Promise<void>) | null>(null);
+  const reconnectInputRef = useRef<HTMLInputElement>(null);
 
   const workerRef = useRef<Worker | null>(null);
   const progressRef = useRef<Map<string, { loaded: number; total: number }>>(
@@ -172,6 +205,7 @@ export default function Transcriber({
     setChunks([]);
     setSpeakerNames({});
     setErrorMsg('');
+    clearSession();
   };
 
   const reset = () => {
@@ -182,6 +216,172 @@ export default function Transcriber({
     setSpeakerNames({});
     setErrorMsg('');
     setModelPct(0);
+    clearSession();
+  };
+
+  function clearSession() {
+    void pendingWriteRef.current?.();
+    savedRef.current = null;
+    setSessionId(null);
+    setSessionResults([]);
+    setRestored(null);
+    setUrlSession(null);
+  }
+
+  // Al terminar una transcripción nueva, se guarda como sesión (si el usuario
+  // no desactivó el historial). El audio no se guarda: solo su huella.
+  useEffect(() => {
+    if (phase !== 'done' || !saveOnDoneRef.current || !selectedFile) return;
+    saveOnDoneRef.current = false;
+    if (!isHistoryEnabled()) return;
+    const file = selectedFile;
+    const snapshot = { chunks, text, names: speakerNames };
+    void (async () => {
+      const repo = await getHistoryRepo(reportCorrupt);
+      if (!repo) return;
+      try {
+        const meta = await repo.createSession({
+          title: file.name.replace(/\.[^.]+$/, '') || 'Transcripción',
+          tool: tool.slug,
+          mode,
+          media: {
+            name: file.name,
+            size: file.size,
+            type: file.type,
+            lastModified: file.lastModified,
+          },
+          chunks: snapshot.chunks,
+          text: snapshot.text,
+          speakerNames: snapshot.names,
+        });
+        savedRef.current = snapshot;
+        setSessionId(meta.id);
+        setUrlSession(meta.id);
+        notifyHistoryChanged();
+        trackHistory('history_saved', { tool: tool.slug, mode });
+        // Pide que el navegador no desaloje la base por falta de espacio.
+        void navigator.storage?.persist?.().catch(() => {});
+        if (consumeFirstSaveNotice()) {
+          toast('Guardamos esta transcripción en tu equipo', {
+            description:
+              'Podrás reabrirla, con lo que generes con IA, desde «Transcripciones recientes». Nada se sube.',
+          });
+        }
+      } catch (e) {
+        if (e instanceof HistoryLimitError) {
+          trackHistory('history_limit_reached', {});
+          toast.error('No se guardó en el historial', {
+            description: 'Llegaste al máximo de transcripciones guardadas. Borra algunas para seguir guardando.',
+          });
+        } else if (isQuotaError(e)) {
+          trackHistory('history_quota_error', {});
+          toast.error('No hay espacio para guardar esta transcripción');
+        }
+      }
+    })();
+  }, [phase, runId, selectedFile, chunks, text, speakerNames, mode, tool.slug]);
+
+  // Guarda las ediciones (texto corregido, nombres de hablante) con debounce.
+  useEffect(() => {
+    if (!sessionId) return;
+    const saved = savedRef.current;
+    if (saved && saved.chunks === chunks && saved.text === text && saved.names === speakerNames) {
+      return;
+    }
+    const id = sessionId;
+    const snapshot = { chunks, text, names: speakerNames };
+    const write = async () => {
+      if (pendingWriteRef.current === write) pendingWriteRef.current = null;
+      const repo = await getHistoryRepo(reportCorrupt);
+      try {
+        await repo?.updateTranscript(id, { chunks, text, speakerNames });
+        savedRef.current = snapshot;
+        notifyHistoryChanged();
+      } catch (e) {
+        if (isQuotaError(e)) trackHistory('history_quota_error', {});
+      }
+    };
+    pendingWriteRef.current = write;
+    const t = setTimeout(() => void write(), 500);
+    return () => clearTimeout(t);
+  }, [sessionId, chunks, text, speakerNames]);
+
+  // Al ocultar o cerrar la pestaña, fuerza la escritura pendiente.
+  useEffect(() => {
+    const flush = () => void pendingWriteRef.current?.();
+    const onVisibility = () => {
+      if (document.visibilityState === 'hidden') flush();
+    };
+    window.addEventListener('pagehide', flush);
+    document.addEventListener('visibilitychange', onVisibility);
+    return () => {
+      window.removeEventListener('pagehide', flush);
+      document.removeEventListener('visibilitychange', onVisibility);
+    };
+  }, []);
+
+  // Reabre una sesión guardada: transcripción + resultados de IA, sin audio.
+  const openSession = async (id: string) => {
+    const t0 = performance.now();
+    const repo = await getHistoryRepo(reportCorrupt);
+    const loaded = await repo?.getSession(id).catch(() => null);
+    if (!loaded) {
+      setUrlSession(null);
+      toast.error('No se encontró esa transcripción', {
+        description: 'Puede que se haya borrado de este equipo.',
+      });
+      return;
+    }
+    void pendingWriteRef.current?.();
+    const { chunks: ch, speakerNames: names } = loaded.transcript;
+    const txt = ch.length ? plainText(ch, names) : loaded.transcript.text;
+    savedRef.current = { chunks: ch, text: txt, names };
+    setSelectedFile(null);
+    setErrorMsg('');
+    setModelPct(0);
+    setChunks(ch);
+    setSpeakerNames(names);
+    setText(txt);
+    setMode(loaded.meta.mode);
+    setSessionResults(loaded.results);
+    setRestored(loaded.meta);
+    setSessionId(id);
+    setUrlSession(id);
+    setRunId((n) => n + 1);
+    setPhase('done');
+    trackHistory('history_opened', {
+      tool: tool.slug,
+      ms: Math.round(performance.now() - t0),
+      results: loaded.results.length,
+    });
+  };
+
+  // Enlace directo `?s=<id>` (recargar la página no pierde la sesión).
+  useEffect(() => {
+    const id = new URLSearchParams(window.location.search).get('s');
+    if (id) void openSession(id);
+    // Solo al montar.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Reconecta el audio a una sesión reabierta. No se puede verificar que sea el
+  // mismo archivo sin guardarlo, así que se compara la huella (nombre + tamaño).
+  const handleReconnect = (file: File) => {
+    if (!isMedia(file)) {
+      toast.error('Archivo no válido', {
+        description: 'Selecciona el audio o video original de esta transcripción.',
+      });
+      return;
+    }
+    const m = restored?.media;
+    const match = !!m && m.name === file.name && m.size === file.size;
+    setSelectedFile(file);
+    trackHistory('history_media_reconnected', { match });
+    if (!match) {
+      toast.warning('No parece el mismo archivo', {
+        description: 'Los tiempos de la transcripción podrían no coincidir con este audio.',
+      });
+    }
   };
 
   // El usuario corrigió el texto de un segmento en el reproductor: guardamos los
@@ -235,6 +435,8 @@ export default function Transcriber({
 
   const handleTranscribe = () => {
     if (!selectedFile) return;
+    clearSession();
+    saveOnDoneRef.current = true;
     setErrorMsg('');
     setText('');
     setChunks([]);
@@ -322,14 +524,17 @@ export default function Transcriber({
     }
   };
 
-  const isVideo = selectedFile?.type.startsWith('video/');
+  const isVideo = selectedFile
+    ? selectedFile.type.startsWith('video/')
+    : !!restored?.media.type.startsWith('video/');
   const busy =
     phase === 'decoding' ||
     phase === 'loading' ||
     phase === 'uploading' ||
     phase === 'transcribing';
-  const step: 1 | 2 | 3 = !selectedFile ? 1 : phase === 'done' ? 3 : 2;
-  const baseName = selectedFile?.name.replace(/\.[^.]+$/, '') || 'transcripcion';
+  const step: 1 | 2 | 3 = phase === 'done' ? 3 : !selectedFile ? 1 : 2;
+  const baseName =
+    restored?.title || selectedFile?.name.replace(/\.[^.]+$/, '') || 'transcripcion';
 
   const phaseLabel =
     phase === 'decoding'
@@ -367,6 +572,10 @@ export default function Transcriber({
       />
 
       <ToolConstraints items={tool.constraints} />
+
+      {!selectedFile && phase !== 'done' && (
+        <RecentTranscripts accent={accent} onOpen={(id) => void openSession(id)} />
+      )}
 
       {contable && <ConsentKit accent={accent} />}
 
@@ -556,7 +765,7 @@ export default function Transcriber({
                 <Check className="h-5 w-5" strokeWidth={3} />
               </span>
               <h2 className="font-display text-lg font-bold text-ink">
-                Transcripción lista
+                {restored ? 'Transcripción guardada' : 'Transcripción lista'}
               </h2>
             </div>
             <Button variant="outline" size="sm" onClick={reset}>
@@ -568,7 +777,7 @@ export default function Transcriber({
           <div className="grid grid-cols-1 items-start gap-5 lg:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)]">
             {/* Izquierda: reproductor + transcripción + exportar */}
             <div className="min-w-0 space-y-4">
-              {chunks.length > 0 && previewUrl ? (
+              {chunks.length > 0 ? (
                 <ErrorBoundary label="el reproductor de la transcripción">
                   <SpeakerNamer
                     chunks={chunks}
@@ -581,7 +790,38 @@ export default function Transcriber({
                     ref={playerRef}
                     chunks={chunks}
                     mediaUrl={previewUrl}
-                    isVideo={!!isVideo}
+                    isVideo={isVideo}
+                    mediaPlaceholder={
+                      <div className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
+                        <p className="text-sm text-ink">
+                          Para escuchar, vuelve a seleccionar{' '}
+                          <span className="break-words font-bold">
+                            {restored?.media.name ?? 'el archivo original'}
+                          </span>
+                          . El audio no se guarda en el historial.
+                        </p>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="shrink-0"
+                          onClick={() => reconnectInputRef.current?.click()}
+                        >
+                          <Upload className="mr-2 h-4 w-4" />
+                          Reconectar audio
+                        </Button>
+                        <input
+                          ref={reconnectInputRef}
+                          type="file"
+                          accept={ACCEPT}
+                          className="hidden"
+                          onChange={(e) => {
+                            const f = e.target.files?.[0];
+                            e.target.value = '';
+                            if (f) handleReconnect(f);
+                          }}
+                        />
+                      </div>
+                    }
                     accent={accent}
                     names={speakerNames}
                     onChange={handleEdit}
@@ -651,11 +891,18 @@ export default function Transcriber({
             </div>
 
             {/* Derecha: workspace de herramientas AI (pestañas, no pila de cards) */}
-            {chunks.length > 0 && previewUrl && (
+            {chunks.length > 0 && (
               <div className="min-w-0 lg:sticky lg:top-24 lg:self-start">
                 <ErrorBoundary label="las herramientas de IA">
-                  <AiWorkspace
+                  <HistoryProvider
                     key={runId}
+                    sessionId={sessionId}
+                    initialResults={sessionResults}
+                    chunks={chunks}
+                    names={speakerNames}
+                    text={text}
+                  >
+                  <AiWorkspace
                     chunks={chunks}
                     text={text}
                     accent={accent}
@@ -665,6 +912,7 @@ export default function Transcriber({
                     variant={variant}
                     onSeek={(t) => playerRef.current?.seekTo(t)}
                   />
+                  </HistoryProvider>
                 </ErrorBoundary>
               </div>
             )}
