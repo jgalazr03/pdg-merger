@@ -71,7 +71,8 @@ await page.setInputFiles('input[type=file]', {
   name: 'junta-obra.wav', mimeType: 'audio/wav', buffer: silentWav(),
 });
 await page.getByRole('button', { name: 'Transcribir', exact: true }).click();
-await page.getByText('Guardada en este equipo').waitFor({ timeout: 30000 });
+await page.getByRole('heading', { level: 1, name: 'junta-obra' }).waitFor({ timeout: 30000 });
+await page.getByText('Guardada', { exact: true }).waitFor();
 await page.waitForFunction(() => new URL(location.href).searchParams.has('s'));
 const sessionId = new URL(page.url()).searchParams.get('s');
 step(`sesión creada ${sessionId}`);
@@ -89,7 +90,10 @@ step('resumen y capítulos generados');
 // 3. Recargar: la sesión se reabre con sus resultados y SIN llamadas a la API.
 apiCalls.length = 0;
 await page.reload({ waitUntil: 'networkidle' });
-await page.getByText('Guardada en este equipo').waitFor({ timeout: 10000 });
+await page.getByRole('heading', { level: 1, name: 'junta-obra' }).waitFor({ timeout: 10000 });
+// Un solo h1 (la grabación) y la ruta nombra el objeto.
+assert.equal(await page.getByRole('heading', { level: 1 }).count(), 1, 'debe haber un solo h1');
+await page.getByRole('navigation', { name: 'Ruta de navegación' }).getByText('junta-obra').waitFor();
 // Jerarquía: en el resultado no quedan los elementos de antes de subir, y las
 // 6 pestañas de IA son visibles completas (no recortadas por el panel).
 assert.equal(await page.getByText('Formatos y límites').count(), 0, 'sobra «Formatos y límites»');
@@ -137,7 +141,10 @@ await page.locator('audio').waitFor();
 step('audio reconectado');
 
 // 6. Lista de recientes: aparece con insignias; borrar y deshacer.
-await page.getByRole('button', { name: 'Nueva grabación' }).click();
+// La herramienta en la ruta vuelve al inicio (y la URL deja de apuntar a la sesión).
+await page.getByRole('navigation', { name: 'Ruta de navegación' }).getByRole('link', { name: 'Transcribir' }).click();
+await page.waitForFunction(() => !new URL(location.href).searchParams.has('s'));
+await page.getByText('Selecciona un audio o video').waitFor();
 const recent = page.getByRole('region', { name: 'Transcripciones recientes' });
 await recent.getByText('junta-obra').waitFor();
 await recent.getByText('Resumen').waitFor();

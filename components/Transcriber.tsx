@@ -612,6 +612,8 @@ export default function Transcriber({
       tool={tool}
       step={step}
       resultMode={phase === 'done'}
+      resultCrumb={baseName}
+      onToolCrumb={reset}
       privacyNote="Tú eliges si se transcribe en tu navegador o en el servidor."
     >
       <FileDropzone
@@ -820,10 +822,12 @@ export default function Transcriber({
               principales (exportar, empezar otra), siempre en la primera pantalla. */}
           <div className="mb-5 flex flex-col gap-3 border-b-2 border-ink/10 pb-4 sm:flex-row sm:items-end sm:justify-between">
             <div className="min-w-0">
-              <h2 className="break-words font-display text-xl font-bold leading-tight text-ink sm:text-2xl">
+              {/* La grabación es el título principal de la página: el hero de
+                  la herramienta se oculta y la herramienta queda en la ruta. */}
+              <h1 className="break-words text-[clamp(1.6rem,6vw,2.25rem)] font-bold leading-[1.1] tracking-tight text-ink">
                 {baseName}
-              </h2>
-              <p className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs tabular-nums text-muted-foreground sm:text-sm">
+              </h1>
+              <p className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs tabular-nums text-muted-foreground sm:text-sm">
                 {resultMeta.map((m, i) => (
                   <span key={m} className="inline-flex items-center gap-2">
                     {i > 0 && <span aria-hidden>·</span>}
@@ -831,9 +835,15 @@ export default function Transcriber({
                   </span>
                 ))}
                 {sessionId && (
-                  <span className="inline-flex items-center gap-1 text-success">
-                    <Check className="h-3.5 w-3.5" strokeWidth={3} />
-                    Guardada en este equipo
+                  <span className="inline-flex items-center gap-2">
+                    <span aria-hidden>·</span>
+                    <span
+                      title="Guardada en este equipo; nada se sube"
+                      className="inline-flex items-center gap-1 text-success"
+                    >
+                      <Check className="h-3.5 w-3.5" strokeWidth={3} />
+                      Guardada
+                    </span>
                   </span>
                 )}
               </p>

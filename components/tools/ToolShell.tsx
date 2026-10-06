@@ -17,8 +17,10 @@ import StepIndicator from './StepIndicator';
  *    Cuando existe, el contenido reserva sitio abajo para no quedar tapado.
  *
  * `resultMode`: con el resultado listo, la página pasa a ser un espacio de
- * trabajo: sin tagline ni riel de pasos (ya no orientan), el contenido ocupa el
- * ancho completo y empieza más arriba.
+ * trabajo sobre un objeto (p. ej. una grabación): sin hero ni riel de pasos, y
+ * el objeto es el título principal (h1, lo pinta el hijo). La herramienta queda
+ * en el breadcrumb como enlace (`onToolCrumb` reinicia) y `resultCrumb` nombra
+ * el objeto, como en Drive/Notion.
  * `privacyNote`: frase de privacidad junto al tagline. Por defecto «Todo se
  * procesa en tu navegador»; las herramientas que usan servidor pasan la suya.
  */
@@ -29,6 +31,8 @@ export default function ToolShell({
   aside,
   bar,
   resultMode = false,
+  resultCrumb,
+  onToolCrumb,
   privacyNote = 'Todo se procesa en tu navegador.',
 }: {
   tool: ToolDef;
@@ -37,6 +41,8 @@ export default function ToolShell({
   aside?: React.ReactNode;
   bar?: React.ReactNode;
   resultMode?: boolean;
+  resultCrumb?: string;
+  onToolCrumb?: () => void;
   privacyNote?: string;
 }) {
   return (
@@ -50,7 +56,7 @@ export default function ToolShell({
       )}
     >
       <nav aria-label="Ruta de navegación" className="mb-4 sm:mb-8">
-        <ol className="flex items-center gap-1.5 text-sm text-muted-foreground">
+        <ol className="flex min-w-0 items-center gap-1.5 text-sm text-muted-foreground">
           <li>
             <Link
               href="/"
@@ -62,48 +68,69 @@ export default function ToolShell({
           <li aria-hidden="true">
             <ChevronRight className="h-3.5 w-3.5" />
           </li>
-          <li
-            aria-current="page"
-            className="flex items-center gap-1.5 font-bold text-ink"
-          >
-            <tool.Icon
-              className={cn('h-4 w-4 shrink-0', tool.accent.text)}
-              strokeWidth={2}
-              aria-hidden="true"
-            />
-            {tool.name}
-          </li>
+          {resultMode && resultCrumb ? (
+            <>
+              <li className="shrink-0">
+                <Link
+                  href={tool.href}
+                  onClick={onToolCrumb}
+                  className="flex items-center gap-1.5 whitespace-nowrap rounded font-bold transition-colors hover-fine:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink focus-visible:ring-offset-2"
+                >
+                  <tool.Icon
+                    className={cn('h-4 w-4 shrink-0', tool.accent.text)}
+                    strokeWidth={2}
+                    aria-hidden="true"
+                  />
+                  {tool.name}
+                </Link>
+              </li>
+              <li aria-hidden="true">
+                <ChevronRight className="h-3.5 w-3.5 shrink-0" />
+              </li>
+              <li aria-current="page" className="min-w-0 truncate font-bold text-ink">
+                {resultCrumb}
+              </li>
+            </>
+          ) : (
+            <li
+              aria-current="page"
+              className="flex items-center gap-1.5 font-bold text-ink"
+            >
+              <tool.Icon
+                className={cn('h-4 w-4 shrink-0', tool.accent.text)}
+                strokeWidth={2}
+                aria-hidden="true"
+              />
+              {tool.name}
+            </li>
+          )}
         </ol>
       </nav>
 
-      {/* Hero asimétrico: tile a la izquierda, título a la derecha */}
-      <header
-        className={cn(
-          'flex items-start gap-4 motion-safe:animate-fade-in sm:gap-5',
-          resultMode ? 'mb-5 sm:mb-6' : 'mb-5 sm:mb-10'
-        )}
-      >
-        <div
-          className={cn(
-            'flex h-12 w-12 shrink-0 items-center justify-center rounded-lg border-3 border-ink sm:h-16 sm:w-16',
-            tool.accent.iconBg
-          )}
-        >
-          <tool.Icon className="h-6 w-6 text-white sm:h-8 sm:w-8" strokeWidth={2} />
-        </div>
+      {/* Hero asimétrico: tile a la izquierda, título a la derecha. Con el
+          resultado listo sobra: el título es el objeto (lo pinta el hijo). */}
+      {!resultMode && (
+        <header className="mb-5 flex items-start gap-4 motion-safe:animate-fade-in sm:mb-10 sm:gap-5">
+          <div
+            className={cn(
+              'flex h-12 w-12 shrink-0 items-center justify-center rounded-lg border-3 border-ink sm:h-16 sm:w-16',
+              tool.accent.iconBg
+            )}
+          >
+            <tool.Icon className="h-6 w-6 text-white sm:h-8 sm:w-8" strokeWidth={2} />
+          </div>
 
-        <div className="min-w-0 pt-0.5 sm:pt-1">
-          <h1 className="text-[clamp(1.6rem,6vw,2.25rem)] font-bold leading-[1.1] tracking-tight text-ink">
-            {tool.title}
-          </h1>
-          {!resultMode && (
+          <div className="min-w-0 pt-0.5 sm:pt-1">
+            <h1 className="text-[clamp(1.6rem,6vw,2.25rem)] font-bold leading-[1.1] tracking-tight text-ink">
+              {tool.title}
+            </h1>
             <p className="mt-2 max-w-xl text-sm text-muted-foreground sm:text-base md:text-lg">
               {tool.tagline}{' '}
               <span className="text-ink/60">{privacyNote}</span>
             </p>
-          )}
-        </div>
-      </header>
+          </div>
+        </header>
+      )}
 
       {/* Riel de pasos vertical a la izquierda (md+); apilado arriba en móvil.
           Con `aside`, en lg+ aparece una tercera columna pegajosa a la derecha. */}
