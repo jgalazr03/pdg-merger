@@ -44,7 +44,8 @@ import {
   toSrt,
   toVtt,
 } from '@/lib/transcript';
-import { decodeAudioTo16kMono, prepareForUpload } from '@/lib/audio';
+import { decodeAudioTo16kMono, isIOS, prepareForUpload } from '@/lib/audio';
+import { track } from '@vercel/analytics';
 import RecentTranscripts from '@/components/medios/RecentTranscripts';
 import ReconnectDialog from '@/components/medios/ReconnectDialog';
 import { HistoryProvider } from '@/components/medios/HistoryContext';
@@ -473,12 +474,28 @@ export default function Transcriber({
 
   // Cierre común de ambos modos. Sin voz reconocida no hay resultado que
   // mostrar ni guardar: se explica qué pasó en vez de enseñar una caja vacía.
-  const finishTranscription = (ch: Chunk[], rawText?: string) => {
+  // `serverDuration`: segundos que el servidor leyó (0 = no pudo leer el audio).
+  const finishTranscription = (
+    ch: Chunk[],
+    rawText?: string,
+    serverDuration?: number
+  ) => {
     const txt = ch.length ? plainText(ch) : (rawText || '').trim();
     if (!ch.length && !txt) {
       saveOnDoneRef.current = false;
+      const ios = isIOS();
+      // Sin contenido: solo modo, plataforma y duración, para ver la causa real.
+      track('transcribe_empty', {
+        mode: serverDuration === undefined ? 'local' : 'server',
+        ios,
+        duration: Math.round(serverDuration ?? -1),
+      });
       setErrorMsg(
-        'No se reconoció voz en esta grabación. Revisa que tenga audio audible. Si la subiste desde un iPhone, prueba desde una computadora o expórtala como MP3/M4A.'
+        serverDuration === 0
+          ? 'No pudimos leer el audio de este archivo. Prueba exportarlo como MP3 o M4A y vuelve a subirlo.'
+          : serverDuration === undefined && ios
+            ? 'No se reconoció voz en esta grabación. En iPhone y iPad, elige «En el servidor»: lee el audio de los videos de forma más fiable.'
+            : 'No se reconoció voz en esta grabación. Revisa que tenga audio audible.'
       );
       setPhase('error');
       return;
@@ -567,7 +584,11 @@ export default function Transcriber({
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data?.error || 'Error del servidor');
-      finishTranscription(Array.isArray(data.chunks) ? data.chunks : [], data.text);
+      finishTranscription(
+        Array.isArray(data.chunks) ? data.chunks : [],
+        data.text,
+        typeof data.duration === 'number' ? data.duration : undefined
+      );
     } catch (e) {
       setErrorMsg(
         (e as Error).message || 'No se pudo transcribir en el servidor.'

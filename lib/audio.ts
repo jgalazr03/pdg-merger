@@ -76,6 +76,15 @@ export function encodeWav16kMono(samples: Float32Array, sampleRate = 16000): Blo
 
 export type PreparedUpload = { blob: Blob; name: string; downsampled: boolean };
 
+/** iPhone/iPad, incluido el iPad que se anuncia como Mac de escritorio. */
+export function isIOS(): boolean {
+  if (typeof navigator === 'undefined') return false;
+  return (
+    /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+    (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)
+  );
+}
+
 /**
  * ¿El PCM es prácticamente silencio? Safari (sobre todo en iPhone) puede
  * «decodificar» el audio de algunos videos como ceros sin lanzar error; subir
@@ -102,7 +111,10 @@ const MAX_PREPROCESS_BYTES = 120 * 1024 * 1024;
  * fallo de decodificación, cae al original: nunca bloquea la transcripción.
  */
 export async function prepareForUpload(file: File): Promise<PreparedUpload> {
-  if (file.size > MAX_PREPROCESS_BYTES) {
+  // En iPhone/iPad, Safari decodifica el audio de algunos videos de forma
+  // corrupta sin lanzar error (el mismo archivo funciona en computadora y en
+  // iOS llegaba vacío al servidor). Se sube el original: el servidor lo lee bien.
+  if (file.size > MAX_PREPROCESS_BYTES || isIOS()) {
     return { blob: file, name: file.name, downsampled: false };
   }
   try {

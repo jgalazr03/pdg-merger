@@ -47,6 +47,40 @@ interface Utterance {
   speaker?: number;
 }
 
+type Normalized = {
+  text: string;
+  chunks: { timestamp: [number, number]; text: string; speaker?: number }[];
+  duration: number;
+  channels: number;
+};
+
+/** Lo que usamos de la respuesta de Deepgram (todo opcional: no confiar). */
+type DgResponse = {
+  metadata?: { duration?: number; channels?: number };
+  results?: {
+    channels?: { alternatives?: { transcript?: string }[] }[];
+    utterances?: Utterance[];
+  };
+};
+
+/** Normaliza la respuesta de Deepgram a { text, chunks } + metadatos. */
+function normalize(data: DgResponse): Normalized {
+  const alt = data?.results?.channels?.[0]?.alternatives?.[0];
+  const utterances: Utterance[] = data?.results?.utterances ?? [];
+  return {
+    text: (alt?.transcript ?? '').trim(),
+    chunks: utterances
+      .map((u) => ({
+        timestamp: [u.start, u.end] as [number, number],
+        text: (u.transcript ?? '').trim(),
+        ...(typeof u.speaker === 'number' ? { speaker: u.speaker } : {}),
+      }))
+      .filter((c) => c.text),
+    duration: Number(data?.metadata?.duration) || 0,
+    channels: Number(data?.metadata?.channels) || 0,
+  };
+}
+
 /**
  * Modo servidor (Deepgram Nova-3). Recibe la URL de un blob (subido por el
  * cliente a Vercel Blob), pide a Deepgram que lo transcriba por URL, normaliza
@@ -98,18 +132,23 @@ export async function POST(request: Request) {
     if (!dg.ok) {
       return upstreamError(dg.status, await dg.text().catch(() => ''));
     }
+    const result = normalize(await dg.json());
 
-    const data = await dg.json();
-    const alt = data?.results?.channels?.[0]?.alternatives?.[0];
-    const text: string = (alt?.transcript ?? '').trim();
-    const utterances: Utterance[] = data?.results?.utterances ?? [];
-    const chunks = utterances.map((u) => ({
-      timestamp: [u.start, u.end] as [number, number],
-      text: (u.transcript ?? '').trim(),
-      ...(typeof u.speaker === 'number' ? { speaker: u.speaker } : {}),
-    }));
+    if (!result.text && result.chunks.length === 0) {
+      // Sin contenido del usuario: solo metadatos para diagnosticar en los logs.
+      console.warn('[transcribe] resultado vacío', {
+        duration: result.duration,
+        channels: result.channels,
+      });
+    }
 
-    return NextResponse.json({ text, chunks });
+    return NextResponse.json({
+      text: result.text,
+      chunks: result.chunks,
+      // Duración que Deepgram leyó: 0 = no pudo leer el audio (archivo mudo o
+      // ilegible); > 0 sin texto = no reconoció voz.
+      duration: result.duration,
+    });
   } catch (err) {
     return serviceError(err);
   } finally {
