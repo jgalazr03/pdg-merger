@@ -6,6 +6,7 @@
 // Requiere Google Chrome instalado (playwright-core con channel 'chrome').
 import { chromium } from 'playwright-core';
 import assert from 'node:assert/strict';
+import { fileURLToPath } from 'node:url';
 
 const BASE = process.env.E2E_BASE_URL ?? 'http://localhost:3000';
 
@@ -211,6 +212,21 @@ await movPage.waitForFunction(() =>
 );
 await movPage.close();
 step('archivo ilegible en el navegador: botón al servidor y modo recordado');
+
+// 9. Video sin pista de audio (grabación de pantalla sin micrófono): se avisa al
+// elegirlo y no se ofrece transcribir; un video con audio sí se puede.
+const fixtures = new URL('../lib/__fixtures__/', import.meta.url);
+const naPage = await context.newPage();
+await naPage.goto(`${BASE}/transcribir`, { waitUntil: 'networkidle' });
+await naPage.setInputFiles('input[type=file]', fileURLToPath(new URL('video-sin-audio.mov', fixtures)));
+await naPage.getByText('Este video no tiene audio.').waitFor();
+assert.equal(await naPage.getByRole('button', { name: 'Transcribir', exact: true }).count(), 0);
+await naPage.getByRole('button', { name: 'Cambiar archivo' }).click();
+await naPage.setInputFiles('input[type=file]', fileURLToPath(new URL('video-con-audio.mov', fixtures)));
+await naPage.getByRole('button', { name: 'Transcribir', exact: true }).waitFor();
+assert.equal(await naPage.getByText('Este video no tiene audio.').count(), 0);
+await naPage.close();
+step('video sin audio: aviso al elegirlo, sin opción de transcribir');
 
 await page.screenshot({ path: process.env.E2E_SHOT ?? 'e2e-medios-history.png' });
 await browser.close();

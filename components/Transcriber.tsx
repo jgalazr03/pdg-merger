@@ -45,6 +45,7 @@ import {
   toVtt,
 } from '@/lib/transcript';
 import { decodeAudioTo16kMono, isIOS, prepareForUpload } from '@/lib/audio';
+import { probeHasAudio } from '@/lib/media-probe';
 import { track } from '@vercel/analytics';
 import RecentTranscripts from '@/components/medios/RecentTranscripts';
 import ReconnectDialog from '@/components/medios/ReconnectDialog';
@@ -154,6 +155,9 @@ export default function Transcriber({
   const [mode, setMode] = useState<Mode>('local');
   // Tras un fallo de lectura en modo navegador se ofrece el modo servidor.
   const [offerServer, setOfferServer] = useState(false);
+  // El archivo es un video sin pista de audio (p. ej. grabación de pantalla).
+  const [noAudio, setNoAudio] = useState(false);
+  const probedFileRef = useRef<File | null>(null);
   // El modo elegido se recuerda en este equipo (si no, en cada visita volvía a
   // «En tu navegador», que en iPhone no lee algunos videos).
   const chooseMode = (m: Mode) => {
@@ -253,7 +257,16 @@ export default function Transcriber({
     setChunks([]);
     setSpeakerNames({});
     setErrorMsg('');
+    setNoAudio(false);
     clearSession();
+    // Lee solo la estructura del contenedor (KB, no el video entero). Si entre
+    // tanto se eligió otro archivo, el resultado ya no aplica.
+    probedFileRef.current = file;
+    void probeHasAudio(file).then((has) => {
+      if (has !== false || probedFileRef.current !== file) return;
+      setNoAudio(true);
+      track('transcribe_no_audio_track', { ios: isIOS() });
+    });
   };
 
   const reset = () => {
@@ -782,6 +795,25 @@ export default function Transcriber({
               </div>
             )}
 
+            {noAudio ? (
+              // Sin pista de audio no hay nada que transcribir en ningún modo:
+              // se dice de entrada en vez de decodificar o subir el archivo.
+              <div
+                role="alert"
+                className="mt-6 flex items-start gap-2 rounded-lg border-3 border-destructive bg-destructive/5 p-3"
+              >
+                <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-destructive" />
+                <div className="text-sm text-destructive">
+                  <p className="font-bold">Este video no tiene audio.</p>
+                  <p className="mt-1">
+                    Solo trae imagen, así que no hay voz que transcribir. Suele
+                    pasar con grabaciones de pantalla hechas sin micrófono:
+                    vuelve a grabar con el micrófono activado o elige otro
+                    archivo.
+                  </p>
+                </div>
+              </div>
+            ) : (
             <div className="mt-6">
                 {/* Modo: privado (navegador) vs servidor (Nova-3). */}
                 <div
@@ -923,6 +955,7 @@ export default function Transcriber({
                   </div>
                 )}
             </div>
+            )}
           </CardContent>
         </Card>
       )}
