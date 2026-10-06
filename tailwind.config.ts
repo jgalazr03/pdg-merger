@@ -75,6 +75,17 @@ const config: Config = {
         'out-cubic': 'cubic-bezier(0.215, 0.61, 0.355, 1)',
         'in-out-quint': 'cubic-bezier(0.86, 0, 0.07, 1)',
       },
+      // Tailwind 3.3 no trae estos pasos de opacidad (llegaron en 3.4): sin
+      // ellos, `border-ink/15` o `bg-surface/85` no se generan y el color sale
+      // opaco (o cae a otra clase) sin ningún aviso.
+      opacity: {
+        15: '0.15',
+        35: '0.35',
+        45: '0.45',
+        55: '0.55',
+        65: '0.65',
+        85: '0.85',
+      },
       // Bordes navy gruesos = firma del estilo (3px controles, 4px paneles).
       borderWidth: {
         3: '3px',
