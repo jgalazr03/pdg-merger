@@ -357,9 +357,18 @@ export default function Transcriber({
       });
       return;
     }
-    void pendingWriteRef.current?.();
     const { chunks: ch, speakerNames: names } = loaded.transcript;
     const txt = ch.length ? plainText(ch, names) : loaded.transcript.text;
+    // Sesiones vacías guardadas antes de validar el resultado (no se reconoció
+    // voz): no hay nada que abrir.
+    if (!ch.length && !txt.trim()) {
+      setUrlSession(null);
+      toast.error('Esta transcripción quedó vacía', {
+        description: 'No se reconoció voz al transcribirla. Puedes borrarla de «Transcripciones recientes».',
+      });
+      return;
+    }
+    void pendingWriteRef.current?.();
     savedRef.current = { chunks: ch, text: txt, names };
     setSelectedFile(null);
     setErrorMsg('');
@@ -452,19 +461,32 @@ export default function Transcriber({
       case 'transcribing':
         setPhase('transcribing');
         break;
-      case 'complete': {
-        const ch: Chunk[] = Array.isArray(d.chunks) ? d.chunks : [];
-        setChunks(ch);
-        setText(ch.length ? plainText(ch) : (d.text || '').trim());
-        setRunId((n) => n + 1);
-        setPhase('done');
+      case 'complete':
+        finishTranscription(Array.isArray(d.chunks) ? d.chunks : [], d.text);
         break;
-      }
       case 'error':
         setErrorMsg(d.message || 'Error al transcribir');
         setPhase('error');
         break;
     }
+  };
+
+  // Cierre común de ambos modos. Sin voz reconocida no hay resultado que
+  // mostrar ni guardar: se explica qué pasó en vez de enseñar una caja vacía.
+  const finishTranscription = (ch: Chunk[], rawText?: string) => {
+    const txt = ch.length ? plainText(ch) : (rawText || '').trim();
+    if (!ch.length && !txt) {
+      saveOnDoneRef.current = false;
+      setErrorMsg(
+        'No se reconoció voz en esta grabación. Revisa que tenga audio audible. Si la subiste desde un iPhone, prueba desde una computadora o expórtala como MP3/M4A.'
+      );
+      setPhase('error');
+      return;
+    }
+    setChunks(ch);
+    setText(txt);
+    setRunId((n) => n + 1);
+    setPhase('done');
   };
 
   const handleTranscribe = () => {
@@ -545,11 +567,7 @@ export default function Transcriber({
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data?.error || 'Error del servidor');
-      const ch: Chunk[] = Array.isArray(data.chunks) ? data.chunks : [];
-      setChunks(ch);
-      setText(ch.length ? plainText(ch) : (data.text || '').trim());
-      setRunId((n) => n + 1);
-      setPhase('done');
+      finishTranscription(Array.isArray(data.chunks) ? data.chunks : [], data.text);
     } catch (e) {
       setErrorMsg(
         (e as Error).message || 'No se pudo transcribir en el servidor.'

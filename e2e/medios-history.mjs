@@ -161,6 +161,31 @@ await page.getByRole('button', { name: 'Deshacer' }).click();
 await recent.getByText('junta-obra').waitFor();
 step('borrar y deshacer');
 
+// 7. Sin voz reconocida: error explicado, sin resultado vacío ni sesión guardada.
+const emptyPage = await context.newPage();
+await emptyPage.route('**/transcribe-worker.js', (r) =>
+  r.fulfill({
+    contentType: 'text/javascript',
+    body: `self.onmessage = () => self.postMessage({ status: 'complete', text: '', chunks: [] });`,
+  })
+);
+await emptyPage.goto(`${BASE}/transcribir`, { waitUntil: 'networkidle' });
+const before = await emptyPage.evaluate(() => new Promise((res) => {
+  const req = indexedDB.open('gainco-medios');
+  req.onsuccess = () => { const c = req.result.transaction('sessions').objectStore('sessions').count(); c.onsuccess = () => res(c.result); };
+}));
+await emptyPage.setInputFiles('input[type=file]', { name: 'mudo.wav', mimeType: 'audio/wav', buffer: silentWav() });
+await emptyPage.getByRole('button', { name: 'Transcribir', exact: true }).click();
+await emptyPage.getByText('No se reconoció voz en esta grabación').waitFor({ timeout: 30000 });
+await emptyPage.waitForTimeout(500);
+const after = await emptyPage.evaluate(() => new Promise((res) => {
+  const req = indexedDB.open('gainco-medios');
+  req.onsuccess = () => { const c = req.result.transaction('sessions').objectStore('sessions').count(); c.onsuccess = () => res(c.result); };
+}));
+assert.equal(after, before, 'una transcripción vacía no debe guardarse');
+await emptyPage.close();
+step('transcripción sin voz: error explicado y nada guardado');
+
 await page.screenshot({ path: process.env.E2E_SHOT ?? 'e2e-medios-history.png' });
 await browser.close();
 console.log('OK: historial de Medios');

@@ -76,6 +76,20 @@ export function encodeWav16kMono(samples: Float32Array, sampleRate = 16000): Blo
 
 export type PreparedUpload = { blob: Blob; name: string; downsampled: boolean };
 
+/**
+ * ¿El PCM es prácticamente silencio? Safari (sobre todo en iPhone) puede
+ * «decodificar» el audio de algunos videos como ceros sin lanzar error; subir
+ * ese WAV mudo hace que el servidor devuelva una transcripción vacía. Se mira el
+ * pico con un muestreo espaciado (barato aun para horas de audio).
+ */
+export function isSilent(samples: Float32Array, threshold = 1e-4): boolean {
+  const step = Math.max(1, Math.floor(samples.length / 200_000));
+  for (let i = 0; i < samples.length; i += step) {
+    if (Math.abs(samples[i]) > threshold) return false;
+  }
+  return true;
+}
+
 // Techo de seguridad de memoria: decodificar a PCM carga todo el audio en RAM
 // (~115 MB por hora a 16 kHz). Por encima de esto subimos el original tal cual
 // para no arriesgar un OOM en el navegador.
@@ -93,6 +107,8 @@ export async function prepareForUpload(file: File): Promise<PreparedUpload> {
   }
   try {
     const pcm = await decodeAudioTo16kMono(file);
+    // Decodificación muda (ver isSilent): el servidor sí sabe leer el original.
+    if (isSilent(pcm)) return { blob: file, name: file.name, downsampled: false };
     const wav = encodeWav16kMono(pcm);
     if (wav.size < file.size) {
       const base = file.name.replace(/\.[^.]+$/, '') || 'audio';
