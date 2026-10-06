@@ -109,12 +109,13 @@ await page.getByText('Revisión de obra').waitFor();
 await page.getByRole('tab', { name: /Capítulos/ }).click();
 await page.getByText('Arranque').waitFor();
 await page.getByRole('button', { name: 'Reconectar audio' }).waitFor();
-// Sin audio, tocar un tiempo pide reconectarlo (abre el selector de archivo).
-const [chooser] = await Promise.all([
-  page.waitForEvent('filechooser'),
-  page.getByRole('button', { name: /0:00/ }).first().click(),
-]);
-assert.ok(chooser, 'tocar un tiempo sin audio debía abrir el selector');
+// Sin audio, tocar un tiempo explica qué falta (no abre el Finder a ciegas);
+// «Ahora no» cierra sin más.
+await page.getByRole('button', { name: /0:00/ }).first().click();
+const dialog = page.getByRole('dialog', { name: /Reconecta el audio para escuchar el 0:00/ });
+await dialog.waitFor();
+await dialog.getByRole('button', { name: 'Ahora no' }).click();
+await dialog.waitFor({ state: 'detached' });
 assert.deepEqual(apiCalls, [], `no debía llamar a la API: ${apiCalls.join(', ')}`);
 step('recarga: resultados reutilizados sin API');
 
@@ -133,12 +134,18 @@ await page.getByRole('tab', { name: /Resumen/ }).click();
 await page.locator('p:has-text("Se generó antes de tus últimos cambios"):visible').waitFor();
 step('edición persistida y resumen marcado como desactualizado');
 
-// 5. Reconectar el audio con la misma huella.
-await page.setInputFiles('input[type=file][accept]', {
-  name: 'junta-obra.wav', mimeType: 'audio/wav', buffer: silentWav(),
-});
+// 5. Tocar 0:01 → aviso → elegir el archivo: se reconecta y salta a ese momento.
+await page.getByRole('button', { name: /0:01/ }).first().click();
+const ask = page.getByRole('dialog', { name: /0:01/ });
+await ask.waitFor();
+const [chooser] = await Promise.all([
+  page.waitForEvent('filechooser'),
+  ask.getByRole('button', { name: 'Seleccionar archivo' }).click(),
+]);
+await chooser.setFiles({ name: 'junta-obra.wav', mimeType: 'audio/wav', buffer: silentWav() });
 await page.locator('audio').waitFor();
-step('audio reconectado');
+await page.waitForFunction(() => Math.abs(document.querySelector('audio').currentTime - 1) < 0.25);
+step('aviso de reconexión y salto al momento pedido');
 
 // 6. Lista de recientes: aparece con insignias; borrar y deshacer.
 // La herramienta en la ruta vuelve al inicio (y la URL deja de apuntar a la sesión).

@@ -29,8 +29,8 @@ type Props = {
   isVideo: boolean;
   mediaPlaceholder?: React.ReactNode;
   /** Sin audio, tocar un tiempo (o una cita) pide reconectarlo en vez de no
-   *  hacer nada. */
-  onRequestMedia?: () => void;
+   *  hacer nada; recibe el momento pedido para saltar ahí al reconectar. */
+  onRequestMedia?: (time: number) => void;
   accent: ToolAccent;
   /** Nombres personalizados de los hablantes (vacío = etiquetas genéricas). */
   names?: SpeakerNames;
@@ -228,12 +228,14 @@ function TranscriptPlayer(
   const seek = useCallback((start: number, index: number) => {
     const m = mediaRef.current;
     if (!m) {
-      onRequestMedia?.();
+      onRequestMedia?.(start);
       return;
     }
     m.currentTime = start;
     setActiveIndex(index);
-    void m.play();
+    // El navegador puede bloquear play() fuera de un gesto: la posición ya
+    // quedó fijada, así que basta con ignorarlo.
+    m.play().catch(() => {});
   }, [onRequestMedia]);
 
   // Salto desde fuera (panel de preguntas): mueve el audio al momento citado,
@@ -244,12 +246,12 @@ function TranscriptPlayer(
       seekTo(time: number) {
         const m = mediaRef.current;
         if (!m) {
-          onRequestMedia?.();
+          onRequestMedia?.(time);
           return;
         }
         m.currentTime = time;
         setActiveIndex(activeIndexAt(chunks, time));
-        void m.play();
+        m.play().catch(() => {});
         m.scrollIntoView?.({ behavior: 'smooth', block: 'center' });
       },
     }),

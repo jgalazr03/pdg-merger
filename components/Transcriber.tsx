@@ -46,6 +46,7 @@ import {
 } from '@/lib/transcript';
 import { decodeAudioTo16kMono, prepareForUpload } from '@/lib/audio';
 import RecentTranscripts from '@/components/medios/RecentTranscripts';
+import ReconnectDialog from '@/components/medios/ReconnectDialog';
 import { HistoryProvider } from '@/components/medios/HistoryContext';
 import { HistoryLimitError, getHistoryRepo } from '@/lib/medios-history/repo';
 import type { AiResult, SessionMeta } from '@/lib/medios-history/schema';
@@ -157,6 +158,9 @@ export default function Transcriber({
   // Escritura pendiente (debounce) para forzarla al salir o cambiar de sesión.
   const pendingWriteRef = useRef<(() => Promise<void>) | null>(null);
   const reconnectInputRef = useRef<HTMLInputElement>(null);
+  // Tocar un momento sin audio abre un aviso; tras reconectar se salta ahí.
+  const [reconnectAsk, setReconnectAsk] = useState<{ time: number } | null>(null);
+  const pendingSeekRef = useRef<number | null>(null);
 
   const workerRef = useRef<Worker | null>(null);
   const progressRef = useRef<Map<string, { loaded: number; total: number }>>(
@@ -372,6 +376,15 @@ export default function Transcriber({
     // Solo al montar.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Con el audio ya reconectado, salta al momento que se había pedido.
+  useEffect(() => {
+    const t = pendingSeekRef.current;
+    if (previewUrl && t != null) {
+      pendingSeekRef.current = null;
+      playerRef.current?.seekTo(t);
+    }
+  }, [previewUrl]);
 
   // Reconecta el audio a una sesión reabierta. No se puede verificar que sea el
   // mismo archivo sin guardarlo, así que se compara la huella (nombre + tamaño).
@@ -879,7 +892,7 @@ export default function Transcriber({
                     chunks={chunks}
                     mediaUrl={previewUrl}
                     isVideo={isVideo}
-                    onRequestMedia={() => reconnectInputRef.current?.click()}
+                    onRequestMedia={(t) => setReconnectAsk({ time: t })}
                     mediaPlaceholder={
                       <div className="flex flex-col gap-2 px-3 py-2.5 sm:flex-row sm:items-center sm:justify-between">
                         <p className="text-sm text-muted-foreground">
@@ -893,7 +906,10 @@ export default function Transcriber({
                           variant="outline"
                           size="sm"
                           className="shrink-0"
-                          onClick={() => reconnectInputRef.current?.click()}
+                          onClick={() => {
+                            pendingSeekRef.current = null;
+                            reconnectInputRef.current?.click();
+                          }}
                         >
                           <Upload className="mr-2 h-4 w-4" />
                           Reconectar audio
@@ -914,6 +930,18 @@ export default function Transcriber({
                     accent={accent}
                     names={speakerNames}
                     onChange={handleEdit}
+                  />
+                  <ReconnectDialog
+                    open={!!reconnectAsk}
+                    onOpenChange={(open) => !open && setReconnectAsk(null)}
+                    time={reconnectAsk?.time ?? null}
+                    fileName={restored?.media.name ?? null}
+                    accent={accent}
+                    onChoose={() => {
+                      pendingSeekRef.current = reconnectAsk?.time ?? null;
+                      setReconnectAsk(null);
+                      reconnectInputRef.current?.click();
+                    }}
                   />
                 </ErrorBoundary>
               ) : (
