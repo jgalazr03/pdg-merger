@@ -29,6 +29,7 @@ import { extractFigures } from '@/lib/figures';
 import { Button } from '@/components/ui/button';
 import Markdown from '@/components/medios/Markdown';
 import DownloadMenu from '@/components/medios/DownloadMenu';
+import { StaleNotice, usePersisted, useTrackReuse } from '@/components/medios/HistoryContext';
 
 type Props = {
   chunks: Chunk[];
@@ -104,9 +105,17 @@ function Bullets({ items, accent }: { items: string[]; accent: ToolAccent }) {
 export default function AnalysisPanel({ chunks, text, baseName, accent, names, onSeek }: Props) {
   const stats = useMemo(() => talkTime(chunks, names), [chunks, names]);
   const figures = useMemo(() => extractFigures(chunks), [chunks]);
-  const [phase, setPhase] = useState<'idle' | 'loading' | 'done' | 'error'>('idle');
-  const [analysis, setAnalysis] = useState<MeetingAnalysis | null>(null);
-  const [truncated, setTruncated] = useState(false);
+  // Si la sesión ya tenía análisis guardado, se muestra sin volver a llamar a la API.
+  const persisted = usePersisted('analysis');
+  const saved = persisted.get();
+  useTrackReuse('analysis', !!saved);
+  const [phase, setPhase] = useState<'idle' | 'loading' | 'done' | 'error'>(
+    saved ? 'done' : 'idle'
+  );
+  const [analysis, setAnalysis] = useState<MeetingAnalysis | null>(
+    saved?.payload.analysis ?? null
+  );
+  const [truncated, setTruncated] = useState(saved?.payload.truncated ?? false);
   const [error, setError] = useState('');
 
   const generate = async () => {
@@ -123,7 +132,7 @@ export default function AnalysisPanel({ chunks, text, baseName, accent, names, o
       // El modelo puede omitir algún campo pese al esquema: normalizamos para
       // que el render (y el copiar/descargar) nunca toque undefined.
       const a = (data.analysis ?? {}) as Partial<MeetingAnalysis>;
-      setAnalysis({
+      const next: MeetingAnalysis = {
         titulo: a.titulo ?? 'Análisis',
         tipo: a.tipo ?? '',
         resumen: a.resumen ?? '',
@@ -132,8 +141,10 @@ export default function AnalysisPanel({ chunks, text, baseName, accent, names, o
         compromisos: Array.isArray(a.compromisos) ? a.compromisos : [],
         pendientes: Array.isArray(a.pendientes) ? a.pendientes : [],
         sentimiento: a.sentimiento ?? { etiqueta: '', nota: '' },
-      });
+      };
+      setAnalysis(next);
       setTruncated(!!data.truncated);
+      persisted.save({ analysis: next, truncated: !!data.truncated });
       setPhase('done');
     } catch (e) {
       setError((e as Error).message || 'No se pudo generar el análisis.');
@@ -229,6 +240,11 @@ export default function AnalysisPanel({ chunks, text, baseName, accent, names, o
       {/* Análisis cualitativo (IA). */}
       {phase === 'done' && analysis ? (
         <div className="motion-safe:animate-fade-in">
+          {saved?.stale && (
+            <div className="mt-4">
+              <StaleNotice onRegenerate={generate} />
+            </div>
+          )}
           <Section icon={<Activity className="h-4 w-4" />} title="Resumen" accent={accent}>
             <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
               {analysis.tipo}

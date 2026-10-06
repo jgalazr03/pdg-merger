@@ -14,6 +14,7 @@ import {
 } from '@/lib/transcript';
 import { type Chapter, chaptersToText } from '@/lib/chapters';
 import { Button } from '@/components/ui/button';
+import { StaleNotice, usePersisted, useTrackReuse } from '@/components/medios/HistoryContext';
 
 type Props = {
   chunks: Chunk[];
@@ -30,10 +31,14 @@ type Props = {
  * copiar en formato de capítulos (estilo YouTube).
  */
 export default function ChaptersPanel({ chunks, accent, names, onSeek }: Props) {
+  // Si la sesión ya tenía capítulos guardados, se muestran sin volver a llamar a la API.
+  const persisted = usePersisted('chapters');
+  const saved = persisted.get();
+  useTrackReuse('chapters', !!saved);
   const [phase, setPhase] = useState<'idle' | 'loading' | 'done' | 'error'>(
-    'idle'
+    saved ? 'done' : 'idle'
   );
-  const [chapters, setChapters] = useState<Chapter[]>([]);
+  const [chapters, setChapters] = useState<Chapter[]>(saved?.payload.chapters ?? []);
   const [error, setError] = useState('');
 
   const generate = async () => {
@@ -47,7 +52,9 @@ export default function ChaptersPanel({ chunks, accent, names, onSeek }: Props) 
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data?.error || 'No se pudieron generar.');
-      setChapters((data.chapters ?? []) as Chapter[]);
+      const next = (data.chapters ?? []) as Chapter[];
+      setChapters(next);
+      persisted.save({ chapters: next });
       setPhase('done');
     } catch (e) {
       setError((e as Error).message || 'No se pudieron generar los capítulos.');
@@ -59,6 +66,7 @@ export default function ChaptersPanel({ chunks, accent, names, onSeek }: Props) 
     <div className="p-4 sm:p-5">
       {phase === 'done' && chapters.length > 0 ? (
           <>
+            {saved?.stale && <StaleNotice onRegenerate={generate} />}
             <ol className="space-y-1.5">
               {chapters.map((c, i) => (
                 <li key={i}>

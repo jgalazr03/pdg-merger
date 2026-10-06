@@ -263,6 +263,25 @@ export function createHistoryRepo(
     ]);
   }
 
+  /** Reinserta una sesión tal cual se leyó (para «Deshacer» tras borrar). */
+  async function restoreSession(loaded: LoadedSession): Promise<void> {
+    const db = await dbPromise;
+    const tx = db.transaction(
+      ['sessions', 'transcripts', 'ai_results'],
+      'readwrite'
+    );
+    const results = tx.objectStore('ai_results');
+    await Promise.all([
+      tx.objectStore('sessions').put(loaded.meta),
+      tx.objectStore('transcripts').put({
+        ...loaded.transcript,
+        speakerNames: loaded.transcript.speakerNames as Record<string, string>,
+      }),
+      ...loaded.results.map((r) => results.put(r as AiResult & Record<string, unknown>)),
+      tx.done,
+    ]);
+  }
+
   async function clearAll(): Promise<void> {
     const db = await dbPromise;
     const tx = db.transaction(
@@ -286,6 +305,7 @@ export function createHistoryRepo(
     renameSession,
     saveResult,
     deleteSession,
+    restoreSession,
     clearAll,
   };
 }

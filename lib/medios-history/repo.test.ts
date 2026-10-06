@@ -114,6 +114,15 @@ describe('historial de Medios', () => {
     expect(await db.count('ai_results')).toBe(1);
   });
 
+  it('restaurar tras borrar recupera la sesión con sus resultados', async () => {
+    const meta = await repo.createSession(input({ speakerNames: { 0: 'Ana' } }));
+    await repo.saveResult(meta.id, 'chapters', '', { chapters: [] }, 'h');
+    const loaded = await repo.getSession(meta.id);
+    await repo.deleteSession(meta.id);
+    await repo.restoreSession(loaded!);
+    expect(await repo.getSession(meta.id)).toEqual(loaded);
+  });
+
   it('borrar todo deja la base vacía', async () => {
     await repo.createSession(input());
     await repo.clearAll();

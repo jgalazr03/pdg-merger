@@ -20,6 +20,7 @@ import { actionItemsToChecklist, actionItemsToCsv, downloadCsv } from '@/lib/tas
 import { Button } from '@/components/ui/button';
 import Markdown from '@/components/medios/Markdown';
 import DownloadMenu from '@/components/medios/DownloadMenu';
+import { StaleNotice, usePersisted, useTrackReuse } from '@/components/medios/HistoryContext';
 
 type Props = {
   text: string;
@@ -72,11 +73,15 @@ function Section({
  * render. Sin marco de card propio: vive dentro del workspace de herramientas.
  */
 export default function SummaryPanel({ text, baseName, accent }: Props) {
+  // Si la sesión ya tenía resumen guardado, se muestra sin volver a llamar a la API.
+  const persisted = usePersisted('summary');
+  const saved = persisted.get();
+  useTrackReuse('summary', !!saved);
   const [phase, setPhase] = useState<'idle' | 'loading' | 'done' | 'error'>(
-    'idle'
+    saved ? 'done' : 'idle'
   );
-  const [minuta, setMinuta] = useState<Minuta | null>(null);
-  const [truncated, setTruncated] = useState(false);
+  const [minuta, setMinuta] = useState<Minuta | null>(saved?.payload.minuta ?? null);
+  const [truncated, setTruncated] = useState(saved?.payload.truncated ?? false);
   const [error, setError] = useState('');
 
   const generate = async () => {
@@ -93,14 +98,16 @@ export default function SummaryPanel({ text, baseName, accent }: Props) {
       // El modelo puede omitir algún campo pese al esquema: normalizamos para
       // que el render (y el copiar/descargar) nunca toque undefined.
       const m = (data.minuta ?? {}) as Partial<Minuta>;
-      setMinuta({
+      const next: Minuta = {
         titulo: m.titulo ?? 'Resumen',
         resumen: m.resumen ?? '',
         puntosClave: Array.isArray(m.puntosClave) ? m.puntosClave : [],
         acuerdos: Array.isArray(m.acuerdos) ? m.acuerdos : [],
         tareas: Array.isArray(m.tareas) ? m.tareas : [],
-      });
+      };
+      setMinuta(next);
       setTruncated(!!data.truncated);
+      persisted.save({ minuta: next, truncated: !!data.truncated });
       setPhase('done');
     } catch (e) {
       setError((e as Error).message || 'No se pudo generar el resumen.');
@@ -112,6 +119,7 @@ export default function SummaryPanel({ text, baseName, accent }: Props) {
     const md = minutaToText(minuta);
     return (
       <div className="p-4 motion-safe:animate-fade-in sm:p-5">
+        {saved?.stale && <StaleNotice onRegenerate={generate} />}
         <h2 className="text-lg font-bold leading-tight text-ink">
           {minuta.titulo}
         </h2>

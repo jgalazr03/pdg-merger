@@ -9,6 +9,7 @@ import type { ToolAccent } from '@/lib/tools';
 import { type Chunk, plainText, toSrt, toVtt } from '@/lib/transcript';
 import { Button } from '@/components/ui/button';
 import DownloadMenu from '@/components/medios/DownloadMenu';
+import { StaleNotice, usePersisted, useTrackReuse } from '@/components/medios/HistoryContext';
 
 type Props = {
   chunks: Chunk[];
@@ -37,14 +38,43 @@ function downloadText(content: string, filename: string) {
  * subtítulos traducidos (.srt/.vtt) o copiar el texto. El audio sigue en su
  * idioma original; esto produce los subtítulos en el idioma destino.
  */
+/** Reaplica los textos traducidos sobre los tiempos originales. */
+function withTexts(chunks: Chunk[], texts: string[]): Chunk[] {
+  return chunks.map((c, i) => ({ ...c, text: texts[i] ?? c.text }));
+}
+
 export default function TranslatePanel({ chunks, accent, baseName }: Props) {
-  const [target, setTarget] = useState(LANGUAGES[0]);
-  const [phase, setPhase] = useState<'idle' | 'loading' | 'done' | 'error'>(
-    'idle'
+  // Una traducción guardada por idioma; al abrir se muestra la primera que haya.
+  const persisted = usePersisted('translation');
+  const [initialLang] = useState(
+    () => LANGUAGES.find((l) => persisted.get(l)) ?? LANGUAGES[0]
   );
-  const [translated, setTranslated] = useState<Chunk[]>([]);
-  const [truncated, setTruncated] = useState(false);
-  const [doneLang, setDoneLang] = useState('');
+  const initial = persisted.get(initialLang);
+  useTrackReuse('translation', !!initial);
+  const [target, setTarget] = useState(initialLang);
+  const [phase, setPhase] = useState<'idle' | 'loading' | 'done' | 'error'>(
+    initial ? 'done' : 'idle'
+  );
+  const [translated, setTranslated] = useState<Chunk[]>(() =>
+    initial ? withTexts(chunks, initial.payload.texts) : []
+  );
+  const [truncated, setTruncated] = useState(initial?.payload.truncated ?? false);
+  const [doneLang, setDoneLang] = useState(initial ? initialLang : '');
+  const shownStale = phase === 'done' && !!persisted.get(doneLang)?.stale;
+
+  // Cambiar de idioma muestra su traducción guardada (si la hay).
+  const selectTarget = (lang: string) => {
+    setTarget(lang);
+    const stored = persisted.get(lang);
+    if (stored) {
+      setTranslated(withTexts(chunks, stored.payload.texts));
+      setTruncated(stored.payload.truncated);
+      setDoneLang(lang);
+      setPhase('done');
+    } else if (phase === 'done') {
+      setPhase('idle');
+    }
+  };
   const [error, setError] = useState('');
 
   const translate = async () => {
@@ -67,11 +97,11 @@ export default function TranslatePanel({ chunks, accent, baseName }: Props) {
       const map = new Map<number, string>(
         translations.map((t) => [t.i, t.text])
       );
-      setTranslated(
-        chunks.map((c, i) => ({ ...c, text: map.get(i) ?? c.text }))
-      );
+      const texts = chunks.map((c, i) => map.get(i) ?? c.text);
+      setTranslated(withTexts(chunks, texts));
       setTruncated(!!data.truncated);
       setDoneLang(target);
+      persisted.save({ texts, truncated: !!data.truncated }, target);
       setPhase('done');
     } catch (e) {
       setError((e as Error).message || 'No se pudo traducir.');
@@ -96,7 +126,7 @@ export default function TranslatePanel({ chunks, accent, baseName }: Props) {
               <button
                 key={lang}
                 type="button"
-                onClick={() => setTarget(lang)}
+                onClick={() => selectTarget(lang)}
                 disabled={phase === 'loading'}
                 aria-pressed={active}
                 className={cn(
@@ -135,6 +165,7 @@ export default function TranslatePanel({ chunks, accent, baseName }: Props) {
 
         {phase === 'done' && translated.length > 0 && (
           <div className="mt-4">
+            {shownStale && <StaleNotice onRegenerate={translate} />}
             <p className="mb-2 text-sm font-bold text-ink">
               Traducción al {doneLang}
             </p>

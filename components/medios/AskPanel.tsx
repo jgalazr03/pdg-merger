@@ -15,6 +15,7 @@ import {
 import type { Answer } from '@/lib/ask';
 import { Button } from '@/components/ui/button';
 import Markdown from '@/components/medios/Markdown';
+import { usePersisted, useTrackReuse } from '@/components/medios/HistoryContext';
 
 type Props = {
   chunks: Chunk[];
@@ -45,11 +46,36 @@ const FALLBACK_SUGGESTIONS = [
  * reproductor). Cada pregunta es independiente sobre la transcripción.
  */
 export default function AskPanel({ chunks, accent, names, onSeek }: Props) {
+  // El hilo y las sugerencias de la sesión se guardan: al reabrir se ve la
+  // conversación y no se vuelven a pedir las sugerencias.
+  const persistedThread = usePersisted('ask');
+  const persistedSuggestions = usePersisted('suggestions');
+  const [savedThread] = useState(() => persistedThread.get());
+  const [savedSuggestions] = useState(() => persistedSuggestions.get());
+  useTrackReuse('ask', !!savedThread?.payload.turns.length);
   const [input, setInput] = useState('');
-  const [turns, setTurns] = useState<Turn[]>([]);
+  const [turns, setTurns] = useState<Turn[]>(
+    () => savedThread?.payload.turns.map((t) => ({ ...t, loading: false })) ?? []
+  );
   const [busy, setBusy] = useState(false);
-  const [suggestions, setSuggestions] = useState<string[]>(FALLBACK_SUGGESTIONS);
+  const [suggestions, setSuggestions] = useState<string[]>(
+    savedSuggestions?.payload.questions ?? FALLBACK_SUGGESTIONS
+  );
   const threadRef = useRef<HTMLDivElement>(null);
+
+  // Guarda el hilo cuando no hay respuestas en curso (cada pregunta resuelta).
+  // Se omite el estado inicial para no reescribir lo recién cargado.
+  // `save` cambia de identidad con el texto; se lee por ref para que solo un
+  // cambio del hilo dispare el guardado.
+  const saveRef = useRef({ thread: persistedThread.save, suggestions: persistedSuggestions.save });
+  saveRef.current = { thread: persistedThread.save, suggestions: persistedSuggestions.save };
+  const initialTurns = useRef(turns);
+  useEffect(() => {
+    if (turns === initialTurns.current || turns.some((t) => t.loading)) return;
+    saveRef.current.thread({
+      turns: turns.map(({ question, answer, error }) => ({ question, answer, error })),
+    });
+  }, [turns]);
 
   // Auto-scroll al final del hilo en cada cambio (pregunta enviada, respuesta
   // recibida), como un chat: el último mensaje siempre queda a la vista.
@@ -59,7 +85,9 @@ export default function AskPanel({ chunks, accent, names, onSeek }: Props) {
   }, [turns]);
 
   // Sugerencias generadas del contenido de la grabación (no fijas). Con fallback.
+  const hasSavedSuggestions = !!savedSuggestions;
   useEffect(() => {
+    if (hasSavedSuggestions) return;
     let cancelled = false;
     (async () => {
       try {
@@ -70,7 +98,9 @@ export default function AskPanel({ chunks, accent, names, onSeek }: Props) {
         });
         const data = await res.json();
         if (!cancelled && res.ok && Array.isArray(data.questions) && data.questions.length) {
-          setSuggestions(data.questions.slice(0, 3));
+          const questions = (data.questions as string[]).slice(0, 3);
+          setSuggestions(questions);
+          saveRef.current.suggestions({ questions });
         }
       } catch {
         // Se quedan las sugerencias de fallback.
@@ -79,7 +109,7 @@ export default function AskPanel({ chunks, accent, names, onSeek }: Props) {
     return () => {
       cancelled = true;
     };
-  }, [chunks]);
+  }, [chunks, hasSavedSuggestions]);
 
   const ask = async (questionRaw: string) => {
     const question = questionRaw.trim();

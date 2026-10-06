@@ -11,6 +11,7 @@ import { downloadMarkdownAsDocx } from '@/lib/docx';
 import { Button } from '@/components/ui/button';
 import Markdown from '@/components/medios/Markdown';
 import DownloadMenu from '@/components/medios/DownloadMenu';
+import { StaleNotice, usePersisted, useTrackReuse } from '@/components/medios/HistoryContext';
 
 type Props = {
   chunks: Chunk[];
@@ -99,12 +100,37 @@ export default function DeliverablePanel({
     () => (contable ? suggestKind(plainText(chunks, names)) : 'acta'),
     [chunks, names, contable]
   );
-  const [kind, setKind] = useState<Kind>(suggested);
+  // Un documento guardado por plantilla. Al abrir se muestra el sugerido si
+  // existe; si no, el primero guardado de las plantillas visibles.
+  const persisted = usePersisted('deliverable');
+  const [initialKind] = useState<Kind>(() => {
+    if (persisted.get(suggested)) return suggested;
+    const visible = KINDS.filter((k) => groups.some((g) => g.key === k.group));
+    return visible.find((k) => persisted.get(k.key))?.key ?? suggested;
+  });
+  const initial = persisted.get(initialKind);
+  useTrackReuse('deliverable', !!initial);
+  const [kind, setKind] = useState<Kind>(initialKind);
   const [phase, setPhase] = useState<'idle' | 'loading' | 'done' | 'error'>(
-    'idle'
+    initial ? 'done' : 'idle'
   );
-  const [content, setContent] = useState('');
-  const [doneKind, setDoneKind] = useState<Kind>('acta');
+  const [content, setContent] = useState(initial?.payload.content ?? '');
+  const [doneKind, setDoneKind] = useState<Kind>(initial ? initialKind : 'acta');
+  const shownStale = phase === 'done' && !!persisted.get(doneKind)?.stale;
+
+  // Cambiar de plantilla muestra su documento guardado (si lo hay) en vez de
+  // dejar a la vista el de otra plantilla.
+  const selectKind = (k: Kind) => {
+    setKind(k);
+    const stored = persisted.get(k);
+    if (stored) {
+      setContent(stored.payload.content);
+      setDoneKind(k);
+      setPhase('done');
+    } else if (phase === 'done') {
+      setPhase('idle');
+    }
+  };
   const [error, setError] = useState('');
 
   const generate = async () => {
@@ -118,8 +144,10 @@ export default function DeliverablePanel({
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data?.error || 'No se pudo generar.');
-      setContent((data.content as string) || '');
+      const next = (data.content as string) || '';
+      setContent(next);
       setDoneKind(kind);
+      persisted.save({ content: next }, kind);
       setPhase('done');
     } catch (e) {
       setError((e as Error).message || 'No se pudo generar el documento.');
@@ -161,7 +189,7 @@ export default function DeliverablePanel({
                     <button
                       key={k.key}
                       type="button"
-                      onClick={() => setKind(k.key)}
+                      onClick={() => selectKind(k.key)}
                       disabled={phase === 'loading'}
                       aria-pressed={active}
                       className={cn(
@@ -203,6 +231,7 @@ export default function DeliverablePanel({
 
         {phase === 'done' && content && (
           <div className="mt-4">
+            {shownStale && <StaleNotice onRegenerate={generate} />}
             <div className="max-h-80 overflow-y-auto rounded-lg border-2 border-ink/15 bg-surface p-3 text-sm text-ink">
               <Markdown>{content}</Markdown>
             </div>
