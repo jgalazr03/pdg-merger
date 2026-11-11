@@ -40,3 +40,6 @@ next-env.d.ts
 
 .bolt
 e2e-*.png
+
+# Archivos de prueba locales con datos reales (no versionar)
+/test_compression_files/

@@ -426,12 +426,13 @@ export const TOOLS: ToolDef[] = [
       'xlsx',
     ],
     description:
-      'Disminuye el tamaño de tus PDFs convirtiendo cada página en imagen, y el de tus hojas de Excel comprimiendo las imágenes embebidas sin tocar los datos. Ideal para enviar por correo.',
+      'Disminuye el tamaño de tus PDFs reduciendo la resolución de sus imágenes sin tocar el resto del documento, y el de tus hojas de Excel comprimiendo las imágenes embebidas sin tocar los datos. Ideal para enviar por correo.',
     Icon: Minimize2,
     constraints: [
       'Formatos: PDF y Excel (.xlsx)',
       'Tamaño máximo total: 500 MB',
-      'PDF: cada página se convierte en imagen; el texto ya no se podrá buscar ni copiar',
+      'PDF: reduce las imágenes y conserva el documento; ideal para escaneos',
+      'PDF sin imágenes JPEG: se guarda como imagen por página y el texto ya no se podrá buscar',
       'Excel: comprime imágenes embebidas sin afectar los datos',
       'Archivos grandes (más de 100 MB) pueden tardar varios minutos',
       'Sin archivos duplicados',

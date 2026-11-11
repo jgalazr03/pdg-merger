@@ -44,11 +44,21 @@ type CompressionLevel = 'low' | 'medium' | 'high';
 const PASSWORD_ERROR = 'Protegido con contraseña. Quítala primero con Proteger PDF.';
 const GENERIC_FILE_ERROR = 'No se pudo abrir este archivo. Comprueba que no esté dañado.';
 
+// PDF: `maxEdge` es el lado mayor (px) al que se reducen las imágenes y
+// `pdfQuality` la calidad JPEG. Valores medidos con escaneos reales de Google
+// Drive (~2300x2900 px por página): 2200 ≈ 35-40 % menos, 1650 ≈ 60 %, 1240 ≈ 80 %.
+// Excel sigue usando `scale`/`quality` sobre sus imágenes embebidas.
 const compressionSettings = {
-  low: { scale: 0.9, quality: 0.85, label: 'Ligera', description: 'Casi igual al original, reduce poco' },
-  medium: { scale: 0.7, quality: 0.6, label: 'Recomendada', description: 'Equilibrio para correo' },
-  high: { scale: 0.5, quality: 0.4, label: 'Máxima', description: 'Menor calidad, mínimo peso' }
+  low: { maxEdge: 2200, pdfQuality: 0.82, scale: 0.9, quality: 0.85, label: 'Alta calidad', description: 'Máxima nitidez, reduce menos' },
+  medium: { maxEdge: 1650, pdfQuality: 0.8, scale: 0.7, quality: 0.6, label: 'Recomendada', description: 'Nítido al leer e imprimir, mucho más ligero' },
+  high: { maxEdge: 1240, pdfQuality: 0.65, scale: 0.5, quality: 0.4, label: 'Máxima', description: 'Mínimo peso, para leer en pantalla' }
 };
+
+// La vía que conserva la estructura se acepta si ahorra al menos un 5 %; si no
+// (PDF sin imágenes JPEG), se prueba el respaldo de imagen por página.
+const MIN_STRUCTURAL_GAIN = 0.95;
+// Tope de escala del respaldo: 3x = 216 DPI.
+const MAX_RASTER_SCALE = 3;
 
 const tool = getTool('comprimir');
 const accent = tool.accent;
@@ -179,9 +189,46 @@ export default function PDFCompressor() {
     setFiles(prev => prev.filter(file => file.id !== id));
   };
 
+  const setPdfProgress = (id: string, progress: number, progressLabel: string) => {
+    setFiles(prev => prev.map(f => (f.id === id ? { ...f, progress, progressLabel } : f)));
+  };
+
   const compressPDF = async (pdfFile: ProcessableFile): Promise<Blob> => {
-    const { scale, quality } = compressionSettings[compressionLevel];
-    
+    const { maxEdge, pdfQuality } = compressionSettings[compressionLevel];
+
+    // 1) Vía principal: reducir las imágenes JPEG incrustadas sin tocar el
+    //    resto del PDF (texto, enlaces y formularios se conservan).
+    try {
+      const [{ recompressPdfImages }, { resampleJpegInBrowser }] = await Promise.all([
+        import('@/lib/pdf-image-recompress'),
+        import('@/lib/jpeg-resample'),
+      ]);
+      const original = new Uint8Array(await pdfFile.file.arrayBuffer());
+      const result = await recompressPdfImages(original, {
+        maxEdge,
+        quality: pdfQuality,
+        resample: resampleJpegInBrowser,
+        onProgress: (done, total) =>
+          setPdfProgress(pdfFile.id, Math.round((done / total) * 90), `Imagen ${done} de ${total}`),
+      });
+      if (result.bytes.length < original.length * MIN_STRUCTURAL_GAIN) {
+        return new Blob([result.bytes], { type: 'application/pdf' });
+      }
+    } catch (error) {
+      // PDF cifrado o que pdf-lib no puede abrir: decide el respaldo (pdf.js
+      // lanza PasswordException si de verdad pide contraseña).
+      console.warn('Compresión por imágenes no disponible, se usa el respaldo:', error);
+    }
+
+    // 2) Respaldo: una imagen por página (el texto deja de ser seleccionable).
+    return rasterizePDF(pdfFile, maxEdge, pdfQuality);
+  };
+
+  const rasterizePDF = async (
+    pdfFile: ProcessableFile,
+    maxEdge: number,
+    quality: number
+  ): Promise<Blob> => {
     // Carga perezosa de pdfjs-dist + pdf-lib (solo al comprimir un PDF).
     const [pdfjsLib, { PDFDocument }] = await Promise.all([
       loadPdfjs(),
@@ -192,17 +239,21 @@ export default function PDFCompressor() {
     
     // Create new PDF with pdf-lib
     const newPdf = await PDFDocument.create();
+    let imageBytesTotal = 0;
     
     // Process each page
     for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
       const page = await pdf.getPage(pageNum);
+      // La página conserva su tamaño en puntos; solo cambia la resolución del render.
+      const base = page.getViewport({ scale: 1 });
+      const scale = Math.min(MAX_RASTER_SCALE, maxEdge / Math.max(base.width, base.height));
       const viewport = page.getViewport({ scale });
       
       // Create canvas and render page
       const canvas = document.createElement('canvas');
       const context = canvas.getContext('2d')!;
-      canvas.height = viewport.height;
-      canvas.width = viewport.width;
+      canvas.height = Math.round(viewport.height);
+      canvas.width = Math.round(viewport.width);
       
       await page.render({
         canvasContext: context,
@@ -212,33 +263,36 @@ export default function PDFCompressor() {
       // Convert to compressed image
       const imageDataUrl = canvas.toDataURL('image/jpeg', quality);
       const imageBytes = Uint8Array.from(atob(imageDataUrl.split(',')[1]), c => c.charCodeAt(0));
+      imageBytesTotal += imageBytes.length;
+
+      // Un PDF de texto pesa menos que sus páginas en imagen: en cuanto el
+      // resultado ya supera al original, se corta y se conserva el original.
+      if (imageBytesTotal >= pdfFile.originalSize) {
+        return pdfFile.file;
+      }
       
       // Add image to new PDF
       const image = await newPdf.embedJpg(imageBytes);
-      const pdfPage = newPdf.addPage([viewport.width, viewport.height]);
+      const pdfPage = newPdf.addPage([base.width, base.height]);
       pdfPage.drawImage(image, {
         x: 0,
         y: 0,
-        width: viewport.width,
-        height: viewport.height,
+        width: base.width,
+        height: base.height,
       });
 
       // Progreso real por página (deja 90-100% para el guardado final).
-      setFiles(prev => prev.map(f =>
-        f.id === pdfFile.id ? {
-          ...f,
-          progress: Math.round((pageNum / pdf.numPages) * 90),
-          progressLabel: `Página ${pageNum} de ${pdf.numPages}`,
-        } : f
-      ));
+      setPdfProgress(
+        pdfFile.id,
+        Math.round((pageNum / pdf.numPages) * 90),
+        `Página ${pageNum} de ${pdf.numPages}`
+      );
 
       // Cede el hilo para que la barra se pinte antes de renderizar la siguiente página.
       await new Promise((resolve) => setTimeout(resolve, 0));
     }
 
-    setFiles(prev => prev.map(f =>
-      f.id === pdfFile.id ? { ...f, progress: 90, progressLabel: 'Guardando…' } : f
-    ));
+    setPdfProgress(pdfFile.id, 90, 'Guardando…');
 
     const pdfBytes = await newPdf.save();
     return new Blob([pdfBytes], { type: 'application/pdf' });
@@ -802,7 +856,7 @@ export default function PDFCompressor() {
             </div>
             <p className="mt-3 flex items-start gap-2 text-xs text-muted-foreground">
               <Info className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
-              Los PDF se guardan como imagen por página: el texto ya no se podrá buscar ni copiar. Ideal para escaneos y para enviar por correo.
+              En los PDF se reduce la resolución de las imágenes y se conserva el resto del documento. Si un PDF no trae imágenes JPEG, se guarda como imagen por página y su texto ya no se podrá buscar ni copiar.
             </p>
           </div>
 
